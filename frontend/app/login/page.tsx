@@ -110,15 +110,13 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post<{ access_token: string; user: User }>(
+      const response = await api.post<{ token: string; user: User }>(
         ENDPOINTS.LOGIN,
         { email, password }
       );
-      localStorage.setItem('sergestiona_token', response.access_token);
+      localStorage.setItem('sergestiona_token', response.token);
       localStorage.setItem('sergestiona_user', JSON.stringify(response.user));
-      if (remember) {
-        localStorage.setItem('sergestiona_remember', 'true');
-      }
+      if (remember) localStorage.setItem('sergestiona_remember', 'true');
       router.push('/');
     } catch {
       setError('Correo o contraseña incorrectos. Por favor verifica tus datos.');

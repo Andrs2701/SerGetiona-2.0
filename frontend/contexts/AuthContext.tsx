@@ -61,11 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const response = await api.post<{ access_token: string; user: User }>(
+      const response = await api.post<{ token: string; user: User }>(
         ENDPOINTS.LOGIN,
         { email, password }
       );
-      const { access_token, user: userData } = response;
+      const { token: access_token, user: userData } = response;
       localStorage.setItem(TOKEN_KEY, access_token);
       localStorage.setItem(USER_KEY, JSON.stringify(userData));
       setToken(access_token);
