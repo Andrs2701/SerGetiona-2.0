@@ -32,8 +32,24 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+// Unwrap Laravel's { data: [...] } envelope when present
+function unwrap<T>(response: unknown): T {
+  if (
+    response !== null &&
+    typeof response === 'object' &&
+    'data' in response &&
+    !('token' in response) &&
+    !('user' in response) &&
+    !('count' in response) &&
+    !('stats' in response)
+  ) {
+    return (response as { data: T }).data;
+  }
+  return response as T;
+}
+
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string) => request<unknown>('GET', path).then((r) => unwrap<T>(r)),
   post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
