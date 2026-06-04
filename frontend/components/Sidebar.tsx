@@ -42,8 +42,8 @@ export default function Sidebar() {
     return true;
   });
 
-  const initials = user
-    ? user.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  const initials = user?.name
+    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
     : 'US';
 
   return (
