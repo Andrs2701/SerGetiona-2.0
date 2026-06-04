@@ -30,7 +30,7 @@ export default function DashboardOperativo() {
 
   const data = workspace ?? MOCK_WORKSPACE;
 
-  const sorted: WorkspaceActivity[] = [...data.activities].sort(
+  const sorted: WorkspaceActivity[] = [...(data.activities ?? [])].sort(
     (a, b) =>
       (DATE_STATUS_SORT[a.date_status] ?? 9) - (DATE_STATUS_SORT[b.date_status] ?? 9) ||
       (a.commitment_date ?? '').localeCompare(b.commitment_date ?? '')
