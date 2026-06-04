@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useReactTable,
@@ -8,109 +8,49 @@ import {
   flexRender,
   createColumnHelper,
   type SortingState,
-  type ColumnFiltersState,
-} from "@tanstack/react-table";
-import { useState } from "react";
-import { ArrowUpDown, Search } from "lucide-react";
-import { clsx } from "clsx";
+} from '@tanstack/react-table';
+import { useState, useEffect } from 'react';
+import { ArrowUpDown, Search } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useRouter } from 'next/navigation';
+import { api, ENDPOINTS } from '@/lib/api';
+import type { Project } from '@/lib/types';
+import { MOCK_PROJECTS } from '@/lib/mock-data';
+import StatusBadge from '@/components/StatusBadge';
+import { TableSkeleton } from '@/components/LoadingSkeleton';
 
-type Proyecto = {
-  id: number;
-  nombre: string;
-  estado: string;
-  programas: number;
-  entregables: number;
-  cumplimiento: number;
-  responsable: string;
-  fechaInicio: string;
-};
-
-const estadoColors: Record<string, string> = {
-  "En Ejecución": "bg-emerald-100 text-emerald-700",
-  "Parametrizado": "bg-blue-100 text-blue-700",
-  "Pendiente Parametrización": "bg-amber-100 text-amber-700",
-  "Borrador": "bg-gray-100 text-gray-600",
-  "Suspendido": "bg-red-100 text-red-700",
-  "Finalizado": "bg-gray-100 text-gray-500",
-};
-
-const PROYECTOS_DEMO: Proyecto[] = [
-  {
-    id: 1,
-    nombre: "Actualización Curricular 2026",
-    estado: "En Ejecución",
-    programas: 8,
-    entregables: 142,
-    cumplimiento: 67,
-    responsable: "Ana Rodríguez",
-    fechaInicio: "2026-01-15",
-  },
-  {
-    id: 2,
-    nombre: "Creación Especialización Psicosocial",
-    estado: "Parametrizado",
-    programas: 1,
-    entregables: 48,
-    cumplimiento: 23,
-    responsable: "Carlos Méndez",
-    fechaInicio: "2026-02-01",
-  },
-  {
-    id: 3,
-    nombre: "Control de Cambios Q1 2026",
-    estado: "En Ejecución",
-    programas: 3,
-    entregables: 37,
-    cumplimiento: 89,
-    responsable: "Laura Torres",
-    fechaInicio: "2026-01-05",
-  },
-  {
-    id: 4,
-    nombre: "Ajuste Contenidos Maestría",
-    estado: "Pendiente Parametrización",
-    programas: 2,
-    entregables: 20,
-    cumplimiento: 0,
-    responsable: "Jhon Pérez",
-    fechaInicio: "2026-03-10",
-  },
-];
-
-const col = createColumnHelper<Proyecto>();
+const col = createColumnHelper<Project>();
 
 const columns = [
-  col.accessor("nombre", {
-    header: "Proyecto",
-    cell: (info) => (
-      <span className="font-medium text-gray-900">{info.getValue()}</span>
-    ),
+  col.accessor('name', {
+    header: 'Proyecto',
+    cell: (info) => <span className="font-medium text-gray-900">{info.getValue()}</span>,
   }),
-  col.accessor("estado", {
-    header: "Estado",
-    cell: (info) => (
-      <span className={clsx("px-2 py-0.5 rounded-full text-xs font-medium", estadoColors[info.getValue()] ?? "bg-gray-100 text-gray-600")}>
-        {info.getValue()}
-      </span>
-    ),
+  col.accessor('status', {
+    header: 'Estado',
+    cell: (info) => <StatusBadge status={info.getValue()} type="project" />,
+    filterFn: 'equals',
   }),
-  col.accessor("programas", {
-    header: "Programas",
+  col.accessor('programs_count', {
+    header: 'Programas',
     cell: (info) => <span className="text-gray-600">{info.getValue()}</span>,
   }),
-  col.accessor("entregables", {
-    header: "Entregables",
+  col.accessor('deliverables_count', {
+    header: 'Entregables',
     cell: (info) => <span className="text-gray-600">{info.getValue()}</span>,
   }),
-  col.accessor("cumplimiento", {
-    header: "Cumplimiento",
+  col.accessor('compliance_percentage', {
+    header: 'Cumplimiento',
     cell: (info) => {
       const v = info.getValue();
       return (
         <div className="flex items-center gap-2">
           <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[80px]">
             <div
-              className={clsx("h-full rounded-full", v >= 80 ? "bg-emerald-500" : v >= 50 ? "bg-amber-400" : "bg-red-400")}
+              className={clsx(
+                'h-full rounded-full',
+                v >= 80 ? 'bg-emerald-500' : v >= 50 ? 'bg-amber-400' : 'bg-red-400'
+              )}
               style={{ width: `${v}%` }}
             />
           </div>
@@ -119,32 +59,50 @@ const columns = [
       );
     },
   }),
-  col.accessor("responsable", {
-    header: "Responsable",
-    cell: (info) => <span className="text-gray-600">{info.getValue()}</span>,
+  col.accessor('responsible', {
+    header: 'Responsable',
+    cell: (info) => {
+      const r = info.getValue();
+      return <span className="text-gray-600">{r ? r.name : '—'}</span>;
+    },
   }),
-  col.accessor("fechaInicio", {
-    header: "Fecha Inicio",
-    cell: (info) => <span className="text-gray-500 text-sm">{info.getValue()}</span>,
+  col.accessor('start_date', {
+    header: 'Fecha Inicio',
+    cell: (info) => <span className="text-gray-500 text-sm">{info.getValue() ?? '—'}</span>,
   }),
 ];
 
-export default function ProyectosTable() {
+interface ProyectosTableProps {
+  limit?: number;
+}
+
+export default function ProyectosTable({ limit }: ProyectosTableProps) {
+  const router = useRouter();
+  const [data, setData] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState('');
+
+  useEffect(() => {
+    api
+      .get<Project[]>(ENDPOINTS.PROJECTS)
+      .then((projects) => setData(limit ? projects.slice(0, limit) : projects))
+      .catch(() => setData(limit ? MOCK_PROJECTS.slice(0, limit) : MOCK_PROJECTS))
+      .finally(() => setLoading(false));
+  }, [limit]);
 
   const table = useReactTable({
-    data: PROYECTOS_DEMO,
+    data,
     columns,
-    state: { sorting, columnFilters, globalFilter },
+    state: { sorting, globalFilter },
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+
+  if (loading) return <TableSkeleton rows={4} cols={7} />;
 
   return (
     <div>
@@ -182,7 +140,11 @@ export default function ProyectosTable() {
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer">
+              <tr
+                key={row.id}
+                className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => router.push(`/proyectos/${row.original.id}`)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="px-5 py-3">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -200,3 +162,4 @@ export default function ProyectosTable() {
     </div>
   );
 }
+

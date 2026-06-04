@@ -1,14 +1,34 @@
-import { FolderKanban, BookOpen, FileText, AlertCircle } from "lucide-react";
-import ProyectosTable from "@/components/ProyectosTable";
+'use client';
 
-const stats = [
-  { label: "Proyectos Activos", value: "4", icon: FolderKanban, color: "text-indigo-600", bg: "bg-indigo-50" },
-  { label: "Programas", value: "12", icon: BookOpen, color: "text-emerald-600", bg: "bg-emerald-50" },
-  { label: "Entregables", value: "247", icon: FileText, color: "text-amber-600", bg: "bg-amber-50" },
-  { label: "Con Observaciones", value: "18", icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
-];
+import { useState, useEffect } from 'react';
+import { FolderKanban, BookOpen, FileText, AlertCircle } from 'lucide-react';
+import ProyectosTable from '@/components/ProyectosTable';
+import { StatsSkeleton } from '@/components/LoadingSkeleton';
+import { api, ENDPOINTS } from '@/lib/api';
+import type { DashboardStats } from '@/lib/types';
+import { MOCK_DASHBOARD } from '@/lib/mock-data';
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<DashboardStats>(ENDPOINTS.DASHBOARD)
+      .then(setStats)
+      .catch(() => setStats(MOCK_DASHBOARD))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const data = stats ?? MOCK_DASHBOARD;
+
+  const statCards = [
+    { label: 'Proyectos Activos', value: String(data.active_projects), icon: FolderKanban, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Programas', value: String(data.total_programs), icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Entregables', value: String(data.total_deliverables), icon: FileText, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Con Observaciones', value: String(data.with_observations), icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -16,26 +36,27 @@ export default function DashboardPage() {
         <p className="text-sm text-gray-500 mt-0.5">Resumen general de producción académica</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
-            <div className={`${bg} rounded-lg p-2.5`}>
-              <Icon className={`${color} w-5 h-5`} />
+      {loading ? (
+        <StatsSkeleton />
+      ) : (
+        <div className="grid grid-cols-4 gap-4">
+          {statCards.map(({ label, value, icon: Icon, color, bg }) => (
+            <div key={label} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
+              <div className={`${bg} rounded-lg p-2.5`}>
+                <Icon className={`${color} w-5 h-5`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{value}</p>
+                <p className="text-xs text-gray-500">{label}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{value}</p>
-              <p className="text-xs text-gray-500">{label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Proyectos</h2>
-          <button className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 transition-colors">
-            + Nuevo Proyecto
-          </button>
+          <h2 className="font-semibold text-gray-900">Proyectos recientes</h2>
         </div>
         <ProyectosTable />
       </div>
