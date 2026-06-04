@@ -91,13 +91,8 @@ export default function Header({ title }: HeaderProps) {
     setUnread((prev) => Math.max(0, prev - 1));
   }
 
-  const initials = user
-    ? user.name
-        .split(' ')
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join('')
-        .toUpperCase()
+  const initials = user?.name
+    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
     : 'US';
 
   return (
