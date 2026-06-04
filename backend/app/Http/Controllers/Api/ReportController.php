@@ -7,6 +7,8 @@ use App\Models\AcademicProgram;
 use App\Models\Deliverable;
 use App\Models\Project;
 use App\Models\RoleActivity;
+use App\Services\WorkingDayService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +28,7 @@ class ReportController extends Controller
 
         $totalDeliverables = Deliverable::count();
         $finishedDeliverables = Deliverable::where('global_status', 'finished')->count();
+        $withObservations = Deliverable::where('global_status', 'with_observations')->count();
         $globalCompliance = $totalDeliverables > 0
             ? round(($finishedDeliverables / $totalDeliverables) * 100, 2)
             : 0;
@@ -35,13 +38,35 @@ class ReportController extends Controller
             ->groupBy('role')
             ->get();
 
+        $activeProjects = Project::where('status', 'in_progress')->count();
+        $totalPrograms = \App\Models\AcademicProgram::count();
+
+        // Overdue and approaching
+        $allActivities = RoleActivity::whereNotNull('commitment_date')->get();
+        $overdueActivities = 0;
+        $approachingActivities = 0;
+        foreach ($allActivities as $a) {
+            $status = WorkingDayService::getStatus(
+                Carbon::parse($a->commitment_date),
+                $a->actual_delivery_date ? Carbon::parse($a->actual_delivery_date) : null
+            );
+            if ($status === 'overdue') $overdueActivities++;
+            if ($status === 'approaching') $approachingActivities++;
+        }
+
         return response()->json([
-            'projects_by_status' => $projectsByStatus,
-            'deliverables_by_status' => $deliverablesByStatus,
-            'global_compliance_percentage' => $globalCompliance,
-            'total_deliverables' => $totalDeliverables,
-            'finished_deliverables' => $finishedDeliverables,
-            'activities_by_role' => $activitiesByRole,
+            'active_projects'             => $activeProjects,
+            'total_programs'              => $totalPrograms,
+            'total_deliverables'          => $totalDeliverables,
+            'finished_deliverables'       => $finishedDeliverables,
+            'with_observations'           => $withObservations,
+            'compliance_percentage'       => $globalCompliance,
+            'overdue_activities'          => $overdueActivities,
+            'approaching_activities'      => $approachingActivities,
+            'projects_by_status'          => $projectsByStatus,
+            'deliverables_by_status'      => $deliverablesByStatus,
+            'global_compliance_percentage'=> $globalCompliance,
+            'activities_by_role'          => $activitiesByRole,
         ]);
     }
 

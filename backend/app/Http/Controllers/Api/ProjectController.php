@@ -11,9 +11,21 @@ use Illuminate\Http\Request;
 
 class ProjectController extends Controller
 {
+    private const OPERATIONAL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
     public function index(Request $request)
     {
-        $projects = Project::withCount(['academicPrograms as programs_count'])
+        $user = $request->user();
+
+        $projectQuery = Project::withCount(['academicPrograms as programs_count']);
+
+        if (in_array($user->role, self::OPERATIONAL_ROLES)) {
+            $projectQuery->whereHas('academicPrograms.subjects.deliverables.roleActivities', function ($q) use ($user) {
+                $q->where('responsible_id', $user->id);
+            });
+        }
+
+        $projects = $projectQuery
             ->with('responsible', 'creator')
             ->get()
             ->map(function ($project) {

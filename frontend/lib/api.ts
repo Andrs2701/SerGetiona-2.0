@@ -72,4 +72,25 @@ export const ENDPOINTS = {
   DASHBOARD: '/reports/dashboard',
   COMPLIANCE: '/reports/compliance',
   AUDIT: (projectId: number) => `/projects/${projectId}/audit`,
+
+  // Workspace
+  MY_WORKSPACE: '/my-workspace',
+
+  // Notifications
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATION_UNREAD_COUNT: '/notifications/unread-count',
+  NOTIFICATION_READ: (id: number) => `/notifications/${id}/read`,
+  NOTIFICATION_READ_ALL: '/notifications/read-all',
+
+  // Calendar
+  CALENDAR_EVENTS: '/calendar-events',
+  CALENDAR_MY_DELIVERABLES: '/calendar/my-deliverables',
+  CALENDAR_SUGGEST_DATES: '/calendar/suggest-dates',
+
+  // Auth extended
+  AUTH_ME: '/auth/me',
+  AUTH_LOGOUT: '/auth/logout',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  RESET_PASSWORD: '/auth/reset-password',
+  CHANGE_PASSWORD: '/auth/change-password',
 } as const;

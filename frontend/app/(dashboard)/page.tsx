@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { FolderKanban, BookOpen, FileText, AlertCircle } from 'lucide-react';
 import ProyectosTable from '@/components/ProyectosTable';
+import DashboardOperativo from '@/components/DashboardOperativo';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { DashboardStats } from '@/lib/types';
 import { MOCK_DASHBOARD } from '@/lib/mock-data';
+import { useAuthContext } from '@/contexts/AuthContext';
 
-export default function DashboardPage() {
+const ADMIN_ROLES = ['admin', 'coordinator'] as const;
+
+function DashboardAdmin() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +43,7 @@ export default function DashboardPage() {
       {loading ? (
         <StatsSkeleton />
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
               <div className={`${bg} rounded-lg p-2.5`}>
@@ -62,4 +66,24 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+export default function DashboardPage() {
+  const { user, isLoading } = useAuthContext();
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <StatsSkeleton />
+      </div>
+    );
+  }
+
+  const isAdmin = user && ADMIN_ROLES.includes(user.role as typeof ADMIN_ROLES[number]);
+
+  if (isAdmin) {
+    return <DashboardAdmin />;
+  }
+
+  return <DashboardOperativo />;
 }

@@ -12,10 +12,20 @@ use Illuminate\Http\Request;
 
 class DeliverableController extends Controller
 {
+    private const OPERATIONAL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Deliverable::with('subject.academicProgram', 'creator')
             ->withCount('roleActivities');
+
+        // Operational roles only see deliverables where they have an assigned activity
+        if (in_array($user->role, self::OPERATIONAL_ROLES)) {
+            $query->whereHas('roleActivities', function ($q) use ($user) {
+                $q->where('responsible_id', $user->id);
+            });
+        }
 
         if ($request->filled('subject_id')) {
             $query->where('subject_id', $request->subject_id);

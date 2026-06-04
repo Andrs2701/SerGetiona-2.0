@@ -189,3 +189,52 @@ export const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   creation: 'Creación',
   update: 'Actualización',
 };
+
+export type DateStatus = 'on_time' | 'approaching' | 'overdue' | 'completed' | 'not_applicable';
+
+export interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface CalendarEvent {
+  id: number;
+  name: string;
+  date: string;
+  type: 'holiday' | 'non_working' | 'vacation' | 'closure' | 'event';
+  description?: string;
+  is_recurring: boolean;
+}
+
+export interface WorkspaceActivity {
+  id: number;
+  role: Role;
+  status: string;
+  commitment_date?: string;
+  actual_delivery_date?: string;
+  date_status: DateStatus;
+  deliverable: { id: number; name: string; type: DeliverableType };
+  subject: { id: number; name: string };
+  program: { id: number; name: string };
+  project: { id: number; name: string; status: ProjectStatus };
+}
+
+export interface WorkspaceStats {
+  pending: number;
+  approaching: number;
+  overdue: number;
+  completed: number;
+}
+
+export interface Workspace {
+  user: User;
+  role: UserRole;
+  stats: WorkspaceStats;
+  activities: WorkspaceActivity[];
+  calendar_activities: WorkspaceActivity[];
+}

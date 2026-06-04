@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Comment;
 use App\Models\Deliverable;
 use App\Models\FlowTemplate;
+use App\Models\Notification;
 use App\Models\Project;
 use App\Models\RoleActivity;
 use App\Models\Subject;
@@ -370,5 +371,55 @@ class DatabaseSeeder extends Seeder
                 }
             }
         }
+
+        // ── Notificaciones de ejemplo ─────────────────────────────────────────
+        $notifData = [
+            [
+                'user_id' => $admin->id,
+                'type'    => 'status_changed',
+                'title'   => 'Estado de actividad cambiado',
+                'message' => "La actividad 'expert' cambió de estado a 'in_review'.",
+                'data'    => ['entity_type' => 'RoleActivity', 'entity_id' => 1],
+            ],
+            [
+                'user_id' => $admin->id,
+                'type'    => 'overdue',
+                'title'   => 'Actividad vencida',
+                'message' => 'Tienes actividades con fecha de compromiso vencida.',
+                'data'    => [],
+                'read_at' => now(),
+            ],
+            [
+                'user_id' => $admin->id,
+                'type'    => 'comment_added',
+                'title'   => 'Nuevo comentario',
+                'message' => 'Se agregó un comentario en el entregable Semana 0.',
+                'data'    => ['entity_type' => 'Deliverable', 'entity_id' => 1],
+            ],
+            [
+                'user_id' => $coordinator->id,
+                'type'    => 'task_assigned',
+                'title'   => 'Nueva actividad asignada',
+                'message' => "Se te ha asignado la actividad de rol 'pedagogy'.",
+                'data'    => ['entity_type' => 'RoleActivity', 'entity_id' => 2],
+            ],
+            [
+                'user_id' => $coordinator->id,
+                'type'    => 'date_changed',
+                'title'   => 'Fecha de compromiso actualizada',
+                'message' => "La fecha de compromiso de tu actividad 'pedagogy' fue actualizada.",
+                'data'    => ['entity_type' => 'RoleActivity', 'entity_id' => 2],
+            ],
+        ];
+
+        foreach ($notifData as $n) {
+            Notification::create(array_merge([
+                'read_at'    => null,
+                'created_at' => now(),
+            ], $n));
+        }
+
+        $this->command->info('DatabaseSeeder completado con ' . count($notifData) . ' notificaciones de ejemplo.');
     }
 }
+

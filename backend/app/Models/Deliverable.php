@@ -14,9 +14,15 @@ class Deliverable extends Model
         'subject_id',
         'name',
         'type',
+        'record_type',
+        'content_type',
         'global_status',
         'start_date',
+        'semestre',
+        'ciclo',
         'notes',
+        'requirement',
+        'observation',
         'created_by',
     ];
 

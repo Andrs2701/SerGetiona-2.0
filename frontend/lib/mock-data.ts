@@ -7,6 +7,9 @@ import type {
   RoleActivity,
   DashboardStats,
   ComplianceReport,
+  Workspace,
+  Notification,
+  CalendarEvent,
 } from './types';
 
 export const MOCK_USERS: User[] = [
@@ -198,6 +201,122 @@ export const MOCK_DASHBOARD: DashboardStats = {
   with_observations: 18,
   compliance_percentage: 64,
 };
+
+export const MOCK_WORKSPACE: Workspace = {
+  user: MOCK_USERS[3], // Laura Torres - expert
+  role: 'expert',
+  stats: { pending: 8, approaching: 3, overdue: 1, completed: 15 },
+  activities: [
+    {
+      id: 101, role: 'expert', status: 'in_progress', commitment_date: '2026-06-01', date_status: 'overdue',
+      deliverable: { id: 1, name: 'Semana 0 - Bienvenida', type: 'creation' },
+      subject: { id: 1, name: 'Análisis de Contextos' },
+      program: { id: 1, name: 'Especialización en Bienestar Psicosocial' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 102, role: 'expert', status: 'in_progress', commitment_date: '2026-06-06', date_status: 'approaching',
+      deliverable: { id: 2, name: 'Semana 1 - Módulo Introductorio', type: 'creation' },
+      subject: { id: 1, name: 'Análisis de Contextos' },
+      program: { id: 1, name: 'Especialización en Bienestar Psicosocial' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 103, role: 'expert', status: 'approved', commitment_date: '2026-05-20', actual_delivery_date: '2026-05-19', date_status: 'completed',
+      deliverable: { id: 3, name: 'Semana 0 - Bienvenida', type: 'update' },
+      subject: { id: 2, name: 'Fundamentos de Intervención' },
+      program: { id: 1, name: 'Especialización en Bienestar Psicosocial' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 104, role: 'expert', status: 'pending', commitment_date: '2026-06-15', date_status: 'on_time',
+      deliverable: { id: 4, name: 'Módulo 1 - Bases Teóricas', type: 'update' },
+      subject: { id: 2, name: 'Fundamentos de Intervención' },
+      program: { id: 1, name: 'Especialización en Bienestar Psicosocial' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 105, role: 'expert', status: 'pending', commitment_date: '2026-06-20', date_status: 'on_time',
+      deliverable: { id: 5, name: 'Semana 0 - Presentación', type: 'creation' },
+      subject: { id: 3, name: 'Gestión Psicosocial' },
+      program: { id: 1, name: 'Especialización en Bienestar Psicosocial' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 106, role: 'expert', status: 'in_progress', commitment_date: '2026-06-07', date_status: 'approaching',
+      deliverable: { id: 6, name: 'Módulo 2 - Políticas Actuales', type: 'creation' },
+      subject: { id: 4, name: 'Políticas de Atención' },
+      program: { id: 2, name: 'Maestría en Atención Comunitaria' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 107, role: 'expert', status: 'not_started', commitment_date: '2026-06-25', date_status: 'on_time',
+      deliverable: { id: 7, name: 'Semana 1 - Diagnóstico Comunitario', type: 'creation' },
+      subject: { id: 5, name: 'Intervención Comunitaria' },
+      program: { id: 2, name: 'Maestría en Atención Comunitaria' },
+      project: { id: 1, name: 'Actualización Curricular 2026', status: 'in_progress' },
+    },
+    {
+      id: 108, role: 'expert', status: 'approaching', commitment_date: '2026-06-08', date_status: 'approaching',
+      deliverable: { id: 8, name: 'Semana 2 - Contexto Nacional', type: 'creation' },
+      subject: { id: 5, name: 'Intervención Comunitaria' },
+      program: { id: 2, name: 'Maestría en Atención Comunitaria' },
+      project: { id: 2, name: 'Creación Especialización Psicosocial', status: 'parameterized' },
+    },
+  ],
+  calendar_activities: [],
+};
+
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  {
+    id: 1, type: 'task_assigned', title: 'Nueva tarea asignada',
+    message: 'Se te asignó "Semana 0 - Análisis de Contextos" como Experto',
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 2, type: 'deadline_approaching', title: 'Fecha próxima a vencer',
+    message: '"Módulo Introductorio" vence en 2 días. Recuerda entregar a tiempo.',
+    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 3, type: 'status_changed', title: 'Estado actualizado',
+    message: 'Ana Rodríguez cambió el estado de "Semana 0 - Bienvenida" a En Revisión',
+    read_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 4, type: 'comment_added', title: 'Nuevo comentario',
+    message: 'Carlos Méndez comentó en "Fundamentos de Intervención - Semana 1"',
+    read_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 5, type: 'overdue', title: 'Entrega vencida',
+    message: '"Semana 0 - Bienvenida" está vencida desde el 1 de junio de 2026',
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+export const MOCK_CALENDAR_EVENTS: CalendarEvent[] = [
+  { id: 1, name: 'Día del Trabajo', date: '2026-05-01', type: 'holiday', is_recurring: true },
+  { id: 2, name: 'Día de la Ascensión', date: '2026-05-14', type: 'holiday', is_recurring: false },
+  { id: 3, name: 'Corpus Christi', date: '2026-06-04', type: 'holiday', is_recurring: false },
+  { id: 4, name: 'Sagrado Corazón', date: '2026-06-11', type: 'holiday', is_recurring: false },
+  { id: 5, name: 'San Pedro y San Pablo', date: '2026-06-29', type: 'holiday', is_recurring: true },
+  { id: 6, name: 'Día de la Independencia', date: '2026-07-20', type: 'holiday', is_recurring: true },
+  { id: 7, name: 'Batalla de Boyacá', date: '2026-08-07', type: 'holiday', is_recurring: true },
+  { id: 8, name: 'Asunción de la Virgen', date: '2026-08-17', type: 'holiday', is_recurring: true },
+  { id: 9, name: 'Día de la Raza', date: '2026-10-12', type: 'holiday', is_recurring: true },
+  { id: 10, name: 'Todos los Santos', date: '2026-11-02', type: 'holiday', is_recurring: true },
+  { id: 11, name: 'Independencia de Cartagena', date: '2026-11-16', type: 'holiday', is_recurring: true },
+  { id: 12, name: 'Inmaculada Concepción', date: '2026-12-08', type: 'holiday', is_recurring: true },
+  { id: 13, name: 'Navidad', date: '2026-12-25', type: 'holiday', is_recurring: true },
+  { id: 14, name: 'Año Nuevo', date: '2026-01-01', type: 'holiday', is_recurring: true },
+  { id: 15, name: 'Reyes Magos', date: '2026-01-12', type: 'holiday', is_recurring: false },
+  { id: 16, name: 'San José', date: '2026-03-23', type: 'holiday', is_recurring: false },
+  { id: 17, name: 'Jueves Santo', date: '2026-04-02', type: 'holiday', is_recurring: false },
+  { id: 18, name: 'Viernes Santo', date: '2026-04-03', type: 'holiday', is_recurring: false },
+];
 
 export const MOCK_COMPLIANCE: ComplianceReport = {
   projects: [

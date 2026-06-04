@@ -20,6 +20,7 @@ class RoleActivity extends Model
         'actual_delivery_date',
         'status',
         'notes',
+        'checklist',
     ];
 
     protected $casts = [
@@ -27,7 +28,20 @@ class RoleActivity extends Model
         'commitment_date' => 'date',
         'actual_start_date' => 'date',
         'actual_delivery_date' => 'date',
+        'checklist' => 'array',
     ];
+
+    public static function defaultChecklist(string $role): array
+    {
+        return match($role) {
+            'pedagogy'    => ['entrega_pedagogia' => false, 'multimedia' => false, 'descargable' => false, 'actividades' => false, 'guiones' => false],
+            'design'      => ['entrega_diseno' => false, 'multimedia' => false, 'descargable' => false, 'banners' => false],
+            'audiovisual' => ['entrega_audiovisual' => false, 'videos' => false, 'videos_animados' => false, 'video_podcast' => false],
+            'engineering' => ['entrega_ingenieria' => false, 'act_evaluativas' => false, 'act_interactivas' => false],
+            'qa'          => ['entrega_calidad' => false],
+            default       => [],
+        };
+    }
 
     public function deliverable()
     {
