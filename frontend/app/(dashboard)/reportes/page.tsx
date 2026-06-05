@@ -8,6 +8,7 @@ import { ROLE_LABELS, GLOBAL_STATUS_LABELS } from '@/lib/types';
 import { MOCK_COMPLIANCE } from '@/lib/mock-data';
 import PageHeader from '@/components/PageHeader';
 import { Skeleton } from '@/components/LoadingSkeleton';
+import { CheckCircle2, XCircle, BarChart2 } from 'lucide-react';
 
 type GlobalStatus = 'unpublished' | 'pending_start' | 'in_progress' | 'in_review' | 'with_observations' | 'finished' | 'cancelled' | 'not_applicable';
 
@@ -35,11 +36,10 @@ export default function ReportesPage() {
   }, []);
 
   const report = data ?? MOCK_COMPLIANCE;
-  const maxProjectCompliance = 100;
   const totalByStatus = Object.values(report.by_status).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <PageHeader
         title="Reportes"
         subtitle="Métricas de cumplimiento y producción académica"
@@ -48,44 +48,63 @@ export default function ReportesPage() {
 
       {/* KPI Cards */}
       {loading ? (
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Cumplimiento Global</p>
             <p className="text-4xl font-bold text-indigo-600">{report.global_compliance}%</p>
-            <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${report.global_compliance}%` }} />
+            <div className="mt-3 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={clsx(
+                  'h-full rounded-full transition-all',
+                  report.global_compliance >= 80 ? 'bg-emerald-500' : report.global_compliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                )}
+                style={{ width: `${report.global_compliance}%` }}
+              />
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Total Aprobados</p>
-            <p className="text-4xl font-bold text-emerald-600">{report.total_approved}</p>
-            <p className="text-sm text-gray-500 mt-1">entregables aprobados</p>
+          <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-5 flex items-start gap-4">
+            <div className="p-2 bg-emerald-100 rounded-lg flex-shrink-0">
+              <CheckCircle2 size={20} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-emerald-600 uppercase tracking-wide font-semibold mb-1">Total Aprobados</p>
+              <p className="text-4xl font-bold text-emerald-700">{report.total_approved}</p>
+              <p className="text-xs text-emerald-600 mt-1">entregables aprobados</p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Con Retraso</p>
-            <p className="text-4xl font-bold text-red-500">{report.total_delayed}</p>
-            <p className="text-sm text-gray-500 mt-1">entregables con retraso</p>
+          <div className="bg-red-50 rounded-xl border border-red-100 p-5 flex items-start gap-4">
+            <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+              <XCircle size={20} className="text-red-500" />
+            </div>
+            <div>
+              <p className="text-xs text-red-500 uppercase tracking-wide font-semibold mb-1">Con Retraso</p>
+              <p className="text-4xl font-bold text-red-600">{report.total_delayed}</p>
+              <p className="text-xs text-red-500 mt-1">entregables con retraso</p>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
-        {/* Cumplimiento por proyecto — barras horizontales */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cumplimiento por proyecto */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-gray-900 mb-4">Cumplimiento por Proyecto</h3>
           {loading ? (
-            <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-8" />)}</div>
+            <div className="space-y-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10" />)}</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {report.projects.map((p) => (
                 <div key={p.id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-700 truncate max-w-[200px]" title={p.name}>{p.name}</span>
-                    <span className="text-sm font-semibold text-gray-900 ml-2">{p.compliance}%</span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-gray-700 truncate max-w-[60%]" title={p.name}>{p.name}</span>
+                    <span className={clsx(
+                      'text-sm font-bold ml-2',
+                      p.compliance >= 80 ? 'text-emerald-600' : p.compliance >= 50 ? 'text-amber-600' : 'text-red-500'
+                    )}>{p.compliance}%</span>
                   </div>
                   <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
@@ -93,13 +112,15 @@ export default function ReportesPage() {
                         'h-full rounded-full transition-all',
                         p.compliance >= 80 ? 'bg-emerald-500' : p.compliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
                       )}
-                      style={{ width: `${(p.compliance / maxProjectCompliance) * 100}%` }}
+                      style={{ width: `${p.compliance}%` }}
                     />
                   </div>
-                  <div className="flex gap-4 mt-1">
+                  <div className="flex gap-4 mt-1.5">
                     <span className="text-xs text-gray-400">{p.total} total</span>
-                    <span className="text-xs text-emerald-600">{p.approved} aprobados</span>
-                    <span className="text-xs text-red-500">{p.delayed} con retraso</span>
+                    <span className="text-xs text-emerald-600 font-medium">{p.approved} aprobados</span>
+                    {p.delayed > 0 && (
+                      <span className="text-xs text-red-500 font-medium">{p.delayed} con retraso</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -107,25 +128,29 @@ export default function ReportesPage() {
           )}
         </div>
 
-        {/* Distribución de estados — barras verticales */}
+        {/* Distribución de estados */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-gray-900 mb-4">Distribución de Estados</h3>
           {loading ? (
-            <div className="flex items-end gap-2 h-40">{[1,2,3,4,5,6].map(i => <div key={i} className="flex-1 animate-pulse bg-gray-200 rounded" style={{ height: `${40 + i * 15}px` }} />)}</div>
+            <div className="flex items-end gap-2 h-44">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="flex-1 animate-pulse bg-gray-200 rounded" style={{ height: `${40 + i * 15}px` }} />
+              ))}
+            </div>
           ) : (
-            <div className="flex items-end gap-2 h-40">
+            <div className="flex items-end gap-1.5 h-44">
               {Object.entries(report.by_status).map(([status, count]) => {
                 const heightPct = totalByStatus > 0 ? (count / totalByStatus) * 100 : 0;
                 const colorClass = STATUS_COLORS[status] ?? 'bg-gray-300';
                 return (
-                  <div key={status} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs text-gray-600 font-medium">{count}</span>
+                  <div key={status} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                    <span className="text-xs text-gray-600 font-semibold">{count}</span>
                     <div
-                      className={clsx('w-full rounded-t-md', colorClass)}
-                      style={{ height: `${Math.max(heightPct * 1.2, 6)}px` }}
+                      className={clsx('w-full rounded-t-md transition-all', colorClass)}
+                      style={{ height: `${Math.max(heightPct * 1.4, 6)}px` }}
                       title={GLOBAL_STATUS_LABELS[status as GlobalStatus]}
                     />
-                    <span className="text-[10px] text-gray-400 text-center leading-tight">
+                    <span className="text-[9px] text-gray-400 text-center leading-tight truncate w-full px-0.5">
                       {GLOBAL_STATUS_LABELS[status as GlobalStatus]?.split(' ')[0]}
                     </span>
                   </div>
@@ -136,68 +161,47 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* Entregas a tiempo vs tardías por rol */}
+      {/* Entregas por Rol — cards instead of table */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="font-semibold text-gray-900 mb-4">Entregas por Rol</h3>
+        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <BarChart2 size={16} className="text-indigo-500" />
+          Entregas por Rol
+        </h3>
         {loading ? (
-          <TableSkeleton />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-200">
-                <tr>
-                  <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase">Rol</th>
-                  <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase">A Tiempo</th>
-                  <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase">Con Retraso</th>
-                  <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase">% Cumplimiento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.by_role.map((r) => {
-                  const total = r.on_time + r.delayed;
-                  const pct = total > 0 ? Math.round((r.on_time / total) * 100) : 0;
-                  return (
-                    <tr key={r.role} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-gray-900">{ROLE_LABELS[r.role]}</td>
-                      <td className="py-3 px-4 text-emerald-600 font-semibold">{r.on_time}</td>
-                      <td className="py-3 px-4 text-red-500 font-semibold">{r.delayed}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={clsx(
-                                'h-full rounded-full',
-                                pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-red-400'
-                              )}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-600">{pct}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {report.by_role.map((r) => {
+              const total = r.on_time + r.delayed;
+              const pct = total > 0 ? Math.round((r.on_time / total) * 100) : 0;
+              return (
+                <div key={r.role} className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold text-gray-700 mb-3">{ROLE_LABELS[r.role]}</p>
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="text-emerald-600 font-semibold">{r.on_time} a tiempo</span>
+                    <span className="text-red-500 font-semibold">{r.delayed} tardías</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1.5">
+                    <div
+                      className={clsx(
+                        'h-full rounded-full transition-all',
+                        pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : 'bg-red-400'
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className={clsx(
+                    'text-xs font-bold',
+                    pct >= 80 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-red-500'
+                  )}>{pct}%</p>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function TableSkeleton() {
-  return (
-    <div className="space-y-2">
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <div key={i} className="flex gap-4">
-          <Skeleton className="h-8 flex-1" />
-          <Skeleton className="h-8 w-16" />
-          <Skeleton className="h-8 w-16" />
-          <Skeleton className="h-8 w-32" />
-        </div>
-      ))}
     </div>
   );
 }

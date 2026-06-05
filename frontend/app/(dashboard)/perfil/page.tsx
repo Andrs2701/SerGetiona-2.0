@@ -1,9 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Eye, EyeOff, CheckCircle2, AlertCircle,
+  Mail, Phone, Shield, CheckCheck, AlertTriangle, TrendingUp,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { api, ENDPOINTS } from '@/lib/api';
+import { USER_ROLE_LABELS } from '@/lib/types';
+import type { WorkspaceStats } from '@/lib/types';
+import { Skeleton } from '@/components/LoadingSkeleton';
 
 function getStrength(pwd: string): { label: string; color: string; width: string } {
   if (pwd.length === 0) return { label: '', color: '', width: '0%' };
@@ -30,8 +37,28 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState<WorkspaceStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<{ stats: WorkspaceStats }>(ENDPOINTS.MY_WORKSPACE)
+      .then((res) => {
+        const data = res as unknown as { stats: WorkspaceStats };
+        if (data?.stats) setStats(data.stats);
+      })
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   const strength = getStrength(newPwd);
+
+  const initials = user?.name
+    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
+    : 'US';
+
+  const total = stats ? stats.completed + stats.overdue + stats.approaching + stats.pending : 0;
+  const compliance = total > 0 && stats ? Math.round((stats.completed / total) * 100) : 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,29 +89,109 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="p-6 max-w-lg">
-      <div className="mb-6">
+    <div className="p-4 md:p-6 max-w-2xl space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
         <p className="text-sm text-gray-500 mt-0.5">Gestiona tu información personal y seguridad</p>
       </div>
 
-      {/* User info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-            {user?.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'US'}
+      {/* User card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-start gap-5">
+          <div className="w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-sm">
+            {initials}
           </div>
-          <div>
-            <p className="font-semibold text-gray-900">{user?.name}</p>
-            <p className="text-sm text-gray-500">{user?.email}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{user?.role}</p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-gray-900">{user?.name ?? '—'}</h2>
+            <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+              {user ? USER_ROLE_LABELS[user.role] : '—'}
+            </span>
+
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Mail size={14} className="text-gray-400 flex-shrink-0" />
+                <span>{user?.email ?? '—'}</span>
+              </div>
+              {user?.phone && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Phone size={14} className="text-gray-400 flex-shrink-0" />
+                  <span>{user.phone}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Shield size={14} className="text-gray-400 flex-shrink-0" />
+                <span>Cuenta activa</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Personal stats */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <TrendingUp size={16} className="text-indigo-500" />
+          Mis Estadísticas
+        </h2>
+        {statsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
+          </div>
+        ) : stats ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                <CheckCheck size={18} className="text-emerald-600 mx-auto mb-1" />
+                <p className="text-xl font-bold text-emerald-700">{stats.completed}</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Completadas</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3 text-center">
+                <AlertTriangle size={18} className="text-red-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-red-600">{stats.overdue}</p>
+                <p className="text-xs text-red-500 mt-0.5">Vencidas</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 text-center">
+                <AlertCircle size={18} className="text-amber-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-amber-600">{stats.approaching}</p>
+                <p className="text-xs text-amber-500 mt-0.5">Por vencer</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <Shield size={18} className="text-gray-400 mx-auto mb-1" />
+                <p className="text-xl font-bold text-gray-700">{stats.pending}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Pendientes</p>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-gray-500 font-medium">% Cumplimiento personal</span>
+                <span className={clsx(
+                  'text-sm font-bold',
+                  compliance >= 80 ? 'text-emerald-600' : compliance >= 50 ? 'text-amber-600' : 'text-red-500'
+                )}>{compliance}%</span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={clsx(
+                    'h-full rounded-full transition-all',
+                    compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                  )}
+                  style={{ width: `${compliance}%` }}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-gray-400 text-center py-4">No disponible para tu rol</p>
+        )}
+      </div>
+
       {/* Change password */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-900 mb-5">Cambiar contraseña</h2>
+        <h2 className="font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <Shield size={16} className="text-indigo-500" />
+          Cambiar contraseña
+        </h2>
 
         {success && (
           <div className="mb-5 flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
@@ -101,7 +208,6 @@ export default function PerfilPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Current password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña actual</label>
             <div className="relative">
@@ -119,7 +225,6 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* New password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Nueva contraseña</label>
             <div className="relative">
@@ -150,7 +255,6 @@ export default function PerfilPage() {
             )}
           </div>
 
-          {/* Confirm */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmar nueva contraseña</label>
             <div className="relative">
