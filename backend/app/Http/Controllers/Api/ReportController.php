@@ -127,11 +127,53 @@ class ReportController extends Controller
             ];
         }
 
+        // Projects compliance
+        $projects = Project::withCount(['academicPrograms as programs_count'])
+            ->get()
+            ->map(function ($p) {
+                $deliverables = Deliverable::whereHas('subject.academicProgram', fn($q) => $q->where('project_id', $p->id))->get();
+                $pTotal = $deliverables->count();
+                $pApproved = $deliverables->where('global_status', 'finished')->count();
+                $pDelayed = RoleActivity::whereHas('deliverable.subject.academicProgram', fn($q) => $q->where('project_id', $p->id))
+                    ->whereNotNull('actual_delivery_date')->whereNotNull('commitment_date')
+                    ->get()->filter(fn($a) => $a->actual_delivery_date > $a->commitment_date)->count();
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'compliance' => $pTotal > 0 ? round(($pApproved / $pTotal) * 100) : 0,
+                    'total' => $pTotal,
+                    'approved' => $pApproved,
+                    'delayed' => $pDelayed,
+                ];
+            });
+
+        // By status counts
+        $byStatus = Deliverable::select('global_status', DB::raw('count(*) as cnt'))
+            ->groupBy('global_status')->get()->pluck('cnt', 'global_status');
+
+        $statusKeys = ['unpublished','pending_start','in_progress','in_review','with_observations','finished','cancelled','not_applicable'];
+        $byStatusFull = [];
+        foreach ($statusKeys as $k) {
+            $byStatusFull[$k] = (int)($byStatus[$k] ?? 0);
+        }
+
+        // By role as array
+        $byRoleArray = collect($byRole)->map(fn($v, $k) => [
+            'role' => $k,
+            'on_time' => $v['on_time'],
+            'delayed' => $v['late'],
+        ])->values();
+
+        $totalApproved = collect($byRole)->sum('approved');
+        $totalDelayed = collect($byRole)->sum('late');
+
         return response()->json([
-            'total_deliverables' => $total,
-            'finished_deliverables' => $finished,
-            'compliance_percentage' => $compliance,
-            'by_role' => $byRole,
+            'projects' => $projects,
+            'by_status' => $byStatusFull,
+            'by_role' => $byRoleArray,
+            'global_compliance' => $compliance,
+            'total_approved' => $totalApproved,
+            'total_delayed' => $totalDelayed,
         ]);
     }
 }
