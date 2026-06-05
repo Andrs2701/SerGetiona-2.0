@@ -12,6 +12,31 @@ use Illuminate\Support\Facades\Auth;
 
 class RoleActivityController extends Controller
 {
+    public static function translateStatus(string $status): string
+    {
+        return match($status) {
+            'not_started'           => 'Sin Iniciar',
+            'draft'                 => 'Borrador',
+            'in_development'        => 'En Desarrollo',
+            'delivered'             => 'Entregado',
+            'adjustments_requested' => 'Ajustes Solicitados',
+            'approved'              => 'Aprobado',
+            'not_applicable'        => 'No Aplica',
+            'in_progress'           => 'En Progreso',
+            'in_review'             => 'En Revisión',
+            'adjusting'             => 'Ajustando',
+            'designing'             => 'Diseñando',
+            'production'            => 'Producción',
+            'editing'               => 'Edición',
+            'implementing'          => 'Implementando',
+            'validating'            => 'Validando',
+            'pending'               => 'Pendiente',
+            'in_testing'            => 'En Pruebas',
+            'with_findings'         => 'Con Hallazgos',
+            default                 => $status,
+        };
+    }
+
     public function update(Request $request, RoleActivity $activity)
     {
         $data = $request->validate([

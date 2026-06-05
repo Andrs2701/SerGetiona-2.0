@@ -10,10 +10,10 @@ import {
   createColumnHelper,
   type SortingState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, Search, Plus } from 'lucide-react';
+import { ArrowUpDown, Search, Plus, Download, ChevronDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useRouter } from 'next/navigation';
-import { api, ENDPOINTS } from '@/lib/api';
+import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Project, ProjectStatus } from '@/lib/types';
 import { PROJECT_STATUS_LABELS } from '@/lib/types';
 import { MOCK_PROJECTS, MOCK_USERS } from '@/lib/mock-data';
@@ -105,6 +105,7 @@ export default function ProyectosPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<ProjectForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     api
@@ -166,13 +167,38 @@ export default function ProyectosPage() {
         subtitle="Gestión de proyectos de producción académica"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Proyectos' }]}
         actions={
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-          >
-            <Plus size={16} />
-            Nuevo Proyecto
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Download size={15} />
+                Exportar
+                <ChevronDown size={13} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-44 py-1">
+                  <button
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      downloadCsv('/export/projects?format=csv', 'proyectos.csv').catch(() => {});
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Plus size={16} />
+              Nuevo Proyecto
+            </button>
+          </div>
         }
       />
 

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Filter, Paperclip, X, Clock, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react';
+import { Search, Paperclip, X, Clock, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity } from '@/lib/types';
 import { MOCK_WORKSPACE } from '@/lib/mock-data';
-import { ROLE_LABELS, GLOBAL_STATUS_LABELS } from '@/lib/types';
+import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import DateStatusBadge from '@/components/DateStatusBadge';
 
@@ -18,13 +18,17 @@ const DATE_STATUS_SORT: Record<string, number> = {
   not_applicable: 4,
 };
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Todos los estados' },
-  { value: 'pending', label: 'Pendiente' },
-  { value: 'in_progress', label: 'En proceso' },
-  { value: 'overdue', label: 'Vencido' },
-  { value: 'approved', label: 'Aprobado' },
-];
+// Role-specific status options (Task 7)
+const ROLE_STATES: Record<string, string[]> = {
+  expert:      ['not_started', 'draft', 'in_development', 'delivered', 'adjustments_requested', 'approved', 'not_applicable'],
+  pedagogy:    ['not_started', 'in_progress', 'in_review', 'adjusting', 'approved', 'not_applicable'],
+  design:      ['not_started', 'designing', 'adjusting', 'approved', 'not_applicable'],
+  audiovisual: ['not_started', 'production', 'editing', 'approved', 'not_applicable'],
+  engineering: ['not_started', 'implementing', 'validating', 'approved', 'not_applicable'],
+  qa:          ['pending', 'in_testing', 'with_findings', 'approved', 'not_applicable'],
+};
+
+type DateFilterType = '' | 'overdue' | 'approaching' | 'completed';
 
 interface SidePanelProps {
   activity: WorkspaceActivity;
@@ -36,6 +40,8 @@ function ActivitySidePanel({ activity, onClose }: SidePanelProps) {
   const [status, setStatus] = useState(activity.status);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const roleStates = ROLE_STATES[activity.role] ?? Object.keys(ROLE_STATUS_LABELS);
 
   async function handleSave() {
     setSaving(true);
@@ -76,7 +82,7 @@ function ActivitySidePanel({ activity, onClose }: SidePanelProps) {
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Tipo</p>
-              <p className="text-sm text-gray-700">{activity.deliverable.type === 'creation' ? 'Creación' : 'Actualización'}</p>
+              <p className="text-sm text-gray-700">{DELIVERABLE_TYPE_LABELS[activity.deliverable.type]}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Fecha compromiso</p>
@@ -92,17 +98,17 @@ function ActivitySidePanel({ activity, onClose }: SidePanelProps) {
             </div>
           </div>
 
-          {/* Change status */}
+          {/* Change status — role-specific options */}
           <div className="border-t border-gray-100 pt-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estado actual</p>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
             >
-              {['not_started', 'in_progress', 'in_review', 'approved', 'with_observations', 'pending'].map((s) => (
+              {roleStates.map((s) => (
                 <option key={s} value={s}>
-                  {(GLOBAL_STATUS_LABELS as Record<string, string>)[s] ?? s}
+                  {ROLE_STATUS_LABELS[s] ?? s}
                 </option>
               ))}
             </select>
@@ -116,7 +122,7 @@ function ActivitySidePanel({ activity, onClose }: SidePanelProps) {
               onChange={(e) => setComment(e.target.value)}
               rows={3}
               placeholder="Escribe una nota o comentario..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-gray-900 placeholder:text-gray-400"
             />
           </div>
 
@@ -174,7 +180,7 @@ export default function MiEspacioPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('');
   const [filterProject, setFilterProject] = useState('');
   const [selected, setSelected] = useState<WorkspaceActivity | null>(null);
 
@@ -197,9 +203,14 @@ export default function MiEspacioPage() {
         act.deliverable.name.toLowerCase().includes(search.toLowerCase()) ||
         act.subject.name.toLowerCase().includes(search.toLowerCase()) ||
         act.project.name.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = !filterStatus || act.status === filterStatus || act.date_status === filterStatus;
+
+      let matchDate = true;
+      if (dateFilter === 'overdue') matchDate = act.date_status === 'overdue';
+      else if (dateFilter === 'approaching') matchDate = act.date_status === 'approaching';
+      else if (dateFilter === 'completed') matchDate = act.date_status === 'completed' || act.status === 'approved';
+
       const matchProject = !filterProject || act.project.name === filterProject;
-      return matchSearch && matchStatus && matchProject;
+      return matchSearch && matchDate && matchProject;
     })
     .sort(
       (a, b) =>
@@ -207,10 +218,10 @@ export default function MiEspacioPage() {
     );
 
   const statCards = [
-    { label: 'Pendientes', value: data.stats.pending, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Próx. a vencer', value: data.stats.approaching, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Vencidas', value: data.stats.overdue, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-    { label: 'Completadas', value: data.stats.completed, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Pendientes', value: data.stats.pending, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50', filter: '' as DateFilterType },
+    { label: 'Próx. a vencer', value: data.stats.approaching, icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', filter: 'approaching' as DateFilterType },
+    { label: 'Vencidas', value: data.stats.overdue, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', filter: 'overdue' as DateFilterType },
+    { label: 'Completadas', value: data.stats.completed, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', filter: 'completed' as DateFilterType },
   ];
 
   if (loading) {
@@ -235,10 +246,17 @@ export default function MiEspacioPage() {
           <p className="text-sm text-gray-500 mt-0.5">Tus actividades asignadas y su estado</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats — clickable filters */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {statCards.map(({ label, value, icon: Icon, color, bg }) => (
-            <div key={label} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
+          {statCards.map(({ label, value, icon: Icon, color, bg, filter }) => (
+            <button
+              key={label}
+              onClick={() => setDateFilter((prev) => (prev === filter ? '' : filter))}
+              className={clsx(
+                'bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4 text-left transition-colors hover:border-gray-300',
+                dateFilter === filter && filter !== '' && 'ring-2 ring-indigo-400 border-indigo-300'
+              )}
+            >
               <div className={`${bg} rounded-lg p-2.5`}>
                 <Icon className={`${color} w-5 h-5`} />
               </div>
@@ -246,7 +264,30 @@ export default function MiEspacioPage() {
                 <p className="text-2xl font-bold text-gray-900">{value}</p>
                 <p className="text-xs text-gray-500">{label}</p>
               </div>
-            </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Quick filter tabs */}
+        <div className="flex gap-2 flex-wrap">
+          {([
+            { label: 'Todos', value: '' },
+            { label: 'Vencidos', value: 'overdue' },
+            { label: 'Por Vencer', value: 'approaching' },
+            { label: 'Completados', value: 'completed' },
+          ] as { label: string; value: DateFilterType }[]).map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setDateFilter(tab.value)}
+              className={clsx(
+                'px-3 py-1 text-sm rounded-full border transition-colors',
+                dateFilter === tab.value
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+              )}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
@@ -258,45 +299,37 @@ export default function MiEspacioPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por nombre..."
-              className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder:text-gray-400"
             />
           </div>
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select
             value={filterProject}
             onChange={(e) => setFilterProject(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
           >
             <option value="">Todos los proyectos</option>
             {projects.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
-          {(search || filterStatus || filterProject) && (
+          {(search || dateFilter || filterProject) && (
             <button
-              onClick={() => { setSearch(''); setFilterStatus(''); setFilterProject(''); }}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              onClick={() => { setSearch(''); setDateFilter(''); setFilterProject(''); }}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
             >
-              <Filter size={12} /> Limpiar filtros
+              Limpiar filtros
             </button>
           )}
         </div>
 
-        {/* Table */}
+        {/* Table — all columns (Task 8) */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="w-full text-sm min-w-[960px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Proyecto</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Programa</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Asignatura</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Entregable</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">T. Contenido</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">F. Compromiso</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Indicador</th>
@@ -307,13 +340,15 @@ export default function MiEspacioPage() {
                 {filtered.map((act) => (
                   <tr key={act.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
                     <td className="px-4 py-3 text-gray-700 truncate max-w-[130px]" title={act.project.name}>{act.project.name}</td>
-                    <td className="px-4 py-3 text-gray-600 truncate max-w-[110px]" title={act.program.name}>{act.program.name}</td>
-                    <td className="px-4 py-3 text-gray-600 truncate max-w-[110px]" title={act.subject.name}>{act.subject.name}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 truncate max-w-[150px]" title={act.deliverable.name}>{act.deliverable.name}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{act.deliverable.type === 'creation' ? 'Creación' : 'Actualización'}</td>
+                    <td className="px-4 py-3 text-gray-600 truncate max-w-[120px]" title={act.subject.name}>{act.subject.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 truncate max-w-[160px]" title={act.deliverable.name}>{act.deliverable.name}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{DELIVERABLE_TYPE_LABELS[act.deliverable.type]}</td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {(GLOBAL_STATUS_LABELS as Record<string, string>)[act.status] ?? act.status}
+                      <span className={clsx(
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                        'bg-gray-100 text-gray-700'
+                      )}>
+                        {ROLE_STATUS_LABELS[act.status] ?? act.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
@@ -336,7 +371,7 @@ export default function MiEspacioPage() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-gray-400 text-sm">
+                    <td colSpan={8} className="text-center py-10 text-gray-400 text-sm">
                       No se encontraron actividades con los filtros aplicados.
                     </td>
                   </tr>

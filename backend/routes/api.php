@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\DeliverableController;
+use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\ImportController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\ProjectController;
@@ -63,4 +65,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
     Route::get('reports/compliance', [ReportController::class, 'compliance']);
+
+    // Importación
+    Route::post('/import/deliverables', [ImportController::class, 'deliverables']);
+    Route::get('/import/template', [ImportController::class, 'template']);
+
+    // Exportación
+    Route::get('/export/deliverables', [ExportController::class, 'deliverables']);
+    Route::get('/export/projects', [ExportController::class, 'projects']);
+
+    // Flujo secuencial de entregable
+    Route::get('deliverables/{deliverable}/flow', [DeliverableController::class, 'flow']);
 });

@@ -2,10 +2,10 @@
 
 import { useState, useEffect, use } from 'react';
 import { clsx } from 'clsx';
-import { Search, ChevronDown, ChevronRight } from 'lucide-react';
-import { api, ENDPOINTS } from '@/lib/api';
+import { Search, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
+import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType } from '@/lib/types';
-import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
+import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import {
   MOCK_PROJECTS,
   MOCK_PROGRAMS,
@@ -15,10 +15,23 @@ import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import SidePanel from '@/components/SidePanel';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+import DeliverableFlow, { type FlowStep } from '@/components/DeliverableFlow';
+import CommentThread from '@/components/CommentThread';
+import ImportModal from '@/components/ImportModal';
 
 type Role = RoleType;
 
 const ROLES: Role[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
+// Role-specific status options (Task 7)
+const ROLE_STATES: Record<string, string[]> = {
+  expert:      ['not_started', 'draft', 'in_development', 'delivered', 'adjustments_requested', 'approved', 'not_applicable'],
+  pedagogy:    ['not_started', 'in_progress', 'in_review', 'adjusting', 'approved', 'not_applicable'],
+  design:      ['not_started', 'designing', 'adjusting', 'approved', 'not_applicable'],
+  audiovisual: ['not_started', 'production', 'editing', 'approved', 'not_applicable'],
+  engineering: ['not_started', 'implementing', 'validating', 'approved', 'not_applicable'],
+  qa:          ['pending', 'in_testing', 'with_findings', 'approved', 'not_applicable'],
+};
 
 const PROGRAM_HEADER_COLORS = [
   'bg-indigo-100 text-indigo-800',
@@ -27,6 +40,23 @@ const PROGRAM_HEADER_COLORS = [
   'bg-purple-100 text-purple-800',
   'bg-pink-100 text-pink-800',
 ];
+
+function buildFlowSteps(deliverable: Deliverable): FlowStep[] {
+  return ROLES.map((role) => {
+    const activity = (deliverable.role_activities ?? []).find((a) => a.role === role);
+    const status = activity?.status ?? 'not_started';
+    const completed = status === 'approved';
+    const active = !completed && !!activity && status !== 'not_started';
+    return {
+      role,
+      label: ROLE_LABELS[role],
+      status: ROLE_STATUS_LABELS[status] ?? status,
+      responsible: activity?.responsible?.name,
+      completed,
+      active,
+    };
+  });
+}
 
 function RoleCell({
   activity,
@@ -78,6 +108,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     activity: RoleActivity;
     deliverable: Deliverable;
   } | null>(null);
+  const [activityStatus, setActivityStatus] = useState('');
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     async function fetchAll() {
@@ -100,6 +133,38 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
     fetchAll();
   }, [projectId]);
+
+  // Keep local status in sync with selected activity
+  useEffect(() => {
+    if (selectedActivity) {
+      setActivityStatus(selectedActivity.activity.status);
+    }
+  }, [selectedActivity]);
+
+  async function handleStatusChange(newStatus: string) {
+    if (!selectedActivity) return;
+    setActivityStatus(newStatus);
+    setSavingStatus(true);
+    try {
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(selectedActivity.activity.id), { status: newStatus });
+      // Update local state
+      setDeliverables((prev) =>
+        prev.map((d) => {
+          if (d.id !== selectedActivity.deliverable.id) return d;
+          return {
+            ...d,
+            role_activities: (d.role_activities ?? []).map((a) =>
+              a.id === selectedActivity.activity.id ? { ...a, status: newStatus } : a
+            ),
+          };
+        })
+      );
+    } catch {
+      // ignore — optimistic update already applied
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   // Build program groups
   const filteredDeliverables = deliverables.filter((d) => {
@@ -145,6 +210,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const proj = project ?? MOCK_PROJECTS[0];
+  const roleStates = selectedActivity ? (ROLE_STATES[selectedActivity.activity.role] ?? Object.keys(ROLE_STATUS_LABELS)) : [];
+  const flowSteps = selectedActivity ? buildFlowSteps(selectedActivity.deliverable) : [];
 
   return (
     <div className="p-6">
@@ -179,21 +246,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Tab: Entregables */}
       {activeTab === 'deliverables' && (
         <div>
-          {/* Filters */}
-          <div className="flex items-center gap-3 mb-4">
+          {/* Filters + Export/Import */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar asignatura o entregable..."
-                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder:text-gray-400"
               />
             </div>
             <select
               value={filterProgram}
               onChange={(e) => setFilterProgram(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
             >
               <option value="">Todos los programas</option>
               {uniquePrograms.map((p) => (
@@ -205,13 +272,31 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
             >
               <option value="">Todos los estados</option>
               {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() =>
+                  downloadCsv(`/export/deliverables?project_id=${projectId}&format=csv`, `entregables_proyecto_${projectId}.csv`).catch(() => {})
+                }
+                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Download size={14} />
+                Exportar CSV
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors"
+              >
+                <Upload size={14} />
+                Importar
+              </button>
+            </div>
           </div>
 
           {/* Table */}
@@ -387,73 +472,93 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             ? `${ROLE_LABELS[selectedActivity.activity.role as Role]} — ${selectedActivity.deliverable.name}`
             : ''
         }
+        width="lg"
       >
         {selectedActivity && (
-          <div className="p-6 space-y-5">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Entregable</p>
-              <p className="font-medium text-gray-900">{selectedActivity.deliverable.name}</p>
-              <p className="text-sm text-gray-500">{selectedActivity.deliverable.subject_name}</p>
-            </div>
-
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Responsable</p>
-              <p className="text-sm text-gray-800">
-                {selectedActivity.activity.responsible?.name ?? 'Sin asignar'}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Estado</p>
-              <StatusBadge status={selectedActivity.activity.status} type="role" size="md" />
-            </div>
-
-            {selectedActivity.activity.commitment_date && (
+          <div className="flex flex-col h-full">
+            <div className="p-6 space-y-5 border-b border-gray-100">
+              {/* Deliverable Flow */}
               <div>
-                <p className="text-xs text-gray-500 mb-1">Fecha Compromiso</p>
-                <p className="text-sm text-gray-800">{selectedActivity.activity.commitment_date}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Flujo de Producción</p>
+                <DeliverableFlow steps={flowSteps} />
               </div>
-            )}
 
-            {selectedActivity.activity.actual_start_date && (
+              {/* Info */}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Entregable</p>
+                  <p className="font-medium text-gray-900 text-sm">{selectedActivity.deliverable.name}</p>
+                  <p className="text-xs text-gray-500">{selectedActivity.deliverable.subject_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Responsable</p>
+                  <p className="text-sm text-gray-800">
+                    {selectedActivity.activity.responsible?.name ?? 'Sin asignar'}
+                  </p>
+                </div>
+                {selectedActivity.activity.commitment_date && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Fecha Compromiso</p>
+                    <p className="text-sm text-gray-800">{selectedActivity.activity.commitment_date}</p>
+                  </div>
+                )}
+                {selectedActivity.activity.actual_delivery_date && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Entrega Real</p>
+                    <p className="text-sm text-gray-800">{selectedActivity.activity.actual_delivery_date}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedActivity.activity.notes && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Notas</p>
+                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                    {selectedActivity.activity.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Role-specific status selector (Task 7) */}
               <div>
-                <p className="text-xs text-gray-500 mb-1">Inicio Real</p>
-                <p className="text-sm text-gray-800">{selectedActivity.activity.actual_start_date}</p>
-              </div>
-            )}
-
-            {selectedActivity.activity.actual_delivery_date && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Entrega Real</p>
-                <p className="text-sm text-gray-800">{selectedActivity.activity.actual_delivery_date}</p>
-              </div>
-            )}
-
-            {selectedActivity.activity.notes && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Notas</p>
-                <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
-                  {selectedActivity.activity.notes}
-                </p>
-              </div>
-            )}
-
-            <div className="border-t border-gray-100 pt-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cambiar Estado</p>
-              <div className="flex flex-wrap gap-2">
-                {['not_started', 'in_progress', 'in_review', 'approved', 'with_observations'].map((s) => (
-                  <button
-                    key={s}
-                    className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cambiar Estado</p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={activityStatus}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    disabled={savingStatus}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 disabled:opacity-60"
                   >
-                    <StatusBadge status={s} type="role" size="sm" />
-                  </button>
-                ))}
+                    {roleStates.map((s) => (
+                      <option key={s} value={s}>
+                        {ROLE_STATUS_LABELS[s] ?? s}
+                      </option>
+                    ))}
+                  </select>
+                  {savingStatus && (
+                    <span className="text-xs text-gray-400">Guardando...</span>
+                  )}
+                </div>
               </div>
+            </div>
+
+            {/* Comment Thread */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <CommentThread
+                deliverableId={selectedActivity.deliverable.id}
+                deliverableName={selectedActivity.deliverable.name}
+              />
             </div>
           </div>
         )}
       </SidePanel>
+
+      {/* Import Modal */}
+      <ImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        projectId={projectId}
+      />
     </div>
   );
 }

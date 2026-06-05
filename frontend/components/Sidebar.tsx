@@ -18,29 +18,83 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext";
 import { USER_ROLE_LABELS } from "@/lib/types";
 
-const ADMIN_ROLES = ['admin', 'coordinator'] as const;
+type UserRole = 'admin' | 'coordinator' | 'expert' | 'pedagogy' | 'design' | 'audiovisual' | 'engineering' | 'qa';
+
+const OPERATIVE_ROLES: UserRole[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number }>;
+  roles: UserRole[];
+}
+
+const ALL_NAV_ITEMS: NavItem[] = [
+  {
+    href: '/',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+  },
+  {
+    href: '/mi-espacio',
+    label: 'Mi Espacio',
+    icon: UserCircle,
+    roles: ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+  },
+  {
+    href: '/proyectos',
+    label: 'Proyectos',
+    icon: FolderKanban,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/programas',
+    label: 'Programas Académicos',
+    icon: BookOpen,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/entregables',
+    label: 'Entregables',
+    icon: FileText,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/calendario',
+    label: 'Calendario',
+    icon: CalendarDays,
+    roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+  },
+  {
+    href: '/usuarios',
+    label: 'Usuarios',
+    icon: Users,
+    roles: ['admin'],
+  },
+  {
+    href: '/reportes',
+    label: 'Reportes',
+    icon: BarChart3,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/configuracion',
+    label: 'Configuración',
+    icon: Settings,
+    roles: ['admin'],
+  },
+];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuthContext();
 
-  const isAdmin = user && ADMIN_ROLES.includes(user.role as typeof ADMIN_ROLES[number]);
+  const role = (user?.role ?? 'admin') as UserRole;
 
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard, always: true },
-    { href: "/proyectos", label: "Proyectos", icon: FolderKanban, always: true },
-    { href: "/programas", label: "Programas Académicos", icon: BookOpen, always: true },
-    { href: "/entregables", label: "Entregables", icon: FileText, always: true },
-    { href: "/calendario", label: "Calendario", icon: CalendarDays, always: true },
-    { href: "/mi-espacio", label: "Mi Espacio", icon: UserCircle, always: false, operativeOnly: true },
-    { href: "/usuarios", label: "Usuarios", icon: Users, always: true },
-    { href: "/reportes", label: "Reportes", icon: BarChart3, always: true },
-    { href: "/configuracion", label: "Configuración", icon: Settings, adminOnly: true },
-  ].filter((item) => {
-    if (item.adminOnly) return isAdmin;
-    if (item.operativeOnly) return !isAdmin;
-    return true;
-  });
+  const navItems = ALL_NAV_ITEMS.filter((item) =>
+    item.roles.includes(role)
+  );
 
   const initials = user?.name
     ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'

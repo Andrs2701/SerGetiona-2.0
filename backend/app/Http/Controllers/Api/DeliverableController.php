@@ -91,6 +91,55 @@ class DeliverableController extends Controller
         return response()->json(['message' => 'Entregable eliminado correctamente.']);
     }
 
+    public function flow(Deliverable $deliverable)
+    {
+        $deliverable->load('roleActivities.responsible');
+
+        $roleLabels = [
+            'expert'      => 'Experto',
+            'pedagogy'    => 'Pedagogía',
+            'design'      => 'Diseño',
+            'audiovisual' => 'Audiovisual',
+            'engineering' => 'Ingeniería',
+            'qa'          => 'Calidad',
+        ];
+
+        $completedStatuses = ['approved', 'delivered', 'not_applicable'];
+
+        $activities   = $deliverable->roleActivities->keyBy('role');
+        $steps        = [];
+        $currentRole  = null;
+        $activeFound  = false;
+
+        foreach ($roleLabels as $role => $label) {
+            $act       = $activities[$role] ?? null;
+            $status    = $act?->status ?? 'not_started';
+            $completed = in_array($status, $completedStatuses);
+
+            $step = [
+                'role'        => $role,
+                'label'       => $label,
+                'status'      => $status,
+                'responsible' => $act?->responsible?->name,
+                'completed'   => $completed,
+            ];
+
+            // El primer rol no completado es el activo
+            if (!$completed && !$activeFound) {
+                $step['active'] = true;
+                $currentRole    = $role;
+                $activeFound    = true;
+            }
+
+            $steps[] = $step;
+        }
+
+        return response()->json([
+            'current_role' => $currentRole,
+            'steps'        => $steps,
+        ]);
+    }
+
     public function applyFlowTemplate(Request $request, Deliverable $deliverable)
     {
         $request->validate([

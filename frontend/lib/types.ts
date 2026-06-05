@@ -190,6 +190,29 @@ export const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   update: 'Actualización',
 };
 
+export const ROLE_STATUS_LABELS: Record<string, string> = {
+  not_started: 'Sin Iniciar',
+  draft: 'Borrador',
+  in_development: 'En Desarrollo',
+  delivered: 'Entregado',
+  adjustments_requested: 'Ajustes Solicitados',
+  approved: 'Aprobado',
+  not_applicable: 'No Aplica',
+  in_progress: 'En Progreso',
+  in_review: 'En Revisión',
+  adjusting: 'Ajustando',
+  designing: 'Diseñando',
+  production: 'Producción',
+  editing: 'Edición',
+  implementing: 'Implementando',
+  validating: 'Validando',
+  pending: 'Pendiente',
+  in_testing: 'En Pruebas',
+  with_findings: 'Con Hallazgos',
+  with_observations: 'Con Observaciones',
+  rejected: 'Rechazado',
+};
+
 export type DateStatus = 'on_time' | 'approaching' | 'overdue' | 'completed' | 'not_applicable';
 
 export interface Notification {

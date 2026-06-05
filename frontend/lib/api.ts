@@ -48,6 +48,20 @@ function unwrap<T>(response: unknown): T {
   return response as T;
 }
 
+export async function downloadCsv(path: string, filename: string): Promise<void> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sergestiona_token') : null;
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export const api = {
   get: <T>(path: string) => request<unknown>('GET', path).then((r) => unwrap<T>(r)),
   post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
@@ -102,6 +116,12 @@ export const ENDPOINTS = {
   CALENDAR_EVENTS: '/calendar-events',
   CALENDAR_MY_DELIVERABLES: '/calendar/my-deliverables',
   CALENDAR_SUGGEST_DATES: '/calendar/suggest-dates',
+
+  // Import / Export
+  IMPORT_TEMPLATE: '/import/template',
+  IMPORT_DELIVERABLES: '/import/deliverables',
+  EXPORT_PROJECTS: '/export/projects',
+  EXPORT_DELIVERABLES: '/export/deliverables',
 
   // Auth extended
   AUTH_ME: '/auth/me',
