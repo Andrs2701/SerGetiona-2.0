@@ -83,6 +83,25 @@ class EvidenceLinkController extends Controller
     }
 
     /**
+     * GET /role-activities/{activity}/evidence
+     * Retorna los evidence_links de una role_activity específica.
+     */
+    public function byActivity(RoleActivity $activity)
+    {
+        $links = $activity->evidenceLinks()->with('user')->orderBy('created_at', 'asc')->get();
+        return response()->json($links->map(function ($link) {
+            return [
+                'id'         => $link->id,
+                'type'       => $link->type,
+                'title'      => $link->title,
+                'url'        => $link->url,
+                'user'       => $link->user ? ['id' => $link->user->id, 'name' => $link->user->name] : null,
+                'created_at' => $link->created_at?->toIso8601String(),
+            ];
+        })->values());
+    }
+
+    /**
      * DELETE /evidence/{link}
      */
     public function destroy(EvidenceLink $link)

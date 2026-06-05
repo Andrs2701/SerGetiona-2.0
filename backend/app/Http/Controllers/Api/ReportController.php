@@ -54,11 +54,67 @@ class ReportController extends Controller
             if ($status === 'approaching') $approachingActivities++;
         }
 
+        // Per-program breakdown
+        $programs = \App\Models\AcademicProgram::with('project')->get();
+        $programsBreakdown = $programs->map(function ($prog) {
+            $deliverableIds = \App\Models\Subject::where('academic_program_id', $prog->id)
+                ->pluck('id')
+                ->pipe(fn($subjectIds) => \App\Models\Deliverable::whereIn('subject_id', $subjectIds)->pluck('id'));
+
+            $total = $deliverableIds->count();
+            $finished = \App\Models\Deliverable::whereIn('id', $deliverableIds)
+                ->where('global_status', 'finished')->count();
+            $compliance = $total > 0 ? round(($finished / $total) * 100) : 0;
+
+            $overdueCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->whereNotNull('commitment_date')
+                ->whereNull('actual_delivery_date')
+                ->where('commitment_date', '<', now()->toDateString())
+                ->whereNotIn('status', ['approved', 'not_applicable'])
+                ->count();
+
+            $activeCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->whereNotIn('status', ['approved', 'not_applicable', 'not_started'])
+                ->count();
+
+            return [
+                'id'                    => $prog->id,
+                'name'                  => $prog->name,
+                'project_id'            => $prog->project_id,
+                'project_name'          => $prog->project->name ?? '',
+                'total'                 => $total,
+                'finished'              => $finished,
+                'compliance_percentage' => $compliance,
+                'overdue_count'         => $overdueCount,
+                'active_count'          => $activeCount,
+                'pending_count'         => max(0, $total - $finished),
+            ];
+        })->sortByDesc('overdue_count')->values();
+
+        // Activities by role with more detail (for flow/bottleneck analysis)
+        $activitiesByRoleDetail = RoleActivity::select(
+                'role',
+                DB::raw('count(*) as total'),
+                DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
+                DB::raw("sum(case when status NOT IN ('approved','not_applicable','not_started') then 1 else 0 end) as active"),
+                DB::raw("sum(case when commitment_date < CURRENT_DATE and actual_delivery_date IS NULL and status NOT IN ('approved','not_applicable') then 1 else 0 end) as overdue")
+            )
+            ->groupBy('role')
+            ->get();
+
+        // Activities counts (for KPI cards)
+        $totalActivities    = RoleActivity::count();
+        $finishedActivities = RoleActivity::where('status', 'approved')->count();
+        $activeActivities   = RoleActivity::whereNotIn('status', ['approved', 'not_applicable', 'not_started'])->count();
+
         return response()->json([
             'active_projects'             => $activeProjects,
             'total_programs'              => $totalPrograms,
             'total_deliverables'          => $totalDeliverables,
+            'total_activities'            => $totalActivities,
             'finished_deliverables'       => $finishedDeliverables,
+            'finished_activities'         => $finishedActivities,
+            'active_activities'           => $activeActivities,
             'with_observations'           => $withObservations,
             'compliance_percentage'       => $globalCompliance,
             'overdue_activities'          => $overdueActivities,
@@ -67,6 +123,8 @@ class ReportController extends Controller
             'deliverables_by_status'      => $deliverablesByStatus,
             'global_compliance_percentage'=> $globalCompliance,
             'activities_by_role'          => $activitiesByRole,
+            'activities_by_role_detail'   => $activitiesByRoleDetail,
+            'programs_breakdown'          => $programsBreakdown,
         ]);
     }
 

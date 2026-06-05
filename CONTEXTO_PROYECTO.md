@@ -301,9 +301,12 @@ GET    /api/export/deliverables?project_id=X&format=csv
 
 ---
 
-## Estado actual del desarrollo (04/06/2026)
+## Estado actual del desarrollo (05/06/2026)
 
 ### ✅ Completado y funcionando
+- Dashboard operativo rediseñado: 4 KPIs (Pendientes, En Proceso, Vencidas, % Avance) + tarjetas de prioridad con click → /mi-espacio
+- Dashboard admin/coordinador rediseñado: KPIs ejecutivos, avance por programa (barras CSS), distribución por estado, análisis de flujo/cuellos de botella, ranking de programas
+- Backend: endpoint /reports/dashboard extendido con programs_breakdown y activities_by_role_detail
 - Autenticación completa (login, logout, recuperar contraseña, cambiar contraseña)
 - Dashboard admin (stats globales + tabla proyectos)
 - Dashboard operativo (6 tarjetas + tabla pendientes + acciones rápidas + toast)

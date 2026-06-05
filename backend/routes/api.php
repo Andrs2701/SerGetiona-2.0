@@ -58,6 +58,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('deliverables', DeliverableController::class);
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
     Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
+    Route::get('activities/{activity}/timeline', [RoleActivityController::class, 'timeline']);
+    Route::get('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'byActivity']);
 
     // Evidence links
     Route::get('deliverables/{deliverable}/evidence', [EvidenceLinkController::class, 'byDeliverable']);
