@@ -18,6 +18,8 @@ import { TableSkeleton } from '@/components/LoadingSkeleton';
 import DeliverableFlow, { type FlowStep } from '@/components/DeliverableFlow';
 import CommentThread from '@/components/CommentThread';
 import ImportModal from '@/components/ImportModal';
+import EvidencePanel from '@/components/EvidencePanel';
+import NextResponsibleCard from '@/components/NextResponsibleCard';
 
 type Role = RoleType;
 
@@ -111,6 +113,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [activityStatus, setActivityStatus] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [sidePanelTab, setSidePanelTab] = useState<'info' | 'flow' | 'evidence' | 'comments'>('info');
 
   useEffect(() => {
     async function fetchAll() {
@@ -466,7 +469,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Side panel for role activity detail */}
       <SidePanel
         open={!!selectedActivity}
-        onClose={() => setSelectedActivity(null)}
+        onClose={() => { setSelectedActivity(null); setSidePanelTab('info'); }}
         title={
           selectedActivity
             ? `${ROLE_LABELS[selectedActivity.activity.role as Role]} — ${selectedActivity.deliverable.name}`
@@ -476,78 +479,116 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       >
         {selectedActivity && (
           <div className="flex flex-col h-full">
-            <div className="p-6 space-y-5 border-b border-gray-100">
-              {/* Deliverable Flow */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Flujo de Producción</p>
-                <DeliverableFlow steps={flowSteps} />
-              </div>
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-gray-200 px-4 pt-2 flex-shrink-0">
+              {(['info', 'flow', 'evidence', 'comments'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setSidePanelTab(tab)}
+                  className={clsx(
+                    'px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                    sidePanelTab === tab
+                      ? 'border-indigo-600 text-indigo-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  )}
+                >
+                  {tab === 'info' ? 'Info' : tab === 'flow' ? 'Flujo' : tab === 'evidence' ? 'Evidencias' : 'Comentarios'}
+                </button>
+              ))}
+            </div>
 
-              {/* Info */}
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Entregable</p>
-                  <p className="font-medium text-gray-900 text-sm">{selectedActivity.deliverable.name}</p>
-                  <p className="text-xs text-gray-500">{selectedActivity.deliverable.subject_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Responsable</p>
-                  <p className="text-sm text-gray-800">
-                    {selectedActivity.activity.responsible?.name ?? 'Sin asignar'}
-                  </p>
-                </div>
-                {selectedActivity.activity.commitment_date && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Fecha Compromiso</p>
-                    <p className="text-sm text-gray-800">{selectedActivity.activity.commitment_date}</p>
+            <div className="flex-1 overflow-y-auto">
+              {/* Info tab */}
+              {sidePanelTab === 'info' && (
+                <div className="p-5 space-y-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Entregable</p>
+                      <p className="font-medium text-gray-900 text-sm">{selectedActivity.deliverable.name}</p>
+                      <p className="text-xs text-gray-500">{selectedActivity.deliverable.subject_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Responsable</p>
+                      <p className="text-sm text-gray-800">
+                        {selectedActivity.activity.responsible?.name ?? 'Sin asignar'}
+                      </p>
+                    </div>
+                    {selectedActivity.activity.commitment_date && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">Fecha Compromiso</p>
+                        <p className="text-sm text-gray-800">{selectedActivity.activity.commitment_date}</p>
+                      </div>
+                    )}
+                    {selectedActivity.activity.actual_delivery_date && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">Entrega Real</p>
+                        <p className="text-sm text-gray-800">{selectedActivity.activity.actual_delivery_date}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedActivity.activity.actual_delivery_date && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Entrega Real</p>
-                    <p className="text-sm text-gray-800">{selectedActivity.activity.actual_delivery_date}</p>
-                  </div>
-                )}
-              </div>
 
-              {selectedActivity.activity.notes && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Notas</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
-                    {selectedActivity.activity.notes}
-                  </p>
+                  {selectedActivity.activity.notes && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Notas</p>
+                      <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                        {selectedActivity.activity.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Status selector */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cambiar Estado</p>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={activityStatus}
+                        onChange={(e) => handleStatusChange(e.target.value)}
+                        disabled={savingStatus}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 disabled:opacity-60"
+                      >
+                        {roleStates.map((s) => (
+                          <option key={s} value={s}>
+                            {ROLE_STATUS_LABELS[s] ?? s}
+                          </option>
+                        ))}
+                      </select>
+                      {savingStatus && <span className="text-xs text-gray-400">Guardando...</span>}
+                    </div>
+                  </div>
+
+                  {/* Next responsible */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Próximo responsable</p>
+                    <NextResponsibleCard />
+                  </div>
                 </div>
               )}
 
-              {/* Role-specific status selector (Task 7) */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cambiar Estado</p>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={activityStatus}
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    disabled={savingStatus}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 disabled:opacity-60"
-                  >
-                    {roleStates.map((s) => (
-                      <option key={s} value={s}>
-                        {ROLE_STATUS_LABELS[s] ?? s}
-                      </option>
-                    ))}
-                  </select>
-                  {savingStatus && (
-                    <span className="text-xs text-gray-400">Guardando...</span>
-                  )}
+              {/* Flow tab */}
+              {sidePanelTab === 'flow' && (
+                <div className="p-5 space-y-5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Flujo de Producción</p>
+                  <DeliverableFlow steps={flowSteps} />
+                  <NextResponsibleCard />
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Comment Thread */}
-            <div className="flex-1 flex flex-col min-h-0">
-              <CommentThread
-                deliverableId={selectedActivity.deliverable.id}
-                deliverableName={selectedActivity.deliverable.name}
-              />
+              {/* Evidence tab */}
+              {sidePanelTab === 'evidence' && (
+                <EvidencePanel
+                  deliverableId={selectedActivity.deliverable.id}
+                  activityId={selectedActivity.activity.id}
+                  role={selectedActivity.activity.role}
+                />
+              )}
+
+              {/* Comments tab */}
+              {sidePanelTab === 'comments' && (
+                <CommentThread
+                  deliverableId={selectedActivity.deliverable.id}
+                  deliverableName={selectedActivity.deliverable.name}
+                />
+              )}
             </div>
           </div>
         )}

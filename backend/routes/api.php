@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleActivityController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\EvidenceLinkController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +57,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('subjects', SubjectController::class);
     Route::apiResource('deliverables', DeliverableController::class);
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
+    Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
+
+    // Evidence links
+    Route::get('deliverables/{deliverable}/evidence', [EvidenceLinkController::class, 'byDeliverable']);
+    Route::post('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'store']);
+    Route::delete('evidence/{link}', [EvidenceLinkController::class, 'destroy']);
     Route::post('deliverables/{deliverable}/apply-template', [DeliverableController::class, 'applyFlowTemplate']);
     Route::get('deliverables/{deliverable}/comments', [CommentController::class, 'index']);
     Route::post('deliverables/{deliverable}/comments', [CommentController::class, 'store']);

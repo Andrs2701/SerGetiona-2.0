@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\RoleActivity;
 use App\Models\User;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -109,5 +110,107 @@ class RoleActivityController extends Controller
         }
 
         return response()->json($activity->load('responsible', 'assignedBy'));
+    }
+
+    /**
+     * POST /api/activities/{activity}/quick-action
+     * body: { action: 'deliver'|'approve'|'request_adjustments'|'reject' }
+     */
+    public function quickAction(Request $request, RoleActivity $activity)
+    {
+        $data = $request->validate([
+            'action' => 'required|in:deliver,approve,request_adjustments,reject',
+        ]);
+
+        $action  = $data['action'];
+        $today   = Carbon::today()->toDateString();
+        $oldStatus = $activity->status;
+
+        switch ($action) {
+            case 'deliver':
+                $activity->status               = 'delivered';
+                $activity->actual_delivery_date = $today;
+                break;
+
+            case 'approve':
+                $activity->status               = 'approved';
+                $activity->actual_delivery_date = $activity->actual_delivery_date ?? $today;
+                break;
+
+            case 'request_adjustments':
+                $activity->status = 'adjustments_requested';
+                // Notificar al experto del entregable
+                $expertActivity = $activity->deliverable?->roleActivities()
+                    ->where('role', 'expert')
+                    ->first();
+                if ($expertActivity?->responsible_id) {
+                    $expertUser = User::find($expertActivity->responsible_id);
+                    if ($expertUser) {
+                        NotificationService::notify(
+                            $expertUser,
+                            'adjustments_requested',
+                            'Ajustes solicitados',
+                            "Se han solicitado ajustes en el entregable '{$activity->deliverable?->name}'.",
+                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                        );
+                    }
+                }
+                break;
+
+            case 'reject':
+                $activity->status = 'with_findings';
+                break;
+        }
+
+        $activity->save();
+
+        // Audit log
+        AuditLog::create([
+            'user_id'       => Auth::id(),
+            'action'        => 'quick_action',
+            'entity_type'   => 'RoleActivity',
+            'entity_id'     => $activity->id,
+            'field_changed' => 'status',
+            'old_value'     => $oldStatus,
+            'new_value'     => $activity->status,
+            'ip_address'    => $request->ip(),
+            'created_at'    => now(),
+        ]);
+
+        // Notificar coordinadores del cambio de estado
+        $coordinators = User::whereIn('role', ['admin', 'coordinator'])->get();
+        NotificationService::notifyMany(
+            $coordinators,
+            'status_changed',
+            'Estado de actividad cambiado',
+            "La actividad '{$activity->role}' cambió de estado a '{$activity->status}' mediante acción rápida.",
+            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'new_status' => $activity->status]
+        );
+
+        // Resolver siguiente rol en la cadena
+        $roleChain   = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+        $currentIdx  = array_search($activity->role, $roleChain);
+        $nextRole    = null;
+        $nextResponsible     = null;
+        $nextCommitmentDate  = null;
+
+        if ($currentIdx !== false && $currentIdx < count($roleChain) - 1 && $activity->status === 'approved') {
+            $nextRole     = $roleChain[$currentIdx + 1];
+            $nextActivity = $activity->deliverable?->roleActivities()
+                ->where('role', $nextRole)
+                ->with('responsible')
+                ->first();
+            $nextResponsible    = $nextActivity?->responsible?->name;
+            $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
+        }
+
+        $activity->load('responsible', 'assignedBy', 'deliverable');
+
+        return response()->json([
+            'activity'             => $activity,
+            'next_role'            => $nextRole,
+            'next_responsible'     => $nextResponsible,
+            'next_commitment_date' => $nextCommitmentDate,
+        ]);
     }
 }

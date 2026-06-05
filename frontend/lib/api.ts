@@ -123,6 +123,12 @@ export const ENDPOINTS = {
   EXPORT_PROJECTS: '/export/projects',
   EXPORT_DELIVERABLES: '/export/deliverables',
 
+  // Evidence & quick actions
+  DELIVERABLE_EVIDENCE: (id: number) => `/deliverables/${id}/evidence`,
+  ACTIVITY_EVIDENCE: (id: number) => `/role-activities/${id}/evidence`,
+  ACTIVITY_QUICK_ACTION: (id: number) => `/activities/${id}/quick-action`,
+  DELIVERABLE_FLOW: (id: number) => `/deliverables/${id}/flow`,
+
   // Auth extended
   AUTH_ME: '/auth/me',
   AUTH_LOGOUT: '/auth/logout',

@@ -245,6 +245,29 @@ export interface WorkspaceActivity {
   subject: { id: number; name: string };
   program: { id: number; name: string };
   project: { id: number; name: string; status: ProjectStatus };
+  next_role?: Role;
+  next_responsible?: string;
+  next_date?: string;
+}
+
+export interface EvidenceLink {
+  id: number;
+  role_activity_id: number;
+  type: 'file' | 'url' | 'drive' | 'onedrive' | 'sharepoint' | 'repository';
+  title: string;
+  url?: string;
+  filename?: string;
+  user?: User;
+  created_at: string;
+}
+
+export interface EvidenceByRole {
+  expert: EvidenceLink[];
+  pedagogy: EvidenceLink[];
+  design: EvidenceLink[];
+  audiovisual: EvidenceLink[];
+  engineering: EvidenceLink[];
+  qa: EvidenceLink[];
 }
 
 export interface WorkspaceStats {
