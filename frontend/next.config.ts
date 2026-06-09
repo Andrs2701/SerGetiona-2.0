@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Usando webpack (estable) con Tailwind CSS v3
+  experimental: {
+    // Usa el postcss.config.js local dentro de Turbopack (fix para Tailwind v3)
+    turbopackLocalPostcssConfig: true,
+  },
 };
 
 export default nextConfig;
