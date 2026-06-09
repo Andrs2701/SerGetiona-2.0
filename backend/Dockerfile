@@ -2,9 +2,9 @@ FROM php:8.2-cli
 
 WORKDIR /app
 
-# Dependencias del sistema
+# Dependencias del sistema — libsqlite3-dev es requerida para pdo_sqlite
 RUN apt-get update && apt-get install -y \
-    zip unzip git curl libzip-dev \
+    zip unzip git curl libzip-dev libsqlite3-dev \
     && docker-php-ext-install pdo pdo_sqlite zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
