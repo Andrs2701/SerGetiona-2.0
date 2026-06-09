@@ -129,7 +129,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
     <aside className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
       <div className="h-14 flex items-center justify-between px-6 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-baseline gap-1">
-          <span className="font-bold text-lg text-indigo-700 tracking-tight">Sergestiona</span>
+          <span className="font-bold text-lg tracking-tight" style={{ color: '#194276' }}>Sergestiona</span>
           <span className="text-xs font-medium text-gray-400">2.0</span>
         </div>
         {onMobileClose && (
@@ -154,9 +154,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
               className={clsx(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active
-                  ? "bg-indigo-600 text-white shadow-sm"
+                  ? "text-white shadow-sm"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               )}
+              style={active ? { background: '#194276' } : undefined}
             >
               <Icon size={18} />
               <span className="flex-1 truncate">{label}</span>
@@ -181,11 +182,14 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           onClick={onMobileClose}
           className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors group"
         >
-          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: '#194276' }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-700 transition-colors">
+            <p className="text-sm font-medium text-gray-900 truncate transition-colors" style={{ color: undefined }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#194276')}
+              onMouseLeave={e => (e.currentTarget.style.color = '')}
+            >
               {user?.name ?? 'Usuario'}
             </p>
             <p className="text-xs text-gray-500 truncate">

@@ -6,6 +6,9 @@ import { api, ENDPOINTS } from '@/lib/api';
 import type { User } from '@/lib/types';
 import { AlertCircle, Eye, EyeOff, CheckCircle2, Mail, Lock, GraduationCap, Users, BarChart3, ClipboardList } from 'lucide-react';
 
+// Colores institucionales Universidad Sergio Arboleda
+// Azul oscuro: #194276  |  Amarillo: #ffec00
+
 function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,9 +53,11 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@sergestiona.co"
+                  placeholder="usuario@usa.edu.co"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                  onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.2)')}
+                  onBlur={e => (e.currentTarget.style.boxShadow = '')}
                 />
               </div>
               <div className="flex gap-3">
@@ -66,7 +71,10 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2 px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                  className="flex-1 py-2 px-4 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-60"
+                  style={{ background: '#194276' }}
+                  onMouseEnter={e => !loading && (e.currentTarget.style.background = '#12305a')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '#194276')}
                 >
                   {loading ? 'Enviando...' : 'Enviar instrucciones'}
                 </button>
@@ -84,7 +92,10 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
             </p>
             <button
               onClick={onClose}
-              className="py-2 px-6 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="py-2 px-6 text-sm font-medium text-white rounded-lg transition-colors"
+              style={{ background: '#194276' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#12305a')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#194276')}
             >
               Entendido
             </button>
@@ -130,68 +141,113 @@ export default function LoginPage() {
       {showRecovery && <PasswordRecoveryModal onClose={() => setShowRecovery(false)} />}
 
       <div className="min-h-screen flex">
-        {/* Left panel — branding (hidden on mobile) */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-indigo-800 to-indigo-600 flex-col justify-between p-12">
-          <div>
-            <div className="flex items-center gap-2 mb-12">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
+
+        {/* ── Panel izquierdo — branding institucional (oculto en móvil) ── */}
+        <div
+          className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
+          style={{ background: 'linear-gradient(145deg, #0d2a4f 0%, #194276 55%, #1e5099 100%)' }}
+        >
+          {/* Decoraciones de fondo */}
+          <div className="absolute inset-0 pointer-events-none select-none">
+            <div
+              className="absolute -top-24 -right-24 w-96 h-96 rounded-full"
+              style={{ background: '#ffec00', opacity: 0.07 }}
+            />
+            <div
+              className="absolute -bottom-16 -left-16 w-60 h-60 rounded-full"
+              style={{ background: '#ffec00', opacity: 0.07 }}
+            />
+            <div
+              className="absolute top-0 left-0 w-1 h-full"
+              style={{ background: 'linear-gradient(to bottom, transparent 0%, #ffec00 50%, transparent 100%)', opacity: 0.25 }}
+            />
+          </div>
+
+          {/* Logo + nombre */}
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-12">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(255,236,0,0.15)', border: '1.5px solid rgba(255,236,0,0.3)' }}
+              >
+                <GraduationCap className="w-7 h-7" style={{ color: '#ffec00' }} />
               </div>
               <div>
-                <span className="font-bold text-white text-xl tracking-tight">Sergestiona</span>
-                <span className="text-indigo-300 text-sm ml-1">2.0</span>
+                <div className="font-bold text-white text-xl tracking-tight leading-tight">Sergestiona</div>
+                <div
+                  className="text-xs font-semibold tracking-widest uppercase"
+                  style={{ color: '#ffec00' }}
+                >
+                  v2.0
+                </div>
               </div>
             </div>
 
             <h1 className="text-4xl font-bold text-white leading-tight mb-4">
               Plataforma de Gestión de Producción Académica
             </h1>
-            <p className="text-indigo-200 text-lg leading-relaxed">
+            <p className="text-blue-200 text-lg leading-relaxed">
               Centraliza, controla y mide el avance de todos tus proyectos académicos en un solo lugar.
             </p>
           </div>
 
-          <div className="space-y-4">
+          {/* Características */}
+          <div className="relative z-10 space-y-4">
             {[
               { icon: ClipboardList, text: 'Trazabilidad completa de entregables y roles' },
-              { icon: Users, text: 'Colaboración en tiempo real entre equipos' },
-              { icon: BarChart3, text: 'Indicadores automáticos de cumplimiento' },
+              { icon: Users,         text: 'Colaboración en tiempo real entre equipos' },
+              { icon: BarChart3,     text: 'Indicadores automáticos de cumplimiento' },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-white/15 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5 text-indigo-100" />
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(255,236,0,0.1)', border: '1px solid rgba(255,236,0,0.2)' }}
+                >
+                  <Icon className="w-5 h-5" style={{ color: '#ffec00' }} />
                 </div>
-                <span className="text-indigo-100 text-sm">{text}</span>
+                <span className="text-blue-100 text-sm">{text}</span>
               </div>
             ))}
           </div>
 
-          <p className="text-indigo-300 text-xs">
-            Sergestiona 2.0 &copy; {new Date().getFullYear()}
-          </p>
+          {/* Pie del panel */}
+          <div className="relative z-10">
+            <div className="w-10 h-0.5 mb-4 rounded-full" style={{ background: '#ffec00', opacity: 0.45 }} />
+            <p className="text-blue-300 text-xs">
+              Universidad Sergio Arboleda &nbsp;·&nbsp; Sergestiona 2.0 &copy; {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
 
-        {/* Right panel — form */}
+        {/* ── Panel derecho — formulario ── */}
         <div className="flex-1 flex items-center justify-center p-6 bg-white">
           <div className="w-full max-w-sm">
-            {/* Mobile logo */}
+
+            {/* Logo móvil */}
             <div className="lg:hidden text-center mb-8">
-              <div className="inline-flex items-center gap-1 mb-1">
-                <span className="font-bold text-2xl text-indigo-700 tracking-tight">Sergestiona</span>
-                <span className="text-sm font-medium text-gray-400 mt-0.5">2.0</span>
+              <div
+                className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3"
+                style={{ background: '#194276' }}
+              >
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+              <div className="font-bold text-2xl tracking-tight" style={{ color: '#194276' }}>
+                Sergestiona
+                <span className="text-sm font-medium text-gray-400 ml-1">2.0</span>
               </div>
               <p className="text-sm text-gray-500">Plataforma de Gestión Académica</p>
             </div>
 
-            {/* Desktop logo text */}
-            <div className="hidden lg:block mb-8">
-              <p className="text-sm font-semibold text-indigo-600 uppercase tracking-widest mb-2">
-                Sergestiona 2.0
+            {/* Etiqueta institucional (desktop) */}
+            <div className="hidden lg:flex items-center gap-2 mb-8">
+              <div className="w-1 h-5 rounded-full" style={{ background: '#194276' }} />
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#194276' }}>
+                Universidad Sergio Arboleda &nbsp;·&nbsp; Sergestiona 2.0
               </p>
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Iniciar Sesión</h2>
-            <p className="text-sm text-gray-500 mb-8">Ingresa tus credenciales para continuar</p>
+            <p className="text-sm text-gray-500 mb-8">Ingresa tus credenciales institucionales para continuar</p>
 
             {error && (
               <div className="mb-5 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
@@ -201,6 +257,7 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
+
               {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -212,14 +269,16 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@sergestiona.co"
+                    placeholder="usuario@usa.edu.co"
                     required
-                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.18)')}
+                    onBlur={e => (e.currentTarget.style.boxShadow = '')}
                   />
                 </div>
               </div>
 
-              {/* Password */}
+              {/* Contraseña */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Contraseña
@@ -232,7 +291,9 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-9 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full pl-9 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.18)')}
+                    onBlur={e => (e.currentTarget.style.boxShadow = '')}
                   />
                   <button
                     type="button"
@@ -244,30 +305,36 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Remember + forgot */}
+              {/* Recordar + olvidé */}
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    className="w-4 h-4 border-gray-300 rounded"
+                    style={{ accentColor: '#194276' }}
                   />
                   <span className="text-sm text-gray-600">Recordar sesión</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowRecovery(true)}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                  className="text-sm font-medium hover:underline transition-colors"
+                  style={{ color: '#194276' }}
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
 
+              {/* Botón principal */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-lg text-sm font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none"
+                style={{ background: '#194276' }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#12305a'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#194276'; }}
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -280,11 +347,19 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="text-center text-xs text-gray-400 mt-8">
-              Sergestiona 2.0 &copy; {new Date().getFullYear()} · Todos los derechos reservados
+            {/* Separador con acento amarillo */}
+            <div className="flex items-center gap-2 mt-8 mb-4">
+              <div className="flex-1 h-px bg-gray-100" />
+              <div className="w-2 h-2 rounded-full" style={{ background: '#ffec00' }} />
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+
+            <p className="text-center text-xs text-gray-400">
+              Sergestiona 2.0 &copy; {new Date().getFullYear()} &nbsp;·&nbsp; Universidad Sergio Arboleda
             </p>
           </div>
         </div>
+
       </div>
     </>
   );
