@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User } from '@/lib/types';
 import { AlertCircle, Eye, EyeOff, CheckCircle2, Mail, Lock, GraduationCap, Users, BarChart3, ClipboardList } from 'lucide-react';
@@ -223,31 +224,31 @@ export default function LoginPage() {
         <div className="flex-1 flex items-center justify-center p-6 bg-white">
           <div className="w-full max-w-sm">
 
-            {/* Logo móvil */}
-            <div className="lg:hidden text-center mb-8">
-              <div
-                className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3"
-                style={{ background: '#194276' }}
-              >
-                <GraduationCap className="w-8 h-8 text-white" />
-              </div>
-              <div className="font-bold text-2xl tracking-tight" style={{ color: '#194276' }}>
-                Sergestiona
-                <span className="text-sm font-medium text-gray-400 ml-1">2.0</span>
-              </div>
-              <p className="text-sm text-gray-500">Plataforma de Gestión Académica</p>
+            {/* Logo institucional — visible en ambos breakpoints, fondo blanco garantizado */}
+            <div className="flex justify-center mb-8">
+              <Image
+                src="/logo-usa.png"
+                alt="Campus Virtual — Universidad Sergio Arboleda"
+                width={260}
+                height={72}
+                priority
+                className="object-contain"
+                style={{ maxHeight: 72 }}
+              />
             </div>
 
-            {/* Etiqueta institucional (desktop) */}
-            <div className="hidden lg:flex items-center gap-2 mb-8">
-              <div className="w-1 h-5 rounded-full" style={{ background: '#194276' }} />
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#194276' }}>
-                Universidad Sergio Arboleda &nbsp;·&nbsp; Sergestiona 2.0
-              </p>
+            {/* Separador con badge de sistema */}
+            <div className="flex items-center gap-2 mb-6">
+              <div className="flex-1 h-px bg-gray-100" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full"
+                style={{ color: '#194276', background: 'rgba(25,66,118,0.08)' }}>
+                Sergestiona 2.0
+              </span>
+              <div className="flex-1 h-px bg-gray-100" />
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Iniciar Sesión</h2>
-            <p className="text-sm text-gray-500 mb-8">Ingresa tus credenciales institucionales para continuar</p>
+            <p className="text-sm text-gray-500 mb-6">Ingresa tus credenciales institucionales para continuar</p>
 
             {error && (
               <div className="mb-5 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
