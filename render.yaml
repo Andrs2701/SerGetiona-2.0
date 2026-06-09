@@ -37,7 +37,7 @@ services:
     name: sergestiona-frontend
     runtime: node
     rootDir: frontend
-    buildCommand: npm install && npx next build --no-turbopack
+    buildCommand: npm install && npm run build
     startCommand: npm start
     plan: free
     envVars:
