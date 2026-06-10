@@ -17,8 +17,10 @@ class DeliverableController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Deliverable::with('subject.academicProgram', 'creator')
-            ->withCount('roleActivities');
+        $query = Deliverable::with([
+            'subject.academicProgram.project',
+            'roleActivities.responsible',
+        ]);
 
         // Operational roles only see deliverables where they have an assigned activity
         if (in_array($user->role, self::OPERATIONAL_ROLES)) {
@@ -41,7 +43,50 @@ class DeliverableController extends Controller
             $query->byStatus($request->global_status);
         }
 
-        return response()->json($query->get());
+        $today = now()->toDateString();
+
+        $result = $query->get()->map(function ($d) use ($today) {
+            $subject  = $d->subject;
+            $program  = $subject?->academicProgram;
+            $project  = $program?->project;
+
+            $activities = $d->roleActivities;
+            $total      = $activities->count();
+            $approved   = $activities->where('status', 'approved')->count();
+            $compliance = $total > 0 ? (int) round(($approved / $total) * 100) : 0;
+
+            return [
+                'id'                   => $d->id,
+                'subject_id'           => $d->subject_id,
+                'name'                 => $d->name,
+                'type'                 => $d->type,
+                'global_status'        => $d->global_status,
+                'start_date'           => $d->start_date,
+                'notes'                => $d->notes,
+                'subject_name'         => $subject?->name,
+                'program_id'           => $program?->id,
+                'program_name'         => $program?->name,
+                'project_id'           => $project?->id,
+                'project_name'         => $project?->name,
+                'compliance_percentage'=> $compliance,
+                'role_activities'      => $activities->map(fn($a) => [
+                    'id'                   => $a->id,
+                    'role'                 => $a->role,
+                    'status'               => $a->status,
+                    'commitment_date'      => $a->commitment_date?->toDateString(),
+                    'actual_start_date'    => $a->actual_start_date?->toDateString(),
+                    'actual_delivery_date' => $a->actual_delivery_date?->toDateString(),
+                    'notes'                => $a->notes,
+                    'responsible'          => $a->responsible ? [
+                        'id'   => $a->responsible->id,
+                        'name' => $a->responsible->name,
+                        'role' => $a->responsible->role,
+                    ] : null,
+                ])->values(),
+            ];
+        });
+
+        return response()->json($result);
     }
 
     public function store(Request $request)

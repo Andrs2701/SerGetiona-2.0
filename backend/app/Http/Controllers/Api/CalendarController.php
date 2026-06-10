@@ -83,6 +83,62 @@ class CalendarController extends Controller
         return response()->json(collect($suggested)->map(fn($d) => $d->toDateString()));
     }
 
+    public function allActivities(Request $request)
+    {
+        $user = $request->user();
+
+        if (!in_array($user->role, ['admin', 'coordinator'])) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $roleLabelMap = [
+            'expert'      => 'Experto',
+            'pedagogy'    => 'Pedagogía',
+            'design'      => 'Diseño',
+            'audiovisual' => 'Audiovisual',
+            'engineering' => 'Ingeniería',
+            'qa'          => 'Calidad',
+        ];
+
+        $activities = RoleActivity::with([
+            'deliverable.subject.academicProgram.project',
+            'responsible',
+        ])->get()->map(function ($activity) use ($roleLabelMap) {
+            $deliverable = $activity->deliverable;
+            $subject     = $deliverable?->subject;
+            $program     = $subject?->academicProgram;
+            $project     = $program?->project;
+
+            $dateStatus = 'on_time';
+            if ($activity->commitment_date) {
+                $dateStatus = WorkingDayService::getStatus(
+                    Carbon::parse($activity->commitment_date),
+                    $activity->actual_delivery_date ? Carbon::parse($activity->actual_delivery_date) : null
+                );
+            }
+
+            return [
+                'id'                   => $activity->id,
+                'deliverable_id'       => $activity->deliverable_id,
+                'deliverable_name'     => $deliverable?->name,
+                'role'                 => $activity->role,
+                'role_label'           => $roleLabelMap[$activity->role] ?? $activity->role,
+                'responsible_id'       => $activity->responsible_id,
+                'responsible_name'     => $activity->responsible?->name,
+                'commitment_date'      => $activity->commitment_date?->toDateString(),
+                'actual_delivery_date' => $activity->actual_delivery_date?->toDateString(),
+                'status'               => $activity->status,
+                'date_status'          => $dateStatus,
+                'program_name'         => $program?->name,
+                'subject_name'         => $subject?->name,
+                'project_id'           => $project?->id,
+                'project_name'         => $project?->name,
+            ];
+        });
+
+        return response()->json($activities);
+    }
+
     public function myDeliverables(Request $request)
     {
         $user = $request->user();

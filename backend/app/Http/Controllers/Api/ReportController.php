@@ -7,6 +7,7 @@ use App\Models\AcademicProgram;
 use App\Models\Deliverable;
 use App\Models\Project;
 use App\Models\RoleActivity;
+use App\Models\User;
 use App\Services\WorkingDayService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,6 +15,55 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
+    public function workload(Request $request)
+    {
+        $user = $request->user();
+
+        if (!in_array($user->role, ['admin', 'coordinator'])) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $pendingStatuses  = ['not_started', 'pending', 'in_development', 'in_progress', 'designing', 'production', 'implementing', 'draft'];
+        $inReviewStatuses = ['delivered', 'in_review', 'in_testing', 'validating', 'editing', 'adjusting'];
+        $today = now()->toDateString();
+
+        $activities = RoleActivity::whereNotNull('responsible_id')->get();
+
+        $grouped = $activities->groupBy('responsible_id');
+
+        $workload = $grouped->map(function ($items, $responsibleId) use ($pendingStatuses, $inReviewStatuses, $today) {
+            $user = User::find($responsibleId);
+
+            $pending  = $items->whereIn('status', $pendingStatuses)->count();
+            $inReview = $items->whereIn('status', $inReviewStatuses)->count();
+            $completed = $items->where('status', 'approved')->count();
+            $overdue  = $items->filter(function ($a) use ($today) {
+                return $a->commitment_date
+                    && $a->commitment_date->toDateString() < $today
+                    && is_null($a->actual_delivery_date)
+                    && !in_array($a->status, ['approved', 'not_applicable']);
+            })->count();
+
+            return [
+                'user_id'   => $responsibleId,
+                'user_name' => $user?->name ?? 'Unknown',
+                'role'      => $user?->role ?? '',
+                'total'     => $items->count(),
+                'pending'   => $pending,
+                'in_review' => $inReview,
+                'overdue'   => $overdue,
+                'completed' => $completed,
+            ];
+        })->values()
+          ->sortBy([
+              ['overdue', 'desc'],
+              ['total', 'desc'],
+          ])
+          ->values();
+
+        return response()->json($workload);
+    }
+
     public function dashboard()
     {
         $projectsByStatus = Project::select('status', DB::raw('count(*) as count'))
@@ -54,11 +104,67 @@ class ReportController extends Controller
             if ($status === 'approaching') $approachingActivities++;
         }
 
+        // Per-program breakdown
+        $programs = \App\Models\AcademicProgram::with('project')->get();
+        $programsBreakdown = $programs->map(function ($prog) {
+            $deliverableIds = \App\Models\Subject::where('academic_program_id', $prog->id)
+                ->pluck('id')
+                ->pipe(fn($subjectIds) => \App\Models\Deliverable::whereIn('subject_id', $subjectIds)->pluck('id'));
+
+            $total = $deliverableIds->count();
+            $finished = \App\Models\Deliverable::whereIn('id', $deliverableIds)
+                ->where('global_status', 'finished')->count();
+            $compliance = $total > 0 ? round(($finished / $total) * 100) : 0;
+
+            $overdueCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->whereNotNull('commitment_date')
+                ->whereNull('actual_delivery_date')
+                ->where('commitment_date', '<', now()->toDateString())
+                ->whereNotIn('status', ['approved', 'not_applicable'])
+                ->count();
+
+            $activeCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->whereNotIn('status', ['approved', 'not_applicable', 'not_started'])
+                ->count();
+
+            return [
+                'id'                    => $prog->id,
+                'name'                  => $prog->name,
+                'project_id'            => $prog->project_id,
+                'project_name'          => $prog->project->name ?? '',
+                'total'                 => $total,
+                'finished'              => $finished,
+                'compliance_percentage' => $compliance,
+                'overdue_count'         => $overdueCount,
+                'active_count'          => $activeCount,
+                'pending_count'         => max(0, $total - $finished),
+            ];
+        })->sortByDesc('overdue_count')->values();
+
+        // Activities by role with more detail (for flow/bottleneck analysis)
+        $activitiesByRoleDetail = RoleActivity::select(
+                'role',
+                DB::raw('count(*) as total'),
+                DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
+                DB::raw("sum(case when status NOT IN ('approved','not_applicable','not_started') then 1 else 0 end) as active"),
+                DB::raw("sum(case when commitment_date < CURRENT_DATE and actual_delivery_date IS NULL and status NOT IN ('approved','not_applicable') then 1 else 0 end) as overdue")
+            )
+            ->groupBy('role')
+            ->get();
+
+        // Activities counts (for KPI cards)
+        $totalActivities    = RoleActivity::count();
+        $finishedActivities = RoleActivity::where('status', 'approved')->count();
+        $activeActivities   = RoleActivity::whereNotIn('status', ['approved', 'not_applicable', 'not_started'])->count();
+
         return response()->json([
             'active_projects'             => $activeProjects,
             'total_programs'              => $totalPrograms,
             'total_deliverables'          => $totalDeliverables,
+            'total_activities'            => $totalActivities,
             'finished_deliverables'       => $finishedDeliverables,
+            'finished_activities'         => $finishedActivities,
+            'active_activities'           => $activeActivities,
             'with_observations'           => $withObservations,
             'compliance_percentage'       => $globalCompliance,
             'overdue_activities'          => $overdueActivities,
@@ -67,6 +173,8 @@ class ReportController extends Controller
             'deliverables_by_status'      => $deliverablesByStatus,
             'global_compliance_percentage'=> $globalCompliance,
             'activities_by_role'          => $activitiesByRole,
+            'activities_by_role_detail'   => $activitiesByRoleDetail,
+            'programs_breakdown'          => $programsBreakdown,
         ]);
     }
 

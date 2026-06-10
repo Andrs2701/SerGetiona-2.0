@@ -115,12 +115,43 @@ export interface Comment {
   created_at: string;
 }
 
+export interface ProgramBreakdown {
+  id: number;
+  name: string;
+  project_id: number;
+  project_name: string;
+  total: number;
+  finished: number;
+  compliance_percentage: number;
+  overdue_count: number;
+  active_count: number;
+  pending_count: number;
+}
+
+export interface ActivityByRoleDetail {
+  role: Role;
+  total: number;
+  approved: number;
+  active: number;
+  overdue: number;
+}
+
 export interface DashboardStats {
   active_projects: number;
   total_programs: number;
   total_deliverables: number;
+  total_activities: number;
+  finished_deliverables: number;
+  finished_activities: number;
+  active_activities: number;
   with_observations: number;
   compliance_percentage: number;
+  global_compliance_percentage: number;
+  overdue_activities: number;
+  approaching_activities: number;
+  deliverables_by_status: Record<string, number>;
+  activities_by_role_detail: ActivityByRoleDetail[];
+  programs_breakdown: ProgramBreakdown[];
 }
 
 export interface ComplianceReport {
@@ -234,14 +265,24 @@ export interface CalendarEvent {
   is_recurring: boolean;
 }
 
+export interface TimelineEvent {
+  type: 'created' | 'assigned' | 'status' | 'delivered' | 'date_changed' | 'note' | 'approved';
+  icon: string;
+  label: string;
+  user?: string | null;
+  date?: string;
+}
+
 export interface WorkspaceActivity {
   id: number;
   role: Role;
   status: string;
+  notes?: string;
   commitment_date?: string;
+  actual_start_date?: string;
   actual_delivery_date?: string;
   date_status: DateStatus;
-  deliverable: { id: number; name: string; type: DeliverableType };
+  deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string };
   subject: { id: number; name: string };
   program: { id: number; name: string };
   project: { id: number; name: string; status: ProjectStatus };

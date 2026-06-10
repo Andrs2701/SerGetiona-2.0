@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -116,6 +116,7 @@ export const ENDPOINTS = {
   CALENDAR_EVENTS: '/calendar-events',
   CALENDAR_MY_DELIVERABLES: '/calendar/my-deliverables',
   CALENDAR_SUGGEST_DATES: '/calendar/suggest-dates',
+  CALENDAR_ALL_ACTIVITIES: '/calendar/all-activities',
 
   // Import / Export
   IMPORT_TEMPLATE: '/import/template',
@@ -127,6 +128,7 @@ export const ENDPOINTS = {
   DELIVERABLE_EVIDENCE: (id: number) => `/deliverables/${id}/evidence`,
   ACTIVITY_EVIDENCE: (id: number) => `/role-activities/${id}/evidence`,
   ACTIVITY_QUICK_ACTION: (id: number) => `/activities/${id}/quick-action`,
+  ACTIVITY_TIMELINE: (id: number) => `/activities/${id}/timeline`,
   DELIVERABLE_FLOW: (id: number) => `/deliverables/${id}/flow`,
 
   // Auth extended

@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/calendar-events/{event}', [CalendarController::class, 'destroy'])->middleware('role:admin,coordinator');
     Route::post('/calendar/suggest-dates', [CalendarController::class, 'suggestDates']);
     Route::get('/calendar/my-deliverables', [CalendarController::class, 'myDeliverables']);
+    Route::get('/calendar/all-activities', [CalendarController::class, 'allActivities']);
 
     // Workspace personal
     Route::get('/my-workspace', [WorkspaceController::class, 'index']);
@@ -58,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('deliverables', DeliverableController::class);
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
     Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
+    Route::get('activities/{activity}/timeline', [RoleActivityController::class, 'timeline']);
+    Route::get('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'byActivity']);
 
     // Evidence links
     Route::get('deliverables/{deliverable}/evidence', [EvidenceLinkController::class, 'byDeliverable']);
@@ -72,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
     Route::get('reports/compliance', [ReportController::class, 'compliance']);
+    Route::get('reports/workload', [ReportController::class, 'workload']);
 
     // Importación
     Route::post('/import/deliverables', [ImportController::class, 'deliverables']);
