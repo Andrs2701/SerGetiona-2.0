@@ -198,8 +198,21 @@ export const MOCK_DASHBOARD: DashboardStats = {
   active_projects: 4,
   total_programs: 12,
   total_deliverables: 247,
+  total_activities: 1482,
+  finished_deliverables: 158,
+  finished_activities: 948,
+  active_activities: 312,
   with_observations: 18,
   compliance_percentage: 64,
+  global_compliance_percentage: 64,
+  overdue_activities: 34,
+  approaching_activities: 21,
+  deliverables_by_status: {
+    finished: 158, in_progress: 42, in_review: 18, with_observations: 18,
+    pending_start: 7, unpublished: 3, cancelled: 0, not_applicable: 1,
+  },
+  activities_by_role_detail: [],
+  programs_breakdown: [],
 };
 
 export const MOCK_WORKSPACE: Workspace = {

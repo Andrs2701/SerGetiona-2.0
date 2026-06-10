@@ -1,0 +1,49 @@
+services:
+
+  # ── Backend Laravel (Docker) ──────────────────────────────────────
+  - type: web
+    name: sergestiona-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: APP_NAME
+        value: Sergestiona
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /app/database/database.sqlite
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: LOG_CHANNEL
+        value: stderr
+      # Completar con la URL del frontend de Render después del primer deploy
+      - key: FRONTEND_URL
+        value: https://sergestiona-frontend.onrender.com
+
+  # ── Frontend Next.js ──────────────────────────────────────────────
+  - type: web
+    name: sergestiona-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # IMPORTANTE: Completar con la URL real del backend después del primer deploy
+      # Ejemplo: https://sergestiona-backend.onrender.com/api
+      - key: NEXT_PUBLIC_API_URL
+        value: https://sergestiona-backend.onrender.com/api

@@ -213,4 +213,96 @@ class RoleActivityController extends Controller
             'next_commitment_date' => $nextCommitmentDate,
         ]);
     }
+
+    /**
+     * GET /api/activities/{activity}/timeline
+     * Timeline de cambios de estado, fechas y notas para una actividad.
+     */
+    public function timeline(RoleActivity $activity)
+    {
+        $logs = AuditLog::where('entity_type', 'RoleActivity')
+            ->where('entity_id', $activity->id)
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $events = [];
+
+        // Evento de creación
+        $events[] = [
+            'type'  => 'created',
+            'icon'  => 'plus',
+            'label' => 'Actividad creada',
+            'user'  => null,
+            'date'  => $activity->created_at?->toIso8601String(),
+        ];
+
+        // Si tiene responsable asignado, evento de asignación
+        if ($activity->responsible_id && $activity->assigned_at) {
+            $events[] = [
+                'type'  => 'assigned',
+                'icon'  => 'user',
+                'label' => 'Asignada a ' . ($activity->responsible?->name ?? 'responsable'),
+                'user'  => null,
+                'date'  => Carbon::parse($activity->assigned_at)->toIso8601String(),
+            ];
+        }
+
+        // Eventos del audit log
+        foreach ($logs as $log) {
+            if ($log->field_changed === 'status' && $log->new_value) {
+                $oldLabel = self::translateStatus($log->old_value ?? '');
+                $newLabel = self::translateStatus($log->new_value);
+                $events[] = [
+                    'type'  => 'status',
+                    'icon'  => 'refresh',
+                    'label' => "Estado: {$oldLabel} → {$newLabel}",
+                    'user'  => $log->user?->name,
+                    'date'  => $log->created_at?->toIso8601String(),
+                ];
+            } elseif ($log->field_changed === 'actual_delivery_date' && $log->new_value) {
+                $events[] = [
+                    'type'  => 'delivered',
+                    'icon'  => 'send',
+                    'label' => 'Entrega registrada',
+                    'user'  => $log->user?->name,
+                    'date'  => $log->created_at?->toIso8601String(),
+                ];
+            } elseif ($log->field_changed === 'commitment_date' && $log->new_value) {
+                $events[] = [
+                    'type'  => 'date_changed',
+                    'icon'  => 'calendar',
+                    'label' => "Fecha límite → {$log->new_value}",
+                    'user'  => $log->user?->name,
+                    'date'  => $log->created_at?->toIso8601String(),
+                ];
+            } elseif ($log->field_changed === 'notes' && $log->new_value) {
+                $events[] = [
+                    'type'  => 'note',
+                    'icon'  => 'message',
+                    'label' => 'Observación actualizada',
+                    'user'  => $log->user?->name,
+                    'date'  => $log->created_at?->toIso8601String(),
+                ];
+            }
+        }
+
+        // Si está aprobado y tiene fecha de entrega real
+        if ($activity->status === 'approved' && $activity->actual_delivery_date) {
+            $onTime = $activity->commitment_date
+                && $activity->actual_delivery_date->lte(Carbon::parse($activity->commitment_date));
+            $events[] = [
+                'type'  => 'approved',
+                'icon'  => 'check',
+                'label' => $onTime ? 'Aprobada ✓ (a tiempo)' : 'Aprobada (fuera de tiempo)',
+                'user'  => null,
+                'date'  => $activity->updated_at?->toIso8601String(),
+            ];
+        }
+
+        // Ordenar por fecha
+        usort($events, fn($a, $b) => strcmp($a['date'] ?? '', $b['date'] ?? ''));
+
+        return response()->json(['events' => $events]);
+    }
 }
