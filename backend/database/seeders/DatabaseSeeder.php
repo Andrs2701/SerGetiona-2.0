@@ -466,6 +466,9 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->command->info('DatabaseSeeder completado con ' . count($notifData) . ' notificaciones de ejemplo.');
+
+        // Canales, mensajes y decisiones de demostración
+        $this->call(DemoSeeder::class);
     }
 
     /**
