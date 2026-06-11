@@ -1,162 +1,109 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Search,
-  Eye,
-  MessageCircle,
-  FileText,
-  CheckCircle2,
-  Send,
-  RotateCcw,
-  X,
-  Download,
-  ChevronRight,
-  ChevronDown,
-  AlertCircle,
-  Clock,
-  Filter,
-  LayoutList,
-  Layers,
+  Search, Eye, MessageCircle, FileText, CheckCircle2, Send, RotateCcw,
+  X, Download, ChevronDown, AlertCircle, Clock, Filter,
+  Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
+  BookOpen, FolderOpen, LayoutList, Table2,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Deliverable, RoleActivity, Comment, Role } from '@/lib/types';
+import type { Deliverable, RoleActivity, Comment, Role, User } from '@/lib/types';
 import {
-  GLOBAL_STATUS_LABELS,
-  DELIVERABLE_TYPE_LABELS,
-  ROLE_LABELS,
+  GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
 } from '@/lib/types';
-import { MOCK_DELIVERABLES } from '@/lib/mock-data';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import { clsx } from 'clsx';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROLES: Role[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
 const ROLE_ABBR: Record<Role, string> = {
-  expert: 'EXP',
-  pedagogy: 'PED',
-  design: 'DIS',
-  audiovisual: 'AUD',
-  engineering: 'ING',
-  qa: 'QA',
+  expert: 'EXP', pedagogy: 'PED', design: 'DIS',
+  audiovisual: 'AUD', engineering: 'ING', qa: 'QA',
+};
+
+const ROLE_BADGE_BG: Record<Role, string> = {
+  expert: 'bg-violet-500', pedagogy: 'bg-blue-500', design: 'bg-pink-500',
+  audiovisual: 'bg-amber-500', engineering: 'bg-teal-500', qa: 'bg-emerald-600',
+};
+
+const ROLE_CELL_COLORS: Record<Role, { bg: string; border: string; label: string }> = {
+  expert:      { bg: 'bg-violet-50',  border: 'border-violet-100',  label: 'text-violet-700' },
+  pedagogy:    { bg: 'bg-blue-50',    border: 'border-blue-100',    label: 'text-blue-700' },
+  design:      { bg: 'bg-pink-50',    border: 'border-pink-100',    label: 'text-pink-700' },
+  audiovisual: { bg: 'bg-amber-50',   border: 'border-amber-100',   label: 'text-amber-700' },
+  engineering: { bg: 'bg-teal-50',    border: 'border-teal-100',    label: 'text-teal-700' },
+  qa:          { bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'text-emerald-700' },
+};
+
+const ACTIVITY_STATUS_CFG: Record<string, { label: string; dot: string; text: string }> = {
+  not_started:       { label: 'Sin iniciar',   dot: 'bg-gray-300',    text: 'text-gray-500' },
+  in_progress:       { label: 'En progreso',   dot: 'bg-blue-500',    text: 'text-blue-700' },
+  delivered:         { label: 'Entregado',     dot: 'bg-indigo-500',  text: 'text-indigo-700' },
+  in_review:         { label: 'En revisión',   dot: 'bg-purple-500',  text: 'text-purple-700' },
+  with_observations: { label: 'Observaciones', dot: 'bg-orange-500',  text: 'text-orange-700' },
+  approved:          { label: 'Aprobado',      dot: 'bg-emerald-500', text: 'text-emerald-700' },
+  not_applicable:    { label: 'No aplica',     dot: 'bg-gray-200',    text: 'text-gray-400' },
 };
 
 type QuickAction = 'approve' | 'deliver' | 'request_adjustments';
+type ViewMode = 'rows' | 'grouped';
 
-// ─── Helper: date utilities ───────────────────────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function daysUntil(dateStr?: string): number | null {
   if (!dateStr) return null;
-  const diff = new Date(dateStr).getTime() - new Date().setHours(0, 0, 0, 0);
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
-function dateColorClass(days: number | null): string {
-  if (days === null) return 'text-gray-400';
-  if (days < 0) return 'text-red-600 font-semibold';
-  if (days <= 3) return 'text-orange-500 font-semibold';
-  return 'text-emerald-600';
+  return Math.ceil((new Date(dateStr).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000);
 }
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  });
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-// ─── Flow indicator ───────────────────────────────────────────────────────────
+function calcProgressExcNA(activities: RoleActivity[]): { pct: number; done: number; total: number } {
+  const relevant = activities.filter(a => a.status !== 'not_applicable');
+  if (relevant.length === 0) return { pct: 0, done: 0, total: 0 };
+  const done = relevant.filter(a => a.status === 'approved').length;
+  return { pct: Math.round((done / relevant.length) * 100), done, total: relevant.length };
+}
 
-function FlowIndicator({ activities }: { activities: RoleActivity[] }) {
-  const byRole: Record<string, string> = {};
-  activities.forEach((a) => { byRole[a.role] = a.status; });
-
-  // Determine active role (first non-approved, non-not_applicable that has started)
-  const activeRole = ROLES.find((r) => {
-    const s = byRole[r];
-    return s && s !== 'approved' && s !== 'not_applicable' && s !== 'not_started';
-  });
-
+function getActiveActivity(d: Deliverable): RoleActivity | undefined {
+  const acts = d.role_activities ?? [];
   return (
-    <div className="flex items-center gap-0.5 min-w-[170px]">
-      {ROLES.map((role, idx) => {
-        const status = byRole[role] ?? 'not_started';
-        const isApproved = status === 'approved';
-        const isActive = role === activeRole;
-        const isNA = status === 'not_applicable';
-
-        return (
-          <span key={role} className="flex items-center gap-0.5">
-            <span
-              title={`${ROLE_LABELS[role]}: ${status}`}
-              className={clsx(
-                'inline-flex items-center justify-center rounded px-1 py-0.5 text-[9px] font-bold text-white leading-none',
-                isNA ? 'bg-gray-200 !text-gray-400' :
-                isApproved ? 'bg-emerald-500' :
-                isActive ? 'bg-blue-500 animate-pulse' :
-                'bg-gray-200 !text-gray-400'
-              )}
-            >
-              {ROLE_ABBR[role]}
-            </span>
-            {idx < ROLES.length - 1 && (
-              <ChevronRight size={8} className="text-gray-300 shrink-0" />
-            )}
-          </span>
-        );
-      })}
-    </div>
+    acts.find(a => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started') ??
+    acts.find(a => a.status === 'not_started')
   );
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-
-function ProgressBar({ pct }: { pct?: number }) {
-  const value = pct ?? 0;
-  return (
-    <div className="flex items-center gap-1.5 min-w-[70px]">
-      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={clsx(
-            'h-full rounded-full transition-all',
-            value >= 100 ? 'bg-emerald-500' :
-            value >= 60 ? 'bg-blue-500' :
-            value >= 30 ? 'bg-orange-400' :
-            'bg-gray-300'
-          )}
-          style={{ width: `${Math.min(value, 100)}%` }}
-        />
-      </div>
-      <span className="text-[10px] text-gray-500 w-7 text-right">{value}%</span>
-    </div>
-  );
+function isOverdue(d: Deliverable): boolean {
+  if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
+  return (d.role_activities ?? []).some(a => {
+    if (a.status === 'not_applicable' || a.status === 'approved') return false;
+    const days = daysUntil(a.commitment_date);
+    return days !== null && days < 0;
+  });
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
-interface ToastMsg {
-  id: number;
-  message: string;
-  type: 'success' | 'error';
-}
+interface ToastMsg { id: number; message: string; type: 'success' | 'error'; }
 
 function Toast({ toasts }: { toasts: ToastMsg[] }) {
   return (
     <div className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={clsx(
-            'px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white animate-in fade-in slide-in-from-bottom-2',
-            t.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-          )}
-        >
+      {toasts.map(t => (
+        <div key={t.id} className={clsx(
+          'px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white flex items-center gap-2',
+          t.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        )}>
+          {t.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
           {t.message}
         </div>
       ))}
@@ -164,153 +111,575 @@ function Toast({ toasts }: { toasts: ToastMsg[] }) {
   );
 }
 
-// ─── Side panel ───────────────────────────────────────────────────────────────
+// ─── Activity status indicator ─────────────────────────────────────────────────
+
+function ActivityStatusBadge({ status }: { status: string }) {
+  const cfg = ACTIVITY_STATUS_CFG[status] ?? ACTIVITY_STATUS_CFG.not_started;
+  return (
+    <span className="flex items-center gap-1 min-w-0">
+      <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
+      <span className={clsx('text-[10px] font-semibold leading-tight', cfg.text)}>{cfg.label}</span>
+    </span>
+  );
+}
+
+// ─── Progress bar (excluding N/A) ─────────────────────────────────────────────
+
+function ProgressExcNA({ activities, compact }: { activities: RoleActivity[]; compact?: boolean }) {
+  const { pct, done, total } = calcProgressExcNA(activities);
+  if (total === 0) return <span className="text-[10px] text-gray-300">—</span>;
+  return (
+    <div className={clsx('flex items-center gap-2', compact ? 'min-w-[80px]' : 'min-w-[130px]')}>
+      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={clsx('h-full rounded-full transition-all',
+            pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-orange-400' : 'bg-gray-300'
+          )}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+      </div>
+      <span className="text-xs font-bold text-gray-700 whitespace-nowrap">
+        {done}/{total} <span className="font-normal text-gray-400">({pct}%)</span>
+      </span>
+    </div>
+  );
+}
+
+// ─── Role cell ─────────────────────────────────────────────────────────────────
+
+function RoleCell({ role, activity }: { role: Role; activity?: RoleActivity }) {
+  const isNA = !activity || activity.status === 'not_applicable';
+  const colors = ROLE_CELL_COLORS[role];
+  const days = daysUntil(activity?.commitment_date);
+  const overdueDate = !isNA && activity?.status !== 'approved' && days !== null && days < 0;
+
+  return (
+    <div className={clsx(
+      'rounded-xl border p-3 flex flex-col gap-1.5',
+      isNA ? 'bg-gray-50 border-gray-100 opacity-40' : clsx(colors.bg, colors.border)
+    )}>
+      {/* Role label */}
+      <div className="flex items-center gap-1.5">
+        <span className={clsx('text-[9px] font-black px-1.5 py-0.5 rounded text-white tracking-wider shrink-0', ROLE_BADGE_BG[role])}>
+          {ROLE_ABBR[role]}
+        </span>
+        <span className={clsx('text-[10px] font-bold leading-tight', isNA ? 'text-gray-400' : colors.label)}>
+          {ROLE_LABELS[role]}
+        </span>
+      </div>
+
+      {isNA ? (
+        <p className="text-[10px] text-gray-300 italic">No aplica</p>
+      ) : (
+        <>
+          {/* Responsible */}
+          <div className="flex items-center gap-1">
+            <UserIcon size={9} className="text-gray-400 shrink-0" />
+            <span className="text-[11px] font-semibold text-gray-800 truncate leading-tight">
+              {activity?.responsible?.name ?? <span className="text-gray-300 font-normal italic">Sin asignar</span>}
+            </span>
+          </div>
+
+          {/* Status */}
+          <ActivityStatusBadge status={activity?.status ?? 'not_started'} />
+
+          {/* Date */}
+          <div className="flex items-center gap-1">
+            <Calendar size={9} className={clsx('shrink-0', overdueDate ? 'text-red-400' : 'text-gray-300')} />
+            <span className={clsx('text-[10px] leading-tight font-medium',
+              overdueDate        ? 'text-red-500' :
+              activity?.status === 'approved' ? 'text-emerald-600' :
+              'text-gray-500'
+            )}>
+              {formatDate(activity?.commitment_date)}
+              {overdueDate && (
+                <span className="ml-0.5 text-[9px] font-bold text-red-500">({Math.abs(days!)}d)</span>
+              )}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Deliverable Row (primary "rows" view) ────────────────────────────────────
+
+interface RowProps {
+  deliverable: Deliverable;
+  isManager: boolean;
+  onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onQuickAction: (a: QuickAction) => void;
+}
+
+function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, onQuickAction }: RowProps) {
+  const acts = d.role_activities ?? [];
+  const byRole: Partial<Record<Role, RoleActivity>> = {};
+  acts.forEach(a => { byRole[a.role] = a; });
+
+  const overdue = isOverdue(d);
+  const { pct, done, total } = calcProgressExcNA(acts);
+  const isFinished = d.global_status === 'finished';
+
+  const canApprove = d.global_status === 'in_review' || d.global_status === 'with_observations';
+  const canDeliver = d.global_status === 'in_progress';
+  const canAdjust  = d.global_status === 'in_review';
+
+  return (
+    <div className={clsx(
+      'px-5 py-4 border-b border-gray-100 last:border-0 transition-colors',
+      overdue && !isFinished ? 'bg-red-50/30 hover:bg-red-50/50' : 'hover:bg-slate-50/60'
+    )}>
+      {/* ── Header line ────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        {/* Subject + module */}
+        <div className="flex-1 min-w-[200px]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-bold text-gray-900 leading-tight">{d.subject_name ?? '—'}</h3>
+            <span className={clsx(
+              'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide',
+              d.type === 'creation' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'
+            )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
+            {overdue && !isFinished && (
+              <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">
+                <AlertCircle size={8} /> Vencida
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5 leading-tight">{d.name}</p>
+        </div>
+
+        {/* Status badge */}
+        <StatusBadge status={d.global_status} type="global" />
+
+        {/* Progress (N/A excluded) */}
+        {total > 0 && (
+          <div className="flex items-center gap-2 min-w-[140px]">
+            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={clsx('h-full rounded-full transition-all',
+                  pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-orange-400' : 'bg-gray-300'
+                )}
+                style={{ width: `${Math.min(pct, 100)}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-gray-700 whitespace-nowrap">
+              {done}/{total} <span className="font-normal text-gray-400">({pct}%)</span>
+            </span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 ml-auto shrink-0">
+          {canApprove && (
+            <button title="Aprobar" onClick={() => onQuickAction('approve')}
+              className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors">
+              <CheckCircle2 size={14} />
+            </button>
+          )}
+          {canDeliver && (
+            <button title="Entregar" onClick={() => onQuickAction('deliver')}
+              className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors">
+              <Send size={14} />
+            </button>
+          )}
+          {canAdjust && (
+            <button title="Solicitar ajustes" onClick={() => onQuickAction('request_adjustments')}
+              className="p-1.5 rounded-md text-orange-500 hover:bg-orange-50 transition-colors">
+              <RotateCcw size={14} />
+            </button>
+          )}
+          <span className="w-px h-4 bg-gray-200 mx-0.5" />
+          <button title="Ver detalle" onClick={onView}
+            className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
+            <Eye size={14} />
+          </button>
+          <button title="Comentarios" onClick={onView}
+            className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
+            <MessageCircle size={14} />
+          </button>
+          {isManager && (
+            <>
+              <button title="Editar" onClick={onEdit}
+                className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
+                <Pencil size={14} />
+              </button>
+              <button title="Eliminar" onClick={onDelete}
+                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Role grid: 2 rows × 3 cols ─────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+        {ROLES.map(role => (
+          <RoleCell key={role} role={role} activity={byRole[role]} />
+        ))}
+      </div>
+
+      {pct === 100 && total > 0 && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600 font-semibold">
+          <CheckCircle2 size={11} /> Todos los roles completados
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Group header (shared between views) ──────────────────────────────────────
+
+function GroupHeader({
+  programName, projectName, items, groupKey, isCollapsed, onToggle,
+}: {
+  programName: string; projectName: string; items: Deliverable[];
+  groupKey: string; isCollapsed: boolean; onToggle: () => void;
+}) {
+  const overdueCount = items.filter(isOverdue).length;
+  const totalRelevant = items.reduce((s, d) => s + calcProgressExcNA(d.role_activities ?? []).total, 0);
+  const totalDone     = items.reduce((s, d) => s + calcProgressExcNA(d.role_activities ?? []).done,  0);
+  const avg = totalRelevant > 0 ? Math.round((totalDone / totalRelevant) * 100) : 0;
+
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100"
+    >
+      <ChevronDown size={15} className={clsx('text-gray-400 transition-transform shrink-0 duration-200', isCollapsed && '-rotate-90')} />
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <span className="font-bold text-gray-900 text-sm">{programName}</span>
+        <span className="text-gray-300">·</span>
+        <span className="text-xs text-gray-500 truncate">{projectName}</span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs text-gray-400">{items.length} módulo{items.length !== 1 ? 's' : ''}</span>
+        {overdueCount > 0 && (
+          <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+            <AlertCircle size={10} /> {overdueCount}
+          </span>
+        )}
+        <span className={clsx('text-[10px] font-bold px-2 py-0.5 rounded-full',
+          avg >= 70 ? 'bg-emerald-100 text-emerald-700' : avg >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+        )}>{avg}%</span>
+      </div>
+    </button>
+  );
+}
+
+// ─── Delete confirm ───────────────────────────────────────────────────────────
+
+function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onCancel} />
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Trash2 size={20} className="text-red-600" />
+          </div>
+          <h3 className="text-center font-semibold text-gray-900 mb-2">Eliminar entregable</h3>
+          <p className="text-center text-sm text-gray-600 mb-6">
+            ¿Seguro que deseas eliminar <strong>"{name}"</strong>? Esta acción no se puede deshacer.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onCancel} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button onClick={onConfirm} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Eliminar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Deliverable Form Panel ───────────────────────────────────────────────────
+
+interface ActivityForm { role: Role; responsible_id: string; commitment_date: string; }
+
+interface DeliverableFormData {
+  project_id: string; program_name: string; subject_name: string;
+  name: string; type: 'creation' | 'update'; start_date: string;
+  activities: ActivityForm[];
+}
+
+const EMPTY_FORM: DeliverableFormData = {
+  project_id: '', program_name: '', subject_name: '',
+  name: '', type: 'creation', start_date: '',
+  activities: ROLES.map(r => ({ role: r, responsible_id: '', commitment_date: '' })),
+};
+
+interface DeliverableFormPanelProps {
+  mode: 'create' | 'edit'; deliverable?: Deliverable;
+  projects: Array<{ id: number; name: string }>; users: User[]; programs: string[];
+  onClose: () => void; onSave: () => void;
+  addToast: (msg: string, type: 'success' | 'error') => void;
+}
+
+function DeliverableFormPanel({ mode, deliverable, projects, users, programs, onClose, onSave, addToast }: DeliverableFormPanelProps) {
+  const [form, setForm] = useState<DeliverableFormData>(() => {
+    if (mode === 'edit' && deliverable) {
+      return {
+        project_id: String(deliverable.project_id ?? ''),
+        program_name: deliverable.program_name ?? '',
+        subject_name: deliverable.subject_name ?? '',
+        name: deliverable.name,
+        type: deliverable.type,
+        start_date: deliverable.start_date ?? '',
+        activities: ROLES.map(r => {
+          const act = (deliverable.role_activities ?? []).find(a => a.role === r);
+          return { role: r, responsible_id: act?.responsible ? String(act.responsible.id) : '', commitment_date: act?.commitment_date ?? '' };
+        }),
+      };
+    }
+    return { ...EMPTY_FORM };
+  });
+  const [saving, setSaving] = useState(false);
+
+  function setAct(role: Role, field: keyof ActivityForm, value: string) {
+    setForm(prev => ({ ...prev, activities: prev.activities.map(a => a.role === role ? { ...a, [field]: value } : a) }));
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) { addToast('El nombre del entregable es obligatorio.', 'error'); return; }
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(), type: form.type,
+        start_date: form.start_date || null,
+        program_name: form.program_name.trim() || null,
+        subject_name: form.subject_name.trim() || null,
+        activities: form.activities.filter(a => a.responsible_id || a.commitment_date).map(a => ({
+          role: a.role,
+          responsible_id: a.responsible_id ? Number(a.responsible_id) : null,
+          commitment_date: a.commitment_date || null,
+        })),
+      };
+      if (mode === 'create') payload.project_id = form.project_id ? Number(form.project_id) : null;
+      if (mode === 'create') await api.post<Deliverable>(ENDPOINTS.DELIVERABLES, payload);
+      else await api.put<Deliverable>(ENDPOINTS.DELIVERABLE(deliverable!.id), payload);
+      addToast(mode === 'create' ? 'Entregable creado correctamente.' : 'Entregable actualizado correctamente.', 'success');
+      onSave();
+    } catch (e: unknown) {
+      addToast(e instanceof Error ? e.message : 'Error al guardar.', 'error');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-[540px] bg-white z-50 shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              {mode === 'create' ? <Plus size={16} style={{ color: '#194276' }} /> : <Pencil size={16} style={{ color: '#194276' }} />}
+              {mode === 'create' ? 'Agregar entregable' : 'Editar entregable'}
+            </h2>
+            {mode === 'edit' && deliverable && (
+              <p className="text-xs text-gray-400 mt-0.5">{deliverable.subject_name} / {deliverable.name}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Location */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+              <FolderOpen size={12} /> Ubicación
+            </p>
+            {mode === 'create' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Proyecto <span className="text-red-500">*</span></label>
+                <select value={form.project_id} onChange={e => setForm(p => ({ ...p, project_id: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="">Selecciona un proyecto...</option>
+                  {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Programa</label>
+                <input list="programs-list" value={form.program_name}
+                  onChange={e => setForm(p => ({ ...p, program_name: e.target.value }))}
+                  placeholder="Ej: Ingeniería de Sistemas"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+                <datalist id="programs-list">{programs.map(p => <option key={p} value={p} />)}</datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Asignatura</label>
+                <input value={form.subject_name} onChange={e => setForm(p => ({ ...p, subject_name: e.target.value }))}
+                  placeholder="Ej: Diseño de Interfaces"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+              </div>
+            </div>
+          </div>
+
+          {/* Deliverable info */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+              <BookOpen size={12} /> Entregable
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Nombre / Módulo <span className="text-red-500">*</span></label>
+              <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="Ej: Semana 1 – Introducción"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
+                <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as 'creation' | 'update' }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="creation">Creación</option>
+                  <option value="update">Actualización</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Fecha de inicio</label>
+                <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+              </div>
+            </div>
+          </div>
+
+          {/* Role activities */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+              <UserIcon size={12} /> Responsables y fechas por rol
+            </p>
+            <div className="space-y-2">
+              {form.activities.map(act => {
+                const colors = ROLE_CELL_COLORS[act.role];
+                return (
+                  <div key={act.role} className={clsx('rounded-xl border p-3 space-y-2', colors.bg, colors.border)}>
+                    <div className="flex items-center gap-1.5">
+                      <span className={clsx('text-[9px] font-black px-1.5 py-0.5 rounded text-white', ROLE_BADGE_BG[act.role])}>
+                        {ROLE_ABBR[act.role]}
+                      </span>
+                      <p className={clsx('text-xs font-semibold', colors.label)}>{ROLE_LABELS[act.role]}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select value={act.responsible_id} onChange={e => setAct(act.role, 'responsible_id', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20">
+                        <option value="">Sin asignar</option>
+                        {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+                      </select>
+                      <input type="date" value={act.commitment_date} onChange={e => setAct(act.role, 'commitment_date', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
+            style={{ background: '#194276' }}>
+            {saving
+              ? <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</span>
+              : mode === 'create' ? 'Crear entregable' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Side Panel ───────────────────────────────────────────────────────────────
 
 type PanelTab = 'info' | 'flow' | 'comments';
 
-interface SidePanelProps {
-  deliverable: Deliverable;
-  defaultTab?: PanelTab;
-  onClose: () => void;
-}
-
-function SidePanel({ deliverable, defaultTab = 'info', onClose }: SidePanelProps) {
+function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
+  useEffect(() => { setTab(defaultTab); }, [defaultTab, deliverable.id]);
   useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab, deliverable.id]);
-
-  useEffect(() => {
-    if (tab === 'comments') {
-      setLoadingComments(true);
-      api
-        .get<Comment[]>(ENDPOINTS.DELIVERABLE_COMMENTS(deliverable.id))
-        .then(setComments)
-        .catch(() => setComments([]))
-        .finally(() => setLoadingComments(false));
-    }
+    if (tab !== 'comments') return;
+    setLoadingComments(true);
+    api.get<Comment[]>(ENDPOINTS.DELIVERABLE_COMMENTS(deliverable.id))
+      .then(setComments).catch(() => setComments([])).finally(() => setLoadingComments(false));
   }, [tab, deliverable.id]);
-
-  const tabs: { key: PanelTab; label: string }[] = [
-    { key: 'info', label: 'Info' },
-    { key: 'flow', label: 'Flujo' },
-    { key: 'comments', label: 'Comentarios' },
-  ];
 
   return (
     <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
+      <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-[520px] bg-white z-50 shadow-2xl flex flex-col">
-        {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
           <div className="flex-1 min-w-0 pr-3">
-            <p className="text-xs text-gray-400 mb-0.5">
-              {deliverable.project_name ?? '—'} / {deliverable.program_name ?? '—'}
-            </p>
-            <h2 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
-              {deliverable.name}
-            </h2>
-            <p className="text-xs text-gray-500 mt-1">{deliverable.subject_name ?? '—'}</p>
+            <p className="text-xs text-gray-400 mb-0.5">{deliverable.project_name ?? '—'} · {deliverable.program_name ?? '—'}</p>
+            <h2 className="font-bold text-gray-900 text-sm">{deliverable.subject_name ?? '—'}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{deliverable.name}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <button onClick={onClose} className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
-
-        {/* Tabs */}
         <div className="flex border-b border-gray-100 px-5">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={clsx(
-                'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors',
-                tab === t.key
-                  ? 'border-[#194276] text-[#194276]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              )}
-            >
-              {t.label}
+          {(['info', 'flow', 'comments'] as PanelTab[]).map(t => (
+            <button key={t} onClick={() => setTab(t)} className={clsx(
+              'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+              tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
+            )}>
+              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : 'Comentarios'}
             </button>
           ))}
         </div>
-
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {tab === 'info' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <InfoItem label="Estado">
-                  <StatusBadge status={deliverable.global_status} type="global" />
-                </InfoItem>
-                <InfoItem label="Tipo">
-                  <span className={clsx(
-                    'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
-                    deliverable.type === 'creation'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-amber-100 text-amber-700'
-                  )}>
-                    {DELIVERABLE_TYPE_LABELS[deliverable.type]}
-                  </span>
-                </InfoItem>
-                <InfoItem label="Avance">
-                  <ProgressBar pct={deliverable.compliance_percentage} />
-                </InfoItem>
-                <InfoItem label="Inicio">
-                  <span className="text-sm text-gray-700">{formatDate(deliverable.start_date)}</span>
-                </InfoItem>
+                <div><p className="text-xs text-gray-400 uppercase mb-1">Estado</p><StatusBadge status={deliverable.global_status} type="global" /></div>
+                <div><p className="text-xs text-gray-400 uppercase mb-1">Tipo</p>
+                  <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium',
+                    deliverable.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
+                  )}>{DELIVERABLE_TYPE_LABELS[deliverable.type]}</span>
+                </div>
+                <div><p className="text-xs text-gray-400 uppercase mb-1">Avance (excl. N/A)</p>
+                  <ProgressExcNA activities={deliverable.role_activities ?? []} compact />
+                </div>
+                <div><p className="text-xs text-gray-400 uppercase mb-1">Inicio</p>
+                  <span className="text-sm text-gray-700">{deliverable.start_date ? formatDate(deliverable.start_date) : '—'}</span>
+                </div>
               </div>
               {deliverable.notes && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase mb-1">Notas</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{deliverable.notes}</p>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-sm text-gray-700">{deliverable.notes}</p>
                 </div>
               )}
             </div>
           )}
-
           {tab === 'flow' && (
             <div className="space-y-2">
-              {ROLES.map((role) => {
-                const act = (deliverable.role_activities ?? []).find((a) => a.role === role);
-                const statusLabel = act?.status
-                  ? (act.status.charAt(0).toUpperCase() + act.status.slice(1).replace(/_/g, ' '))
-                  : 'Sin iniciar';
+              {ROLES.map(role => {
+                const act = (deliverable.role_activities ?? []).find(a => a.role === role);
                 const days = daysUntil(act?.commitment_date);
-
                 return (
-                  <div
-                    key={role}
-                    className={clsx(
-                      'rounded-lg border p-3',
-                      !act || act.status === 'not_started' ? 'border-gray-100 bg-gray-50' :
-                      act.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
-                      act.status === 'not_applicable' ? 'border-gray-100 bg-gray-50 opacity-50' :
-                      'border-blue-100 bg-blue-50'
-                    )}
-                  >
+                  <div key={role} className={clsx('rounded-lg border p-3',
+                    !act || act.status === 'not_started' ? 'border-gray-100 bg-gray-50' :
+                    act.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
+                    act.status === 'not_applicable' ? 'border-gray-100 bg-gray-50 opacity-50' :
+                    'border-blue-100 bg-blue-50'
+                  )}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-gray-700">{ROLE_LABELS[role]}</span>
-                      <span className="text-xs text-gray-500">{statusLabel}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[role])}>{ROLE_ABBR[role]}</span>
+                        <span className="text-xs font-semibold text-gray-700">{ROLE_LABELS[role]}</span>
+                      </div>
+                      <ActivityStatusBadge status={act?.status ?? 'not_started'} />
                     </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
                       <span>{act?.responsible?.name ?? '—'}</span>
                       {act?.commitment_date && (
-                        <span className={dateColorClass(days)}>
-                          {formatDate(act.commitment_date)}
-                          {days !== null && ` (${days > 0 ? `${days}d` : `${Math.abs(days)}d atrás`})`}
+                        <span className={clsx(days !== null && days < 0 ? 'text-red-500 font-semibold' : '')}>
+                          {formatDate(act.commitment_date)}{days !== null ? ` (${days > 0 ? `+${days}d` : `${Math.abs(days)}d atrás`})` : ''}
                         </span>
                       )}
                     </div>
@@ -319,29 +688,22 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: SidePanelProps
               })}
             </div>
           )}
-
           {tab === 'comments' && (
-            <div>
-              {loadingComments ? (
-                <div className="text-center py-10 text-gray-400 text-sm">Cargando comentarios…</div>
-              ) : comments.length === 0 ? (
-                <div className="text-center py-10 text-gray-400 text-sm">Sin comentarios</div>
-              ) : (
-                <div className="space-y-3">
-                  {comments.map((c) => (
-                    <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-gray-800">{c.user.name}</span>
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(c.created_at).toLocaleDateString('es-CO')}
-                        </span>
+            loadingComments
+              ? <div className="text-center py-10 text-gray-400 text-sm">Cargando…</div>
+              : comments.length === 0
+                ? <div className="text-center py-10 text-gray-400 text-sm">Sin comentarios</div>
+                : <div className="space-y-3">
+                    {comments.map(c => (
+                      <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-800">{c.user.name}</span>
+                          <span className="text-[10px] text-gray-400">{new Date(c.created_at).toLocaleDateString('es-CO')}</span>
+                        </div>
+                        <p className="text-sm text-gray-700">{c.content}</p>
                       </div>
-                      <p className="text-sm text-gray-700">{c.content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
           )}
         </div>
       </div>
@@ -349,476 +711,638 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: SidePanelProps
   );
 }
 
-function InfoItem({ label, children }: { label: string; children: React.ReactNode }) {
+// ─── Bulk Import Modal ────────────────────────────────────────────────────────
+
+interface ImportError { row: number; field: string; message: string; }
+interface ImportResult { imported?: number; valid?: number; invalid?: number; errors?: ImportError[]; preview?: Array<Record<string, string>>; project_id?: number; }
+
+function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
+  projects: Array<{ id: number; name: string }>;
+  onClose: () => void; onSuccess: () => void;
+  addToast: (msg: string, type: 'success' | 'error') => void;
+}) {
+  const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
+  const [projectId, setProjectId]     = useState('');
+  const [newProjectName, setNewProjectName] = useState('');
+  const [resolvedProjectId, setResolvedProjectId] = useState('');
+  const [file, setFile]     = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult]   = useState<ImportResult | null>(null);
+  const [errors, setErrors]   = useState<ImportError[]>([]);
+  const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
+  const [dlTemplate, setDlTemplate] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function buildForm() {
+    const form = new FormData();
+    form.append('file', file!);
+    if (resolvedProjectId) form.append('project_id', resolvedProjectId);
+    else if (projectMode === 'existing' && projectId) form.append('project_id', projectId);
+    else if (projectMode === 'new' && newProjectName.trim()) form.append('project_name', newProjectName.trim());
+    return form;
+  }
+
+  async function handleDlTemplate() {
+    setDlTemplate(true);
+    try { await downloadCsv(ENDPOINTS.IMPORT_TEMPLATE, 'plantilla_sergestiona.xlsx'); }
+    catch { addToast('Error al descargar la plantilla.', 'error'); }
+    finally { setDlTemplate(false); }
+  }
+
+  async function handleValidate() {
+    setLoading(true); setErrors([]); setResult(null);
+    try {
+      const res = await api.postForm<ImportResult>(`${ENDPOINTS.IMPORT_DELIVERABLES}?validate_only=1`, buildForm());
+      setResult(res); setErrors(res.errors ?? []);
+      if (res.project_id) setResolvedProjectId(String(res.project_id));
+      setStep('preview');
+    } catch (e: unknown) { setErrors([{ row: 0, field: 'file', message: e instanceof Error ? e.message : 'Error al procesar.' }]); }
+    finally { setLoading(false); }
+  }
+
+  async function handleImport() {
+    setLoading(true);
+    try {
+      const res = await api.postForm<ImportResult>(ENDPOINTS.IMPORT_DELIVERABLES, buildForm());
+      setResult(res); setErrors(res.errors ?? []); setStep('done');
+      if ((res.imported ?? 0) > 0) { addToast(`${res.imported} entregable(s) importados.`, 'success'); onSuccess(); }
+    } catch (e: unknown) { setErrors([{ row: 0, field: 'file', message: e instanceof Error ? e.message : 'Error.' }]); }
+    finally { setLoading(false); }
+  }
+
+  const isReady = !!file && (projectMode === 'existing' ? !!projectId : newProjectName.trim().length > 0);
+
   return (
-    <div>
-      <p className="text-xs font-medium text-gray-400 uppercase mb-1">{label}</p>
-      {children}
-    </div>
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Upload size={16} style={{ color: '#194276' }} /> Carga Masiva</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Importa entregables desde un archivo Excel (.xlsx)</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          </div>
+
+          {/* Steps */}
+          <div className="flex items-center gap-0 px-6 pt-4 pb-2">
+            {(['upload', 'preview', 'done'] as const).map((s, i) => {
+              const labels = ['Cargar', 'Validar', 'Resultado'];
+              const done = (step === 'preview' && i === 0) || step === 'done';
+              const active = step === s;
+              return (
+                <div key={s} className="flex items-center gap-0">
+                  <div className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold',
+                    done ? 'bg-emerald-500 text-white' : active ? 'text-white' : 'bg-gray-100 text-gray-400'
+                  )} style={active ? { background: '#194276' } : undefined}>
+                    {done ? <CheckCircle2 size={12} /> : i + 1}
+                  </div>
+                  <span className={clsx('text-xs ml-1.5', active ? 'font-medium text-gray-900' : 'text-gray-400')}>{labels[i]}</span>
+                  {i < 2 && <div className="w-8 h-px bg-gray-200 mx-2" />}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {step === 'upload' && (
+              <>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-start gap-3">
+                  <FileText size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Descarga la plantilla Excel</p>
+                    <p className="text-xs text-blue-700 mt-0.5 mb-2">Complétala y súbela. Responsables por correo institucional.</p>
+                    <button onClick={handleDlTemplate} disabled={dlTemplate}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2 disabled:opacity-60">
+                      <Download size={12} /> {dlTemplate ? 'Descargando...' : 'Descargar plantilla (.xlsx)'}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Proyecto de destino <span className="text-red-500">*</span></label>
+                  <div className="flex gap-2 mb-2">
+                    {(['existing', 'new'] as const).map(m => (
+                      <button key={m} type="button" onClick={() => setProjectMode(m)}
+                        className={clsx('flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+                          projectMode === m ? 'text-white border-[#194276]' : 'text-gray-500 border-gray-200 hover:bg-gray-50'
+                        )} style={projectMode === m ? { background: '#194276' } : undefined}>
+                        {m === 'existing' ? 'Proyecto existente' : 'Crear nuevo proyecto'}
+                      </button>
+                    ))}
+                  </div>
+                  {projectMode === 'existing'
+                    ? <select value={projectId} onChange={e => setProjectId(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                        <option value="">Selecciona un proyecto...</option>
+                        {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                      </select>
+                    : <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
+                        placeholder="Nombre del nuevo proyecto"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+                  }
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Archivo Excel <span className="text-red-500">*</span></label>
+                  <div className={clsx('border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors',
+                    file ? 'border-[#194276]/40 bg-blue-50/30' : 'border-gray-200 hover:border-[#194276]/30 hover:bg-gray-50'
+                  )} onClick={() => fileInputRef.current?.click()}>
+                    <Upload size={22} className={clsx('mx-auto mb-2', file ? 'text-[#194276]' : 'text-gray-300')} />
+                    {file
+                      ? <div><p className="text-sm font-semibold text-gray-800">{file.name}</p><p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024).toFixed(1)} KB</p></div>
+                      : <><p className="text-sm text-gray-600">Haz clic para seleccionar</p><p className="text-xs text-gray-400 mt-1">Formato: .xlsx — Máx. 10 MB</p></>
+                    }
+                    <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                  </div>
+                </div>
+                {errors.length > 0 && (
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                    {errors.map((err, i) => <p key={i} className="text-xs text-red-700">{err.message}</p>)}
+                  </div>
+                )}
+              </>
+            )}
+            {step === 'preview' && result && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+                    <p className="text-3xl font-bold text-emerald-600">{result.valid ?? 0}</p>
+                    <p className="text-xs text-emerald-700 mt-1">Filas válidas</p>
+                  </div>
+                  <div className={clsx('rounded-xl border p-4 text-center', (result.invalid ?? 0) > 0 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100')}>
+                    <p className={clsx('text-3xl font-bold', (result.invalid ?? 0) > 0 ? 'text-red-600' : 'text-gray-300')}>{result.invalid ?? 0}</p>
+                    <p className={clsx('text-xs mt-1', (result.invalid ?? 0) > 0 ? 'text-red-700' : 'text-gray-400')}>Filas con errores</p>
+                  </div>
+                </div>
+                {errors.length > 0 && (
+                  <div className="max-h-44 overflow-y-auto space-y-1.5">
+                    {errors.map((err, i) => (
+                      <div key={i} className="flex gap-2.5 text-xs bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        <span className="font-mono font-semibold text-red-400 whitespace-nowrap">Fila {err.row}</span>
+                        <span className="font-mono text-red-400">[{err.field}]</span>
+                        <span className="text-red-700">{err.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {step === 'done' && result && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Importación completada</h3>
+                <p className="text-sm text-gray-600"><span className="font-bold text-emerald-600">{result.imported}</span> entregable(s) importados.</p>
+                {errors.length > 0 && <p className="text-xs text-red-600 mt-2">{errors.length} fila(s) omitidas.</p>}
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+            {step !== 'done'
+              ? <button onClick={step === 'upload' ? onClose : () => { setStep('upload'); setResult(null); setErrors([]); setResolvedProjectId(''); }}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  {step === 'upload' ? 'Cancelar' : 'Volver'}
+                </button>
+              : <div />}
+            <div className="flex gap-2">
+              {step === 'upload' && (
+                <button onClick={handleValidate} disabled={!isReady || loading}
+                  className="px-4 py-2 text-sm font-medium border rounded-lg disabled:opacity-50 transition-colors"
+                  style={{ borderColor: '#194276', color: '#194276' }}>
+                  {loading ? <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />Validando...</span> : 'Validar archivo'}
+                </button>
+              )}
+              {step === 'preview' && (result?.valid ?? 0) > 0 && (
+                <button onClick={handleImport} disabled={loading}
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50" style={{ background: '#194276' }}>
+                  {loading ? <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Importando...</span> : `Importar ${result?.valid}`}
+                </button>
+              )}
+              {step === 'done' && <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-white rounded-lg" style={{ background: '#194276' }}>Cerrar</button>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
-// ─── Quick action button ──────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
-interface ActionBtnProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  variant?: 'default' | 'success' | 'warning';
-}
-
-function ActionBtn({ icon, label, onClick, variant = 'default' }: ActionBtnProps) {
-  return (
-    <button
-      title={label}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={clsx(
-        'p-1.5 rounded-md transition-colors',
-        variant === 'success' && 'text-emerald-600 hover:bg-emerald-50',
-        variant === 'warning' && 'text-orange-500 hover:bg-orange-50',
-        variant === 'default' && 'text-gray-500 hover:bg-gray-100',
-      )}
-    >
-      {icon}
-    </button>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
-
-interface PanelState {
-  deliverable: Deliverable;
-  tab: PanelTab;
-}
+interface PanelState { deliverable: Deliverable; tab: PanelTab; }
+type FormMode = { mode: 'create' } | { mode: 'edit'; deliverable: Deliverable };
 
 export default function EntregablesPage() {
   const searchParams = useSearchParams();
-  const [data, setData] = useState<Deliverable[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filterProject, setFilterProject] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const { user } = useAuthContext();
+  const isManager = user?.role === 'admin' || user?.role === 'coordinator';
+
+  const [data, setData]         = useState<Deliverable[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
+  const [filterProject, setFilterProject]       = useState('');
+  const [filterStatus, setFilterStatus]         = useState('');
   const [filterResponsible, setFilterResponsible] = useState('');
   const [onlyOverdue, setOnlyOverdue] = useState(false);
-  const [panel, setPanel] = useState<PanelState | null>(null);
-  const [toasts, setToasts] = useState<ToastMsg[]>([]);
-  const [viewMode, setViewMode] = useState<'table' | 'grouped'>('grouped');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [panel, setPanel]     = useState<PanelState | null>(null);
+  const [toasts, setToasts]   = useState<ToastMsg[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('rows');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [formPanel, setFormPanel]     = useState<FormMode | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
+  const [showImport, setShowImport]   = useState(false);
+  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
+  const [users, setUsers]       = useState<User[]>([]);
 
-  // Apply URL filter params on mount (from dashboard navigation)
+  useEffect(() => {
+    api.get<Array<{ id: number; name: string }>>(ENDPOINTS.PROJECTS)
+      .then(r => setProjects(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<User[]>(ENDPOINTS.USERS)
+      .then(r => setUsers(Array.isArray(r) ? r : [])).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const filter = searchParams.get('filter');
     if (!filter) return;
-    if (filter === 'overdue') {
-      setOnlyOverdue(true);
-    } else if (filter === 'approaching') {
-      // Handled in the filter logic below via date check
-      setOnlyOverdue(false);
-    } else if (filter === 'with_observations') {
-      setFilterStatus('with_observations');
-    } else if (filter.startsWith('status_')) {
-      setFilterStatus(filter.replace('status_', ''));
-    } else if (filter.startsWith('role_')) {
-      // Role filter: filter by responsible role
-      setFilterResponsible(filter.replace('role_', ''));
-    }
+    if (filter === 'overdue') setOnlyOverdue(true);
+    else if (filter.startsWith('status_')) setFilterStatus(filter.replace('status_', ''));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   }, []);
 
   const loadData = useCallback(() => {
-    api
-      .get<Deliverable[]>(ENDPOINTS.DELIVERABLES)
-      .then(setData)
-      .catch(() => setData(MOCK_DELIVERABLES))
+    setLoading(true);
+    api.get<Deliverable[]>(ENDPOINTS.DELIVERABLES)
+      .then(d => {
+        setData(d);
+        // Start compact: only auto-expand groups that have overdue items
+        const keys = new Set<string>();
+        const groups = new Map<string, Deliverable[]>();
+        d.forEach(del => {
+          const p = del.program_name ?? '(Sin programa)';
+          const existing = groups.get(p) ?? [];
+          existing.push(del);
+          groups.set(p, existing);
+        });
+        groups.forEach((items, p) => {
+          if (items.some(isOverdue)) {
+            keys.add(p);
+            keys.add(p + '_table');
+          }
+        });
+        setExpandedGroups(keys);
+      })
+      .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Derived filter options
-  const projects = Array.from(new Set(data.map((d) => d.project_name).filter(Boolean))) as string[];
-  const responsibles = Array.from(
-    new Set(
-      data.flatMap((d) =>
-        (d.role_activities ?? [])
-          .map((a) => a.responsible?.name)
-          .filter(Boolean)
-      )
-    )
-  ) as string[];
+  const projectNames = useMemo(() => Array.from(new Set(data.map(d => d.project_name).filter(Boolean))) as string[], [data]);
+  const programNames = useMemo(() => Array.from(new Set(data.map(d => d.program_name).filter(Boolean))) as string[], [data]);
+  const responsibles = useMemo(() => Array.from(new Set(
+    data.flatMap(d => (d.role_activities ?? []).map(a => a.responsible?.name).filter(Boolean))
+  )) as string[], [data]);
 
-  // Active role (first non-approved, non-na activity)
-  function getActiveActivity(d: Deliverable): RoleActivity | undefined {
-    return (d.role_activities ?? []).find(
-      (a) => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started'
-    );
-  }
+  const COMPLETED_STATUSES = ['finished', 'cancelled'];
 
-  function getNextActivity(d: Deliverable): RoleActivity | undefined {
-    const acts = d.role_activities ?? [];
-    const activeIdx = acts.findIndex(
-      (a) => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started'
-    );
-    if (activeIdx === -1) return undefined;
-    return acts.slice(activeIdx + 1).find(
-      (a) => a.status !== 'not_applicable'
-    );
-  }
-
-  // Filters
-  const filtered = data.filter((d) => {
+  const filtered = useMemo(() => data.filter(d => {
     if (search) {
       const q = search.toLowerCase();
-      if (
-        !d.name.toLowerCase().includes(q) &&
-        !(d.subject_name ?? '').toLowerCase().includes(q) &&
-        !(d.project_name ?? '').toLowerCase().includes(q) &&
-        !(d.program_name ?? '').toLowerCase().includes(q)
-      ) return false;
+      if (![d.name, d.subject_name, d.project_name, d.program_name].some(s => s?.toLowerCase().includes(q))) return false;
     }
     if (filterProject && d.project_name !== filterProject) return false;
     if (filterStatus && d.global_status !== filterStatus) return false;
-    if (filterResponsible) {
-      const hasResponsible = (d.role_activities ?? []).some(
-        (a) => a.responsible?.name === filterResponsible
-      );
-      if (!hasResponsible) return false;
-    }
-    if (onlyOverdue) {
-      const active = getActiveActivity(d);
-      const days = daysUntil(active?.commitment_date);
-      if (days === null || days >= 0) return false;
-    }
+    if (filterResponsible && !(d.role_activities ?? []).some(a => a.responsible?.name === filterResponsible)) return false;
+    if (onlyOverdue && !isOverdue(d)) return false;
+    // Hide completed unless the user explicitly filtered for them or toggled showCompleted
+    if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  });
+  }), [data, search, filterProject, filterStatus, filterResponsible, onlyOverdue, showCompleted]);
 
-  // Grouping by program
+  const completedHiddenCount = useMemo(
+    () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
+      ? data.filter(d => COMPLETED_STATUSES.includes(d.global_status)).length
+      : 0,
+    [data, showCompleted, filterStatus]
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<string, { programName: string; projectName: string; items: Deliverable[] }>();
     for (const d of filtered) {
       const key = d.program_name ?? '(Sin programa)';
-      if (!map.has(key)) {
-        map.set(key, { programName: key, projectName: d.project_name ?? '—', items: [] });
-      }
+      if (!map.has(key)) map.set(key, { programName: key, projectName: d.project_name ?? '—', items: [] });
       map.get(key)!.items.push(d);
     }
-    return Array.from(map.values()).sort((a, b) => a.programName.localeCompare(b.programName));
+    return Array.from(map.values()).sort((a, b) => {
+      // Active groups (have non-finished items) go first
+      const aActive = a.items.some(d => !COMPLETED_STATUSES.includes(d.global_status));
+      const bActive = b.items.some(d => !COMPLETED_STATUSES.includes(d.global_status));
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      return a.programName.localeCompare(b.programName);
+    });
   }, [filtered]);
 
   function toggleGroup(key: string) {
-    setCollapsedGroups((prev) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   }
 
-  // Quick actions
-  async function handleQuickAction(deliverable: Deliverable, action: QuickAction) {
-    const active = getActiveActivity(deliverable);
-    if (!active) {
-      addToast('No hay actividad activa para realizar esta acción.', 'error');
-      return;
-    }
+  async function handleQuickAction(d: Deliverable, action: QuickAction) {
+    const active = getActiveActivity(d);
+    if (!active) { addToast('No hay actividad activa.', 'error'); return; }
     try {
       await api.post(ENDPOINTS.ACTIVITY_QUICK_ACTION(active.id), { action });
-      addToast(
-        action === 'approve' ? 'Entregable aprobado correctamente.' :
-        action === 'deliver' ? 'Entregable entregado correctamente.' :
-        'Ajustes solicitados correctamente.',
-        'success'
-      );
+      addToast(action === 'approve' ? 'Aprobado.' : action === 'deliver' ? 'Entregado.' : 'Ajustes solicitados.', 'success');
       loadData();
-    } catch {
-      addToast('Error al ejecutar la acción. Intenta de nuevo.', 'error');
-    }
+    } catch { addToast('Error al ejecutar la acción.', 'error'); }
   }
 
-  function canApprove(d: Deliverable): boolean {
-    const s = d.global_status;
-    return s === 'in_review' || s === 'with_observations';
-  }
-
-  function canDeliver(d: Deliverable): boolean {
-    return d.global_status === 'in_progress';
-  }
-
-  function canRequestAdjustments(d: Deliverable): boolean {
-    return d.global_status === 'in_review';
+  async function handleDelete(d: Deliverable) {
+    try {
+      await api.delete(ENDPOINTS.DELIVERABLE(d.id));
+      addToast('Entregable eliminado.', 'success');
+      setDeleteTarget(null);
+      loadData();
+    } catch { addToast('Error al eliminar.', 'error'); }
   }
 
   async function handleExport() {
-    try {
-      await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.csv');
-      addToast('Exportación iniciada.', 'success');
-    } catch {
-      addToast('Error al exportar.', 'error');
-    }
+    try { await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.csv'); addToast('Exportación iniciada.', 'success'); }
+    catch { addToast('Error al exportar.', 'error'); }
   }
 
   return (
     <div className="p-6">
       <PageHeader
         title="Entregables"
-        subtitle="Centro operativo — seguimiento y acciones sobre todos los entregables"
+        subtitle="Seguimiento por módulo con responsables, estados y fechas de compromiso por rol"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Entregables' }]}
       />
 
-      {/* Filters bar */}
+      {/* ── Filter bar ────────────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex flex-wrap items-center gap-2.5">
-        {/* Search */}
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar proyecto, programa, asignatura..."
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30"
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar asignatura, módulo, proyecto..."
+            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
         </div>
 
-        {/* Project filter */}
-        <select
-          value={filterProject}
-          onChange={(e) => setFilterProject(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[160px]"
-        >
+        <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[150px]">
           <option value="">Todos los proyectos</option>
-          {projects.map((p) => <option key={p} value={p}>{p}</option>)}
+          {projectNames.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
-        {/* Status filter */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[160px]"
-        >
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[140px]">
           <option value="">Todos los estados</option>
-          {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
+          {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
 
-        {/* Responsible filter */}
-        <select
-          value={filterResponsible}
-          onChange={(e) => setFilterResponsible(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[160px]"
-        >
+        <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[150px]">
           <option value="">Todos los responsables</option>
-          {responsibles.map((r) => <option key={r} value={r}>{r}</option>)}
+          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
 
-        {/* Only overdue */}
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={onlyOverdue}
-            onChange={(e) => setOnlyOverdue(e.target.checked)}
-            className="w-3.5 h-3.5 rounded border-gray-300 accent-red-500"
-          />
+          <input type="checkbox" checked={onlyOverdue} onChange={e => setOnlyOverdue(e.target.checked)}
+            className="w-3.5 h-3.5 rounded border-gray-300 accent-red-500" />
           <span className="text-sm text-gray-600 flex items-center gap-1">
-            <AlertCircle size={13} className="text-red-500" />
-            Solo vencidas
+            <AlertCircle size={13} className="text-red-500" /> Solo vencidas
           </span>
         </label>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Result count */}
-          <span className="text-xs text-gray-400 whitespace-nowrap">
-            {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
-          </span>
+        <button
+          onClick={() => setShowCompleted(p => !p)}
+          className={clsx(
+            'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+            showCompleted
+              ? 'bg-gray-100 border-gray-300 text-gray-700'
+              : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+          )}
+        >
+          <CheckCircle2 size={12} className={showCompleted ? 'text-emerald-500' : 'text-gray-300'} />
+          {showCompleted ? 'Ocultar finalizados' : 'Ver finalizados'}
+          {!showCompleted && completedHiddenCount > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
+              {completedHiddenCount}
+            </span>
+          )}
+        </button>
 
-          {/* View toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
+
+          {/* Expand / collapse all groups */}
+          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
             <button
-              onClick={() => setViewMode('grouped')}
-              title="Vista agrupada por programa"
-              className={clsx(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'grouped' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'
-              )}
+              onClick={() => setExpandedGroups(new Set(grouped.flatMap(g => [g.programName, g.programName + '_table'])))}
+              className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-50 transition-colors border-r border-gray-200"
             >
-              <Layers size={15} />
+              Expandir todo
             </button>
             <button
-              onClick={() => setViewMode('table')}
-              title="Vista tabla"
-              className={clsx(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'table' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'
-              )}
+              onClick={() => setExpandedGroups(new Set())}
+              className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
             >
-              <LayoutList size={15} />
+              Colapsar
             </button>
           </div>
 
-          {/* Export */}
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#194276] hover:bg-[#14325c] rounded-lg transition-colors"
-          >
-            <Download size={14} />
-            Exportar CSV
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+            <button onClick={() => setViewMode('rows')} title="Vista detallada por roles"
+              className={clsx('p-1.5 rounded-md transition-colors flex items-center gap-1',
+                viewMode === 'rows' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600')}>
+              <LayoutList size={15} />
+              {viewMode === 'rows' && <span className="text-xs font-medium">Detallada</span>}
+            </button>
+            <button onClick={() => setViewMode('grouped')} title="Vista tabla compacta"
+              className={clsx('p-1.5 rounded-md transition-colors flex items-center gap-1',
+                viewMode === 'grouped' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600')}>
+              <Table2 size={15} />
+              {viewMode === 'grouped' && <span className="text-xs font-medium">Tabla</span>}
+            </button>
+          </div>
+
+          {isManager && (
+            <>
+              <button onClick={() => setFormPanel({ mode: 'create' })}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-lg"
+                style={{ background: '#194276' }}>
+                <Plus size={14} /> Nueva tarea
+              </button>
+              <button onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors"
+                style={{ borderColor: '#194276', color: '#194276' }}>
+                <Upload size={14} /> Carga Masiva
+              </button>
+            </>
+          )}
+
+          <button onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Download size={14} /> Exportar
           </button>
         </div>
       </div>
 
-      {/* Loading skeleton (shared) */}
       {loading && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <TableSkeleton rows={8} cols={9} />
+          <TableSkeleton rows={5} cols={6} />
         </div>
       )}
 
-      {/* Grouped view */}
+      {/* ── ROWS VIEW (detailed, primary) ─────────────────────────────────── */}
+      {viewMode === 'rows' && !loading && (
+        <div className="space-y-3">
+          {grouped.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-14 text-center text-sm text-gray-400">
+              <Filter size={32} className="mx-auto mb-2 opacity-30" />
+              No se encontraron entregables con los filtros aplicados.
+            </div>
+          )}
+          {grouped.map(group => {
+            const isCollapsed = !expandedGroups.has(group.programName);
+            return (
+              <div key={group.programName} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <GroupHeader
+                  programName={group.programName} projectName={group.projectName} items={group.items}
+                  groupKey={group.programName} isCollapsed={isCollapsed}
+                  onToggle={() => toggleGroup(group.programName)}
+                />
+                {!isCollapsed && (
+                  <>
+                    {group.items.map(d => (
+                      <DeliverableRow
+                        key={d.id} deliverable={d} isManager={isManager}
+                        onView={() => setPanel({ deliverable: d, tab: 'info' })}
+                        onEdit={() => setFormPanel({ mode: 'edit', deliverable: d })}
+                        onDelete={() => setDeleteTarget(d)}
+                        onQuickAction={action => handleQuickAction(d, action)}
+                      />
+                    ))}
+                    {isManager && (
+                      <div className="px-5 py-3 border-t border-dashed border-gray-100 bg-gray-50/40">
+                        <button onClick={() => setFormPanel({ mode: 'create' })}
+                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#194276] transition-colors">
+                          <Plus size={12} /> Agregar módulo en este programa
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-3 px-1">
+            <p className="text-xs text-gray-400 flex items-center gap-1.5">
+              <Clock size={11} /> {filtered.length} de {data.length} entregable{data.length !== 1 ? 's' : ''}
+              <span className="mx-1 text-gray-200">·</span>El avance excluye roles marcados como N/A
+            </p>
+            {completedHiddenCount > 0 && (
+              <button onClick={() => setShowCompleted(true)} className="text-xs text-indigo-500 hover:text-indigo-700 underline">
+                {completedHiddenCount} finalizado{completedHiddenCount !== 1 ? 's' : ''} oculto{completedHiddenCount !== 1 ? 's' : ''} — ver
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TABLE VIEW (secondary, compact) ──────────────────────────────── */}
       {viewMode === 'grouped' && !loading && (
         <div className="space-y-3">
           {grouped.length === 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
               <Filter size={32} className="mx-auto mb-2 opacity-30" />
-              No se encontraron entregables con los filtros aplicados.
+              No se encontraron entregables.
             </div>
           )}
-          {grouped.map((group) => {
-            const isCollapsed = collapsedGroups.has(group.programName);
-            const overdue = group.items.filter((d) => {
-              const active = (d.role_activities ?? []).find(
-                (a) => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started'
-              );
-              return active?.commitment_date && daysUntil(active.commitment_date) !== null && (daysUntil(active.commitment_date) ?? 0) < 0;
-            }).length;
-            const avgPct = group.items.length > 0
-              ? Math.round(group.items.reduce((s, d) => s + (d.compliance_percentage ?? 0), 0) / group.items.length)
-              : 0;
-
+          {grouped.map(group => {
+            const tableKey = group.programName + '_table';
+            const isCollapsed = !expandedGroups.has(tableKey);
             return (
-              <div key={group.programName} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                {/* Group header */}
-                <button
-                  onClick={() => toggleGroup(group.programName)}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <ChevronDown
-                    size={16}
-                    className={clsx('text-gray-400 transition-transform flex-shrink-0', isCollapsed && '-rotate-90')}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900 text-sm">{group.programName}</span>
-                      <span className="text-xs text-gray-400">·</span>
-                      <span className="text-xs text-gray-500">{group.projectName}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0 text-xs">
-                    <span className="text-gray-500">{group.items.length} entregable{group.items.length !== 1 ? 's' : ''}</span>
-                    {overdue > 0 && (
-                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 font-semibold rounded-full px-2 py-0.5">
-                        <AlertCircle size={10} /> {overdue} vencida{overdue !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    <span className={clsx(
-                      'rounded-full px-2 py-0.5 font-semibold',
-                      avgPct >= 70 ? 'bg-emerald-100 text-emerald-700' :
-                      avgPct >= 40 ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-100 text-red-700'
-                    )}>{avgPct}% avance</span>
-                  </div>
-                </button>
-
-                {/* Group rows */}
+              <div key={group.programName} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <GroupHeader
+                  programName={group.programName} projectName={group.projectName} items={group.items}
+                  groupKey={tableKey} isCollapsed={isCollapsed}
+                  onToggle={() => toggleGroup(tableKey)}
+                />
                 {!isCollapsed && (
-                  <div className="overflow-x-auto border-t border-gray-100">
-                    <table className="w-full text-sm min-w-[1100px]">
-                      <thead className="bg-gray-50/70 border-b border-gray-100">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[860px]">
+                      <thead className="bg-gray-50/80 border-b border-gray-100">
                         <tr>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Flujo</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Asignatura</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Tipo</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Estado</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Resp. Actual</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Próx. Resp.</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">F. Compromiso</th>
-                          <th className="text-center px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Días</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">% Avance</th>
-                          <th className="sticky right-0 bg-gray-50/70 text-center px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Acciones</th>
+                          {['Asignatura / Módulo','Tipo','Estado','Responsable activo','F. Compromiso','Avance (excl. N/A)','Acciones'].map(h => (
+                            <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {group.items.map((d) => {
+                        {group.items.map(d => {
                           const acts = d.role_activities ?? [];
-                          const active = (acts).find(
-                            (a) => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started'
-                          );
-                          const next = (() => {
-                            const activeIdx = acts.findIndex(
-                              (a) => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started'
-                            );
-                            if (activeIdx === -1) return undefined;
-                            return acts.slice(activeIdx + 1).find((a) => a.status !== 'not_applicable');
-                          })();
+                          const active = getActiveActivity(d);
                           const days = daysUntil(active?.commitment_date);
+                          const overdue = days !== null && days < 0 && d.global_status !== 'finished';
                           return (
-                            <tr key={d.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
-                              <td className="px-3 py-2.5"><FlowIndicator activities={acts} /></td>
-                              <td className="px-3 py-2.5 text-gray-800 text-xs max-w-[180px]">
-                                <span className="block truncate font-medium" title={d.subject_name ?? d.name}>{d.subject_name ?? d.name}</span>
+                            <tr key={d.id} className={clsx('border-b border-gray-50 hover:bg-blue-50/20 transition-colors', overdue && 'bg-red-50/20')}>
+                              <td className="px-3 py-2.5 max-w-[200px]">
+                                <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
                               </td>
                               <td className="px-3 py-2.5">
-                                <span className={clsx(
-                                  'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap',
+                                <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
                                   d.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
-                                )}>
-                                  {DELIVERABLE_TYPE_LABELS[d.type]}
-                                </span>
+                                )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
                               </td>
                               <td className="px-3 py-2.5"><StatusBadge status={d.global_status} type="global" /></td>
-                              <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[110px]">
+                              <td className="px-3 py-2.5 text-xs">
                                 {active ? (
                                   <div>
-                                    <div className="truncate font-medium">{active.responsible?.name ?? '—'}</div>
-                                    <div className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</div>
+                                    <p className="font-medium text-gray-800 truncate max-w-[120px]">{active.responsible?.name ?? '—'}</p>
+                                    <p className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</p>
                                   </div>
                                 ) : <span className="text-gray-300">—</span>}
                               </td>
-                              <td className="px-3 py-2.5 text-xs text-gray-500 max-w-[110px]">
-                                {next ? (
-                                  <div>
-                                    <div className="truncate">{next.responsible?.name ?? '—'}</div>
-                                    <div className="text-[10px] text-gray-400">{ROLE_LABELS[next.role]}</div>
-                                  </div>
-                                ) : <span className="text-gray-300">—</span>}
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span className={clsx('text-xs', overdue ? 'text-red-600 font-semibold' : 'text-gray-600')}>
+                                  {formatDate(active?.commitment_date)}
+                                </span>
+                                {overdue && <span className="ml-1 text-[9px] text-red-500 font-bold">({Math.abs(days!)}d)</span>}
                               </td>
-                              <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-                                <span className={dateColorClass(days)}>{formatDate(active?.commitment_date)}</span>
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {days !== null ? (
-                                  <span className={clsx('text-xs font-semibold', dateColorClass(days))}>
-                                    {days > 0 ? `+${days}` : days}
-                                  </span>
-                                ) : <span className="text-gray-300 text-xs">—</span>}
-                              </td>
-                              <td className="px-3 py-2.5"><ProgressBar pct={d.compliance_percentage} /></td>
-                              <td className="sticky right-0 bg-white px-2 py-2.5">
-                                <div className="flex items-center justify-center gap-0.5">
-                                  <ActionBtn icon={<Eye size={14} />} label="Ver detalle" onClick={() => setPanel({ deliverable: d, tab: 'info' })} />
-                                  <ActionBtn icon={<MessageCircle size={14} />} label="Comentar" onClick={() => setPanel({ deliverable: d, tab: 'comments' })} />
-                                  <ActionBtn icon={<FileText size={14} />} label="Ver evidencias" onClick={() => setPanel({ deliverable: d, tab: 'flow' })} />
-                                  {canApprove(d) && (
-                                    <ActionBtn icon={<CheckCircle2 size={14} />} label="Aprobar" variant="success" onClick={() => handleQuickAction(d, 'approve')} />
+                              <td className="px-3 py-2.5"><ProgressExcNA activities={acts} compact /></td>
+                              <td className="px-2 py-2.5">
+                                <div className="flex items-center gap-0.5">
+                                  <button title="Ver" onClick={() => setPanel({ deliverable: d, tab: 'info' })}
+                                    className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Eye size={13} /></button>
+                                  {isManager && (
+                                    <>
+                                      <button title="Editar" onClick={() => setFormPanel({ mode: 'edit', deliverable: d })}
+                                        className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Pencil size={13} /></button>
+                                      <button title="Eliminar" onClick={() => setDeleteTarget(d)}
+                                        className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                                    </>
                                   )}
-                                  {canDeliver(d) && (
-                                    <ActionBtn icon={<Send size={14} />} label="Entregar" variant="success" onClick={() => handleQuickAction(d, 'deliver')} />
+                                  {(d.global_status === 'in_review' || d.global_status === 'with_observations') && (
+                                    <button title="Aprobar" onClick={() => handleQuickAction(d, 'approve')}
+                                      className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"><CheckCircle2 size={13} /></button>
                                   )}
-                                  {canRequestAdjustments(d) && (
-                                    <ActionBtn icon={<RotateCcw size={14} />} label="Solicitar ajustes" variant="warning" onClick={() => handleQuickAction(d, 'request_adjustments')} />
+                                  {d.global_status === 'in_progress' && (
+                                    <button title="Entregar" onClick={() => handleQuickAction(d, 'deliver')}
+                                      className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"><Send size={13} /></button>
                                   )}
                                 </div>
                               </td>
@@ -832,227 +1356,41 @@ export default function EntregablesPage() {
               </div>
             );
           })}
-          {/* Footer */}
-          <div className="px-5 py-2 text-xs text-gray-400 flex items-center gap-3">
-            <Clock size={12} />
-            {filtered.length} de {data.length} entregable{data.length !== 1 ? 's' : ''}
+          <div className="flex items-center gap-3 px-1">
+            <p className="text-xs text-gray-400 flex items-center gap-1.5">
+              <Clock size={11} /> {filtered.length} de {data.length} entregable{data.length !== 1 ? 's' : ''}
+            </p>
+            {completedHiddenCount > 0 && (
+              <button onClick={() => setShowCompleted(true)} className="text-xs text-indigo-500 hover:text-indigo-700 underline">
+                {completedHiddenCount} finalizado{completedHiddenCount !== 1 ? 's' : ''} oculto{completedHiddenCount !== 1 ? 's' : ''} — ver
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Table */}
-      {viewMode === 'table' && !loading && <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {(
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[1400px]">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Flujo</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Proyecto</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Programa</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Asignatura</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Entregable</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Tipo</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Estado</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Resp. Actual</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Próx. Resp.</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">F. Compromiso</th>
-                    <th className="text-center px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Días Rest.</th>
-                    <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">% Avance</th>
-                    <th className="sticky right-0 bg-gray-50 text-center px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((d) => {
-                    const acts = d.role_activities ?? [];
-                    const active = getActiveActivity(d);
-                    const next = getNextActivity(d);
-                    const days = daysUntil(active?.commitment_date);
+      {/* ── Panels & Modals ───────────────────────────────────────────────── */}
+      {panel && <SidePanel deliverable={panel.deliverable} defaultTab={panel.tab} onClose={() => setPanel(null)} />}
 
-                    return (
-                      <tr
-                        key={d.id}
-                        className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors"
-                      >
-                        {/* Flujo visual */}
-                        <td className="px-3 py-3">
-                          <FlowIndicator activities={acts} />
-                        </td>
-
-                        {/* Proyecto */}
-                        <td className="px-3 py-3 text-gray-600 text-xs max-w-[110px]">
-                          <span className="block truncate" title={d.project_name ?? ''}>
-                            {d.project_name ?? '—'}
-                          </span>
-                        </td>
-
-                        {/* Programa */}
-                        <td className="px-3 py-3 text-gray-600 text-xs max-w-[110px]">
-                          <span className="block truncate" title={d.program_name ?? ''}>
-                            {d.program_name ?? '—'}
-                          </span>
-                        </td>
-
-                        {/* Asignatura */}
-                        <td className="px-3 py-3 text-gray-700 text-xs max-w-[110px]">
-                          <span className="block truncate" title={d.subject_name ?? ''}>
-                            {d.subject_name ?? '—'}
-                          </span>
-                        </td>
-
-                        {/* Entregable */}
-                        <td className="px-3 py-3 font-semibold text-gray-900 max-w-[160px]">
-                          <span className="block truncate" title={d.name}>{d.name}</span>
-                        </td>
-
-                        {/* Tipo */}
-                        <td className="px-3 py-3">
-                          <span className={clsx(
-                            'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap',
-                            d.type === 'creation'
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-amber-100 text-amber-700'
-                          )}>
-                            {DELIVERABLE_TYPE_LABELS[d.type]}
-                          </span>
-                        </td>
-
-                        {/* Estado */}
-                        <td className="px-3 py-3">
-                          <StatusBadge status={d.global_status} type="global" />
-                        </td>
-
-                        {/* Responsable actual */}
-                        <td className="px-3 py-3 text-xs text-gray-700 max-w-[110px]">
-                          {active ? (
-                            <div>
-                              <div className="truncate font-medium" title={active.responsible?.name}>
-                                {active.responsible?.name ?? '—'}
-                              </div>
-                              <div className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-
-                        {/* Próximo responsable */}
-                        <td className="px-3 py-3 text-xs text-gray-500 max-w-[110px]">
-                          {next ? (
-                            <div>
-                              <div className="truncate" title={next.responsible?.name}>
-                                {next.responsible?.name ?? '—'}
-                              </div>
-                              <div className="text-[10px] text-gray-400">{ROLE_LABELS[next.role]}</div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-
-                        {/* Fecha compromiso */}
-                        <td className="px-3 py-3 text-xs whitespace-nowrap">
-                          <span className={dateColorClass(days)}>
-                            {formatDate(active?.commitment_date)}
-                          </span>
-                        </td>
-
-                        {/* Días restantes */}
-                        <td className="px-3 py-3 text-center">
-                          {days !== null ? (
-                            <span className={clsx('text-xs font-semibold', dateColorClass(days))}>
-                              {days > 0 ? `+${days}` : days}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-
-                        {/* % Avance */}
-                        <td className="px-3 py-3">
-                          <ProgressBar pct={d.compliance_percentage} />
-                        </td>
-
-                        {/* Acciones */}
-                        <td className="sticky right-0 bg-white px-2 py-3">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <ActionBtn
-                              icon={<Eye size={14} />}
-                              label="Ver detalle"
-                              onClick={() => setPanel({ deliverable: d, tab: 'info' })}
-                            />
-                            <ActionBtn
-                              icon={<MessageCircle size={14} />}
-                              label="Comentar"
-                              onClick={() => setPanel({ deliverable: d, tab: 'comments' })}
-                            />
-                            <ActionBtn
-                              icon={<FileText size={14} />}
-                              label="Ver evidencias"
-                              onClick={() => setPanel({ deliverable: d, tab: 'flow' })}
-                            />
-                            {canApprove(d) && (
-                              <ActionBtn
-                                icon={<CheckCircle2 size={14} />}
-                                label="Aprobar"
-                                variant="success"
-                                onClick={() => handleQuickAction(d, 'approve')}
-                              />
-                            )}
-                            {canDeliver(d) && (
-                              <ActionBtn
-                                icon={<Send size={14} />}
-                                label="Entregar"
-                                variant="success"
-                                onClick={() => handleQuickAction(d, 'deliver')}
-                              />
-                            )}
-                            {canRequestAdjustments(d) && (
-                              <ActionBtn
-                                icon={<RotateCcw size={14} />}
-                                label="Solicitar ajustes"
-                                variant="warning"
-                                onClick={() => handleQuickAction(d, 'request_adjustments')}
-                              />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={13} className="text-center py-14 text-gray-400 text-sm">
-                        <Filter size={32} className="mx-auto mb-2 opacity-30" />
-                        No se encontraron entregables con los filtros aplicados.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 py-2.5 text-xs text-gray-400 border-t border-gray-100 flex items-center gap-3">
-              <Clock size={12} />
-              {filtered.length} de {data.length} entregable{data.length !== 1 ? 's' : ''}
-            </div>
-          </>
-        )}
-      </div>}
-
-      {/* Side panel */}
-      {panel && (
-        <SidePanel
-          deliverable={panel.deliverable}
-          defaultTab={panel.tab}
-          onClose={() => setPanel(null)}
+      {formPanel && (
+        <DeliverableFormPanel
+          mode={formPanel.mode}
+          deliverable={formPanel.mode === 'edit' ? formPanel.deliverable : undefined}
+          projects={projects} users={users} programs={programNames}
+          onClose={() => setFormPanel(null)}
+          onSave={() => { setFormPanel(null); loadData(); }}
+          addToast={addToast}
         />
       )}
 
-      {/* Toasts */}
+      {deleteTarget && (
+        <DeleteConfirm name={deleteTarget.name} onConfirm={() => handleDelete(deleteTarget)} onCancel={() => setDeleteTarget(null)} />
+      )}
+
+      {showImport && (
+        <BulkImportModal projects={projects} onClose={() => setShowImport(false)} onSuccess={loadData} addToast={addToast} />
+      )}
+
       <Toast toasts={toasts} />
     </div>
   );

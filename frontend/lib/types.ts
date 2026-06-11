@@ -103,6 +103,7 @@ export interface Deliverable {
   subject_name?: string;
   program_name?: string;
   program_id?: number;
+  project_id?: number;
   project_name?: string;
   compliance_percentage?: number;
   complexity_level_id?: number | null;
@@ -285,10 +286,10 @@ export interface WorkspaceActivity {
   actual_start_date?: string;
   actual_delivery_date?: string;
   date_status: DateStatus;
-  deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string };
-  subject: { id: number; name: string };
-  program: { id: number; name: string };
-  project: { id: number; name: string; status: ProjectStatus };
+  deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string } | null;
+  subject: { id: number; name: string } | null;
+  program: { id: number; name: string } | null;
+  project: { id: number; name: string; status: ProjectStatus } | null;
   next_role?: Role;
   next_responsible?: string;
   next_date?: string;

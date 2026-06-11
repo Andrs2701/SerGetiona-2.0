@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity } from '@/lib/types';
-import { MOCK_WORKSPACE } from '@/lib/mock-data';
 import { ROLE_STATUS_LABELS, USER_ROLE_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -229,9 +228,9 @@ function PriorityGroupPanel({
                   className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">{act.deliverable.name}</p>
+                    <p className="text-xs font-medium text-gray-900 truncate">{act.deliverable?.name ?? '—'}</p>
                     <p className="text-[10px] text-gray-400 truncate mt-0.5">
-                      {act.program.name} · {act.subject.name}
+                      {act.program?.name ?? '—'} · {act.subject?.name ?? '—'}
                     </p>
                   </div>
                   {diff !== null && (
@@ -326,8 +325,8 @@ function CountdownBanner({ activities }: { activities: WorkspaceActivity[] }) {
         <p className={`text-xs font-semibold uppercase tracking-wide ${urgent ? 'text-amber-600' : 'text-indigo-500'}`}>
           Próxima entrega
         </p>
-        <p className="text-sm font-medium text-gray-900 truncate mt-0.5">{next.deliverable.name}</p>
-        <p className="text-xs text-gray-500 truncate">{next.program.name} · {next.subject.name}</p>
+        <p className="text-sm font-medium text-gray-900 truncate mt-0.5">{next.deliverable?.name ?? '—'}</p>
+        <p className="text-xs text-gray-500 truncate">{next.program?.name ?? '—'} · {next.subject?.name ?? '—'}</p>
       </div>
       <div className="text-right flex-shrink-0">
         <p className={`text-xl font-bold tabular-nums ${expired ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-indigo-600'}`}>
@@ -381,7 +380,7 @@ function ActivityCard({ act, onClick }: { act: WorkspaceActivity; onClick: () =>
       className={`w-full text-left bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md hover:border-indigo-200 transition-all group ${leftBorder}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-sm font-semibold text-gray-900 leading-tight">{act.deliverable.name}</p>
+        <p className="text-sm font-semibold text-gray-900 leading-tight">{act.deliverable?.name ?? '—'}</p>
         {act.date_status === 'overdue' && (
           <span className="flex-shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
             <XCircle size={10} /> Vencida
@@ -394,16 +393,18 @@ function ActivityCard({ act, onClick }: { act: WorkspaceActivity; onClick: () =>
         )}
       </div>
 
-      <p className="text-xs text-gray-400 truncate mb-3">{act.program.name} · {act.subject.name}</p>
+      <p className="text-xs text-gray-400 truncate mb-3">{act.program?.name ?? '—'} · {act.subject?.name ?? '—'}</p>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${autoStatus.cls}`}>
             {autoStatus.label}
           </span>
+          {act.deliverable && (
           <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-indigo-50 text-indigo-600 font-medium">
             {DELIVERABLE_TYPE_LABELS[act.deliverable.type]}
           </span>
+          )}
         </div>
         {dueInfo && (
           <div className="flex items-center gap-1 text-xs">
@@ -426,16 +427,49 @@ export default function DashboardOperativo() {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tableExpanded, setTableExpanded] = useState(false);
 
   useEffect(() => {
     api
       .get<Workspace>(ENDPOINTS.MY_WORKSPACE)
       .then(setWorkspace)
-      .catch(() => setWorkspace(MOCK_WORKSPACE))
+      .catch(() => setWorkspace(null))
       .finally(() => setLoading(false));
   }, []);
 
-  const data = workspace ?? MOCK_WORKSPACE;
+  // ← loading guard MUST come before the null guard
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
+          ))}
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 animate-pulse h-16" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 animate-pulse h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!workspace) {
+    return (
+      <div className="p-6">
+        <div className="rounded-xl border border-red-100 bg-red-50 p-5 text-sm text-red-700">
+          No fue posible cargar la información operativa.
+          <br />
+          <span className="text-xs text-red-400 mt-1 block">Intenta recargar la página o contacta al administrador.</span>
+        </div>
+      </div>
+    );
+  }
+
+  const data = workspace;
   const activities = data.activities ?? [];
 
   // KPIs
@@ -509,25 +543,7 @@ export default function DashboardOperativo() {
   ];
 
   const userRoleLabel = (USER_ROLE_LABELS as Record<string, string>)[data.role] ?? data.role;
-
-  if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
-          ))}
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 animate-pulse h-16" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-200 animate-pulse h-32" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const TABLE_COMPACT_ROWS = 5;
 
   return (
     <div className="p-6 space-y-6">
@@ -654,29 +670,37 @@ export default function DashboardOperativo() {
         )}
       </div>
 
-      {/* ── Tabla de actividades con columna Prioridad ── */}
+      {/* ── Tabla de actividades — compacta por defecto ── */}
       {activities.length > 0 && (
         <div>
-          <div className="mb-3">
-            <h2 className="text-base font-semibold text-gray-900">Resumen de actividades</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Vista tabular con indicador de prioridad</p>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Resumen de actividades</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Ordenadas por urgencia</p>
+            </div>
+            <button
+              onClick={() => setTableExpanded(v => !v)}
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            >
+              {tableExpanded ? 'Ver menos' : `Ver todas (${activities.length})`}
+            </button>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Entregable</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Programa</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">Fecha</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Estado</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-600">Prioridad</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Entregable</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Programa</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] hidden md:table-cell">Fecha</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Estado</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Prioridad</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {[...activities]
                     .sort((a, b) => urgencyOrder(a) - urgencyOrder(b))
-                    .slice(0, 15)
+                    .slice(0, tableExpanded ? activities.length : TABLE_COMPACT_ROWS)
                     .map((act) => {
                       const autoStatus = computeAutoStatus(act);
                       return (
@@ -685,16 +709,12 @@ export default function DashboardOperativo() {
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => router.push('/mi-espacio')}
                         >
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-gray-900 truncate max-w-[200px]">
-                              {act.deliverable.name}
-                            </p>
-                            <p className="text-gray-400 truncate max-w-[200px]">{act.subject.name}</p>
+                          <td className="px-4 py-2.5">
+                            <p className="font-medium text-gray-900 truncate max-w-[200px]">{act.deliverable?.name ?? '—'}</p>
+                            <p className="text-gray-400 truncate max-w-[200px] text-[10px]">{act.subject?.name ?? '—'}</p>
                           </td>
-                          <td className="px-4 py-3 text-gray-500 truncate max-w-[160px]">
-                            {act.program.name}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
+                          <td className="px-4 py-2.5 text-gray-500 truncate max-w-[160px]">{act.program?.name ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-500 hidden md:table-cell">
                             {act.commitment_date ? (() => {
                               const d = daysDiff(act.commitment_date!);
                               return (
@@ -704,27 +724,25 @@ export default function DashboardOperativo() {
                               );
                             })() : '—'}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5">
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${autoStatus.cls}`}>
                               {autoStatus.label}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <PriorityBadge act={act} />
-                          </td>
+                          <td className="px-4 py-2.5"><PriorityBadge act={act} /></td>
                         </tr>
                       );
                     })}
                 </tbody>
               </table>
             </div>
-            {activities.length > 15 && (
-              <div className="px-4 py-3 border-t border-gray-100 text-center">
+            {!tableExpanded && activities.length > TABLE_COMPACT_ROWS && (
+              <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 text-center">
                 <button
-                  onClick={() => router.push('/mi-espacio')}
+                  onClick={() => setTableExpanded(true)}
                   className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                 >
-                  Ver las {activities.length - 15} actividades restantes en Mi Espacio
+                  Mostrar {activities.length - TABLE_COMPACT_ROWS} actividades más
                 </button>
               </div>
             )}

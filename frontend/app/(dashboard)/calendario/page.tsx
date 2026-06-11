@@ -10,7 +10,6 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { WorkspaceActivity, CalendarEvent, Role } from '@/lib/types';
 import { ROLE_STATUS_LABELS, ROLE_LABELS } from '@/lib/types';
-import { MOCK_WORKSPACE, MOCK_CALENDAR_EVENTS } from '@/lib/mock-data';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -126,9 +125,9 @@ function ActivityCard({ act, onNavigate }: { act: WorkspaceActivity; onNavigate:
 
   return (
     <div className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-gray-200 transition-colors">
-      <p className="text-sm font-semibold text-gray-900 leading-snug">{act.deliverable.name}</p>
-      <p className="text-xs text-gray-500">{act.program.name}</p>
-      <p className="text-xs text-gray-400">{act.subject.name}</p>
+      <p className="text-sm font-semibold text-gray-900 leading-snug">{act.deliverable?.name ?? '—'}</p>
+      <p className="text-xs text-gray-500">{act.program?.name ?? '—'}</p>
+      <p className="text-xs text-gray-400">{act.subject?.name ?? '—'}</p>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={clsx('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', activityStatusBadgeClass(act))}>
           {activityStatusLabel(act)}
@@ -150,7 +149,7 @@ function ActivityCard({ act, onNavigate }: { act: WorkspaceActivity; onNavigate:
         )}
       </div>
       <button
-        onClick={() => onNavigate(act.project.id)}
+        onClick={() => act.project && onNavigate(act.project.id)}
         className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium pt-0.5"
       >
         <ExternalLink size={11} /> Ver proyecto
@@ -256,11 +255,11 @@ function SidePanel({
               <div
                 key={act.id}
                 className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => onNavigate(act.project.id)}
+                onClick={() => act.project && onNavigate(act.project.id)}
               >
                 <span className={clsx('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', activityDotClass(act))} />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-800 truncate">{act.deliverable.name}</p>
+                  <p className="text-xs font-medium text-gray-800 truncate">{act.deliverable?.name ?? '—'}</p>
                   <p className="text-xs text-gray-500">
                     {act.commitment_date
                       ? new Date(act.commitment_date + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
@@ -285,10 +284,10 @@ function SidePanel({
               <div
                 key={act.id}
                 className="p-2 rounded-lg bg-red-50 cursor-pointer"
-                onClick={() => onNavigate(act.project.id)}
+                onClick={() => act.project && onNavigate(act.project.id)}
               >
-                <p className="text-xs font-medium text-red-800 truncate">{act.deliverable.name}</p>
-                <p className="text-xs text-red-500">{act.subject.name}</p>
+                <p className="text-xs font-medium text-red-800 truncate">{act.deliverable?.name ?? '—'}</p>
+                <p className="text-xs text-red-500">{act.subject?.name ?? '—'}</p>
               </div>
             ))}
           </div>
@@ -463,11 +462,13 @@ function MonthView({
                         <div
                           key={act.id}
                           className={clsx('text-[10px] rounded px-1 mb-0.5 truncate', activityChipClass(act))}
-                          title={act.deliverable.name}
+                          title={act.deliverable?.name ?? '—'}
                         >
-                          {act.deliverable.name.length > 14
-                            ? act.deliverable.name.slice(0, 14) + '…'
-                            : act.deliverable.name}
+                          {act.deliverable
+                            ? act.deliverable.name.length > 14
+                              ? act.deliverable.name.slice(0, 14) + '…'
+                              : act.deliverable.name
+                            : '—'}
                         </div>
                       ))}
                   {overflow > 0 && (
@@ -570,11 +571,13 @@ function WeekView({
                     <div
                       key={act.id}
                       className={clsx('text-[10px] rounded px-1.5 py-0.5 mb-1 truncate', activityChipClass(act))}
-                      title={act.deliverable.name}
+                      title={act.deliverable?.name ?? '—'}
                     >
-                      {act.deliverable.name.length > 16
-                        ? act.deliverable.name.slice(0, 16) + '…'
-                        : act.deliverable.name}
+                      {act.deliverable
+                        ? act.deliverable.name.length > 16
+                          ? act.deliverable.name.slice(0, 16) + '…'
+                          : act.deliverable.name
+                        : '—'}
                     </div>
                   ))}
             </div>
@@ -741,7 +744,7 @@ export default function CalendarioPage() {
     api
       .get<WorkspaceActivity[]>(ENDPOINTS.CALENDAR_MY_DELIVERABLES)
       .then(setActivities)
-      .catch(() => setActivities(MOCK_WORKSPACE.activities));
+      .catch(() => setActivities([]));
   }, []);
 
   // Calendar events
@@ -749,7 +752,7 @@ export default function CalendarioPage() {
     api
       .get<CalendarEvent[]>(`${ENDPOINTS.CALENDAR_EVENTS}?year=${year}`)
       .then(setCalEvents)
-      .catch(() => setCalEvents(MOCK_CALENDAR_EVENTS));
+      .catch(() => setCalEvents([]));
   }, [year]);
 
   // All activities (showAll mode) — uses dedicated endpoint

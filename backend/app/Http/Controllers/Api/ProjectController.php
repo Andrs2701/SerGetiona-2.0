@@ -7,6 +7,7 @@ use App\Http\Resources\ProjectResource;
 use App\Http\Resources\ProjectCollection;
 use App\Models\Deliverable;
 use App\Models\Project;
+use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -65,8 +66,10 @@ class ProjectController extends Controller
         return new ProjectResource($project->load('responsible', 'creator'));
     }
 
-    public function show(Project $project)
+    public function show(Request $request, Project $project)
     {
+        abort_unless(ResourceAccess::canAccessProject($request->user(), $project), 403);
+
         $project->load([
             'responsible',
             'creator',

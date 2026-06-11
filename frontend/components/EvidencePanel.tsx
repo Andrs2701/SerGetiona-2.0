@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, ExternalLink, Trash2, Plus } from 'lucide-re
 import { api, ENDPOINTS } from '@/lib/api';
 import type { EvidenceLink, EvidenceByRole, Role } from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 const EVIDENCE_ICONS: Record<string, string> = {
   url: '🔗',
@@ -35,35 +36,6 @@ const EMPTY_EVIDENCE: EvidenceByRole = {
   qa: [],
 };
 
-// Mock evidence for fallback
-function buildMockEvidence(deliverableId: number): EvidenceByRole {
-  return {
-    ...EMPTY_EVIDENCE,
-    expert: [
-      {
-        id: 1,
-        role_activity_id: deliverableId * 10 + 1,
-        type: 'drive',
-        title: 'Documento base del experto',
-        url: 'https://drive.google.com/example',
-        user: { id: 4, name: 'Laura Torres', email: 'laura@sergestiona.co', role: 'expert', is_active: true },
-        created_at: '2026-05-20T10:00:00Z',
-      },
-    ],
-    pedagogy: [
-      {
-        id: 2,
-        role_activity_id: deliverableId * 10 + 2,
-        type: 'url',
-        title: 'Referencia pedagógica',
-        url: 'https://example.com/pedagogia',
-        user: { id: 5, name: 'Jhon Pérez', email: 'jhon@sergestiona.co', role: 'pedagogy', is_active: true },
-        created_at: '2026-05-22T10:00:00Z',
-      },
-    ],
-  };
-}
-
 interface EvidencePanelProps {
   deliverableId: number;
   activityId: number;
@@ -83,15 +55,17 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
   const [newLink, setNewLink] = useState<NewLinkForm>({ type: 'url', title: '', url: '' });
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  // Current user id — in real app from auth context
-  const currentUserId = 4; // Laura Torres (mock)
+  const [error, setError] = useState('');
+  const { user } = useAuthContext();
 
   useEffect(() => {
     api
       .get<EvidenceByRole>(ENDPOINTS.DELIVERABLE_EVIDENCE(deliverableId))
       .then((data) => setEvidence(data))
-      .catch(() => setEvidence(buildMockEvidence(deliverableId)))
+      .catch(() => {
+        setEvidence(EMPTY_EVIDENCE);
+        setError('No fue posible cargar las evidencias.');
+      })
       .finally(() => setLoading(false));
   }, [deliverableId]);
 
@@ -102,6 +76,7 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
   async function handleAdd() {
     if (!newLink.title.trim() || !newLink.url.trim()) return;
     setAdding(true);
+    setError('');
     try {
       const created = await api.post<EvidenceLink>(
         ENDPOINTS.ACTIVITY_EVIDENCE(activityId),
@@ -113,21 +88,7 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
       }));
       setNewLink({ type: 'url', title: '', url: '' });
     } catch {
-      // Optimistic mock add
-      const mockLink: EvidenceLink = {
-        id: Date.now(),
-        role_activity_id: activityId,
-        type: newLink.type as EvidenceLink['type'],
-        title: newLink.title,
-        url: newLink.url,
-        user: { id: currentUserId, name: 'Laura Torres', email: 'laura@sergestiona.co', role: 'expert', is_active: true },
-        created_at: new Date().toISOString(),
-      };
-      setEvidence((prev) => ({
-        ...prev,
-        [role]: [...(prev[role as Role] ?? []), mockLink],
-      }));
-      setNewLink({ type: 'url', title: '', url: '' });
+      setError('La evidencia no se guardó. Intenta nuevamente.');
     } finally {
       setAdding(false);
     }
@@ -138,7 +99,9 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
     try {
       await api.delete<void>(`/evidence/${linkId}`);
     } catch {
-      // ignore — proceed with optimistic removal
+      setError('No fue posible eliminar la evidencia.');
+      setDeletingId(null);
+      return;
     }
     setEvidence((prev) => ({
       ...prev,
@@ -159,6 +122,7 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
 
   return (
     <div className="divide-y divide-gray-100">
+      {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
       {ROLES.map((r) => {
         const links = evidence[r] ?? [];
         const isOpen = !!expanded[r];
@@ -224,7 +188,7 @@ export default function EvidencePanel({ deliverableId, activityId, role }: Evide
                         })}
                       </p>
                     </div>
-                    {link.user?.id === currentUserId && (
+                    {(user?.role === 'admin' || user?.role === 'coordinator' || link.user?.id === user?.id) && (
                       <button
                         onClick={() => handleDelete(r, link.id)}
                         disabled={deletingId === link.id}

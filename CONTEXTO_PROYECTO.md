@@ -47,14 +47,8 @@ php artisan db:seed --class=CalendarEventSeeder
 
 | Rol | Correo | Contraseña |
 |-----|--------|------------|
-| Administrador | admin@sergestiona.co | password |
-| Coordinador | coordinador@sergestiona.co | password |
-| Experto | experto1@sergestiona.co | password |
-| Pedagogía | pedagogia@sergestiona.co | password |
-| Diseño | disenio@sergestiona.co | password |
-| Audiovisual | audiovisual@sergestiona.co | password |
-| Ingeniería | ingenieria@sergestiona.co | password |
-| Calidad | calidad@sergestiona.co | password |
+Las cuentas demo se crean mediante seeders. La contraseña se configura exclusivamente
+con `DEMO_USER_PASSWORD` en el entorno y no debe almacenarse en Git.
 
 ---
 
@@ -149,7 +143,6 @@ SerGetiona-2.0/
 │   ├── lib/
 │   │   ├── api.ts                         # Cliente fetch con unwrap automático de {data:[]}
 │   │   ├── types.ts                       # Todos los tipos TypeScript + labels en español
-│   │   └── mock-data.ts                   # Datos fallback para desarrollo sin backend
 │   ├── contexts/
 │   │   └── AuthContext.tsx                # AuthProvider con localStorage + /auth/me
 │   └── hooks/

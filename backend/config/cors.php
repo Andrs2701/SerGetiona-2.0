@@ -18,9 +18,7 @@ return [
         env('FRONTEND_URL'),                       // URL del frontend en Render
     ]),
 
-    'allowed_origins_patterns' => [
-        '#^https://.*\.onrender\.com$#',           // Cualquier subdominio de onrender.com
-    ],
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 

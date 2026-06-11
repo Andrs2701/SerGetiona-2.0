@@ -89,6 +89,7 @@ class WorkspaceController extends Controller
         $approachingLimit = $today->copy()->addDays(5);
 
         $activities = RoleActivity::where('responsible_id', $user->id)
+            ->whereHas('deliverable')          // exclude activities whose deliverable was (soft-)deleted
             ->with([
                 'deliverable.subject.academicProgram.project',
                 'deliverable.roleActivities.responsible',

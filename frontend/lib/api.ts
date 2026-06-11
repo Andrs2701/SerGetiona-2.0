@@ -32,6 +32,21 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+async function requestForm<T>(method: string, path: string, body: FormData): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { method, headers, body });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 // Unwrap Laravel's { data: [...] } envelope when present
 function unwrap<T>(response: unknown): T {
   if (
@@ -65,6 +80,7 @@ export async function downloadCsv(path: string, filename: string): Promise<void>
 export const api = {
   get: <T>(path: string) => request<unknown>('GET', path).then((r) => unwrap<T>(r)),
   post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
+  postForm: <T>(path: string, body: FormData) => requestForm<T>('POST', path, body),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
 };

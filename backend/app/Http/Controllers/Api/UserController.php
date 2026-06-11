@@ -69,4 +69,16 @@ class UserController extends Controller
 
         return new UserResource($user);
     }
+
+    public function destroy(Request $request, User $user)
+    {
+        if ($request->user()->is($user)) {
+            return response()->json(['message' => 'No puedes eliminar tu propia cuenta.'], 422);
+        }
+
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json(['message' => 'Usuario eliminado correctamente.']);
+    }
 }

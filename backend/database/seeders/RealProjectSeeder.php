@@ -15,6 +15,8 @@ class RealProjectSeeder extends Seeder
 {
     public function run(): void
     {
+        $demoPassword = env('DEMO_USER_PASSWORD', 'password');
+
         // ─── Proyecto ────────────────────────────────────────────────────────
         $project = Project::firstOrCreate(
             ['name' => 'Control de Cambios - Profesional en Negocios Digitales'],
@@ -50,7 +52,7 @@ class RealProjectSeeder extends Seeder
                 [
                     'name'     => $ud['name'],
                     'role'     => $ud['role'],
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make($demoPassword),
                     'is_active'=> true,
                 ]
             );

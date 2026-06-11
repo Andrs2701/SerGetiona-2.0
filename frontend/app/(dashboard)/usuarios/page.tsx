@@ -6,7 +6,6 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User, UserRole } from '@/lib/types';
 import { USER_ROLE_LABELS } from '@/lib/types';
-import { MOCK_USERS } from '@/lib/mock-data';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
@@ -59,7 +58,7 @@ export default function UsuariosPage() {
     api
       .get<User[]>(ENDPOINTS.USERS)
       .then(setData)
-      .catch(() => setData(MOCK_USERS))
+      .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, []);
 

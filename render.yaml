@@ -16,6 +16,10 @@ services:
         value: "false"
       - key: APP_KEY
         generateValue: true
+      - key: DEMO_USER_PASSWORD
+        generateValue: true
+      - key: SANCTUM_EXPIRATION
+        value: "480"
       - key: DB_CONNECTION
         value: sqlite
       - key: DB_DATABASE
@@ -28,6 +32,22 @@ services:
         value: sync
       - key: LOG_CHANNEL
         value: stderr
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_SCHEME
+        value: tls
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: Sergestiona
       # Completar con la URL del frontend de Render después del primer deploy
       - key: FRONTEND_URL
         value: https://sergestiona-frontend.onrender.com

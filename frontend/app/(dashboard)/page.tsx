@@ -80,40 +80,6 @@ function GlobalRing({ value }: { value: number }) {
   );
 }
 
-// MOCK fallback for admin stats
-const MOCK_ADMIN_STATS: DashboardStats = {
-  active_projects: 2,
-  total_programs: 4,
-  total_deliverables: 45,
-  total_activities: 270,
-  finished_deliverables: 9,
-  finished_activities: 54,
-  active_activities: 87,
-  with_observations: 5,
-  compliance_percentage: 20,
-  global_compliance_percentage: 20,
-  overdue_activities: 14,
-  approaching_activities: 8,
-  deliverables_by_status: {
-    in_progress: 12, finished: 9, with_observations: 5, in_review: 6,
-    pending_start: 8, unpublished: 3, cancelled: 0, not_applicable: 2,
-  },
-  activities_by_role_detail: [
-    { role: 'expert', total: 45, approved: 18, active: 15, overdue: 6 },
-    { role: 'pedagogy', total: 45, approved: 14, active: 18, overdue: 8 },
-    { role: 'design', total: 45, approved: 10, active: 12, overdue: 5 },
-    { role: 'audiovisual', total: 45, approved: 6, active: 8, overdue: 3 },
-    { role: 'engineering', total: 45, approved: 4, active: 6, overdue: 2 },
-    { role: 'qa', total: 45, approved: 2, active: 4, overdue: 1 },
-  ],
-  programs_breakdown: [
-    { id: 1, name: 'Esp. Bienestar Psicosocial', project_id: 1, project_name: 'Actualización Curricular 2026', total: 25, finished: 18, compliance_percentage: 72, overdue_count: 2, active_count: 5, pending_count: 7 },
-    { id: 2, name: 'Maestría Atención Comunitaria', project_id: 1, project_name: 'Actualización Curricular 2026', total: 20, finished: 8, compliance_percentage: 40, overdue_count: 5, active_count: 7, pending_count: 12 },
-    { id: 3, name: 'Esp. Psicosocial (nueva)', project_id: 2, project_name: 'Creación Especialización', total: 48, finished: 4, compliance_percentage: 8, overdue_count: 12, active_count: 18, pending_count: 44 },
-    { id: 4, name: 'Control Cambios Derecho', project_id: 3, project_name: 'Control de Cambios Q1', total: 37, finished: 33, compliance_percentage: 89, overdue_count: 0, active_count: 2, pending_count: 4 },
-  ],
-};
-
 // ─── Status label/color map ───────────────────────────────────────────────────
 
 const STATUS_INFO: Record<string, { label: string; color: string }> = {
@@ -149,33 +115,6 @@ interface PanelRow {
   days_diff?: number;
   status?: string;
   role?: string;
-}
-
-// ─── Mock panel rows ──────────────────────────────────────────────────────────
-
-function buildMockRows(filter: PanelFilter): PanelRow[] {
-  const base: PanelRow[] = [
-    { id: 1, name: 'Diseño instruccional módulo 1', responsible: 'María García', program: 'Esp. Bienestar', subject: 'Psicología', commitment_date: '2026-06-05', days_diff: -4, status: 'overdue', role: 'pedagogy' },
-    { id: 2, name: 'Video introductorio', responsible: 'Carlos López', program: 'Maestría Comunitaria', subject: 'Intervención', commitment_date: '2026-06-08', days_diff: -1, status: 'overdue', role: 'audiovisual' },
-    { id: 3, name: 'Rúbrica evaluativa', responsible: 'Ana Torres', program: 'Esp. Bienestar', subject: 'Metodología', commitment_date: '2026-06-12', days_diff: 3, status: 'approaching', role: 'expert' },
-    { id: 4, name: 'Plataforma virtual módulo 2', responsible: 'Luis Pérez', program: 'Esp. Psicosocial', subject: 'Plataforma', commitment_date: '2026-06-11', days_diff: 2, status: 'approaching', role: 'engineering' },
-    { id: 5, name: 'Material gráfico portada', responsible: 'Sofía Ruiz', program: 'Control Cambios', subject: 'Diseño', commitment_date: '2026-07-01', days_diff: 22, status: 'in_progress', role: 'design' },
-    { id: 6, name: 'Contenido semana 3', responsible: 'Pedro Martínez', program: 'Maestría Comunitaria', subject: 'Salud', commitment_date: '2026-06-25', days_diff: 16, status: 'with_observations', role: 'expert' },
-    { id: 7, name: 'QA módulo de evaluación', responsible: 'Laura Díaz', program: 'Esp. Bienestar', subject: 'Calidad', commitment_date: '2026-06-20', days_diff: 11, status: 'in_review', role: 'qa' },
-  ];
-
-  if (filter === 'overdue') return base.filter((r) => r.days_diff !== undefined && r.days_diff < 0);
-  if (filter === 'approaching') return base.filter((r) => r.days_diff !== undefined && r.days_diff >= 0 && r.days_diff <= 3);
-  if (filter === 'with_observations') return base.filter((r) => r.status === 'with_observations');
-  if (filter.startsWith('status_')) {
-    const st = filter.replace('status_', '');
-    return base.filter((r) => r.status === st);
-  }
-  if (filter.startsWith('role_')) {
-    const rl = filter.replace('role_', '');
-    return base.filter((r) => r.role === rl);
-  }
-  return base;
 }
 
 function panelTitle(filter: PanelFilter): string {
@@ -248,10 +187,10 @@ function SlidingPanel({
         }));
         setRows(mapped);
       } else {
-        setRows(buildMockRows(f));
+        setRows([]);
       }
     } catch {
-      setRows(buildMockRows(f));
+      setRows([]);
     } finally {
       setLoadingPanel(false);
     }
@@ -413,19 +352,22 @@ interface WorkloadUser {
   completed: number;
 }
 
+const WORKLOAD_COMPACT = 5;
+
 function DashboardAdmin() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [workload, setWorkload] = useState<WorkloadUser[]>([]);
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [capacity, setCapacity] = useState<{ summary: CapacitySummary; users: CapacityUser[] } | null>(null);
+  const [workloadExpanded, setWorkloadExpanded] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     api
       .get<DashboardStats>(ENDPOINTS.DASHBOARD)
       .then(setStats)
-      .catch(() => setStats(MOCK_ADMIN_STATS))
+      .catch(() => setStats(null))
       .finally(() => setLoading(false));
     api.get<WorkloadUser[]>('/reports/workload')
       .then(data => setWorkload(Array.isArray(data) ? data : []))
@@ -446,7 +388,17 @@ function DashboardAdmin() {
     );
   }
 
-  const d = stats ?? MOCK_ADMIN_STATS;
+  if (!stats) {
+    return (
+      <div className="p-6">
+        <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          No fue posible cargar los indicadores del dashboard.
+        </div>
+      </div>
+    );
+  }
+
+  const d = stats;
   const globalPct = d.global_compliance_percentage ?? d.compliance_percentage ?? 0;
   const programs: ProgramBreakdown[] = d.programs_breakdown ?? [];
   const roleDetail: ActivityByRoleDetail[] = d.activities_by_role_detail ?? [];
@@ -923,7 +875,7 @@ function DashboardAdmin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {workload.map((u) => {
+                  {workload.slice(0, workloadExpanded ? workload.length : WORKLOAD_COMPACT).map((u) => {
                     const inProcess = u.pending + u.in_review;
                     const completedPct = u.total > 0 ? Math.round((u.completed / u.total) * 100) : 0;
                     const barColor = completedPct >= 70 ? 'bg-emerald-500' : completedPct >= 40 ? 'bg-amber-400' : 'bg-red-400';
@@ -980,6 +932,14 @@ function DashboardAdmin() {
                 </tbody>
               </table>
             </div>
+            {workload.length > WORKLOAD_COMPACT && (
+              <button
+                onClick={() => setWorkloadExpanded(e => !e)}
+                className="mt-3 text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+              >
+                {workloadExpanded ? 'Ver menos' : `Ver ${workload.length - WORKLOAD_COMPACT} usuarios más`}
+              </button>
+            )}
           </div>
         )}
       </div>

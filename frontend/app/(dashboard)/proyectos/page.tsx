@@ -9,9 +9,8 @@ import {
 import { clsx } from 'clsx';
 import { useRouter } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Project, ProjectStatus, PortfolioView } from '@/lib/types';
+import type { Project, ProjectStatus, PortfolioView, User } from '@/lib/types';
 import { PROJECT_STATUS_LABELS } from '@/lib/types';
-import { MOCK_PROJECTS, MOCK_USERS } from '@/lib/mock-data';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
@@ -214,13 +213,17 @@ export default function ProyectosPage() {
   const [saving, setSaving] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [view, setView] = useState<PortfolioView>('cards');
+  const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
     api
       .get<Project[]>(ENDPOINTS.PROJECTS)
       .then(setData)
-      .catch(() => setData(MOCK_PROJECTS))
+      .catch(() => setData([]))
       .finally(() => setLoading(false));
+    api.get<User[]>(ENDPOINTS.USERS)
+      .then(setUsers)
+      .catch(() => setUsers([]));
     // Load persisted view preference
     api.get<{ preferences: { portfolio_view?: PortfolioView } }>('/preferences')
       .then((res) => { if (res.preferences?.portfolio_view) setView(res.preferences.portfolio_view); })
@@ -465,7 +468,7 @@ export default function ProyectosPage() {
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Sin asignar</option>
-                {MOCK_USERS.map((u) => (
+                {users.filter((u) => u.is_active).map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>

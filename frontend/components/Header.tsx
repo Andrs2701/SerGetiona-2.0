@@ -8,7 +8,6 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Notification } from '@/lib/types';
 import { USER_ROLE_LABELS } from '@/lib/types';
-import { MOCK_NOTIFICATIONS } from '@/lib/mock-data';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -22,10 +21,15 @@ function timeAgo(dateStr: string): string {
 }
 
 function notifIcon(type: string) {
-  if (type === 'task_assigned') return '📋';
+  if (type === 'task_assigned')       return '📋';
+  if (type === 'status_changed')      return '🔄';
+  if (type === 'date_changed')        return '📅';
+  if (type === 'adjustments_requested') return '↩️';
+  if (type === 'activity_modified')   return '✏️';
+  if (type === 'next_in_chain')       return '▶️';
   if (type === 'deadline_approaching') return '⏰';
-  if (type === 'overdue') return '🔴';
-  if (type === 'comment_added') return '💬';
+  if (type === 'overdue')             return '🔴';
+  if (type === 'comment_added')       return '💬';
   return '🔔';
 }
 
@@ -42,18 +46,22 @@ export default function Header({ title }: HeaderProps) {
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  function fetchNotifications() {
     api
       .get<Notification[]>(ENDPOINTS.NOTIFICATIONS)
       .then((data) => {
         setNotifications(data.slice(0, 10));
         setUnread(data.filter((n) => !n.read_at).length);
       })
-      .catch(() => {
-        setNotifications(MOCK_NOTIFICATIONS);
-        setUnread(MOCK_NOTIFICATIONS.filter((n) => !n.read_at).length);
-      });
-  }, []);
+      .catch(() => {});
+  }
+
+  // Initial load + poll every 30 s
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30_000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -107,7 +115,7 @@ export default function Header({ title }: HeaderProps) {
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
-            onClick={() => { setNotifOpen(!notifOpen); setUserOpen(false); }}
+            onClick={() => { const opening = !notifOpen; setNotifOpen(opening); setUserOpen(false); if (opening) fetchNotifications(); }}
             className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
           >
             <Bell size={18} />

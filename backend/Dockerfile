@@ -29,8 +29,7 @@ RUN chmod -R 775 storage bootstrap/cache
 # Exponer puerto (Render lo asigna en $PORT)
 EXPOSE 10000
 
-# Inicio: generar key → migrar → seed → servir
-CMD sh -c "php artisan key:generate --force && \
-           php artisan migrate --force && \
-           php artisan db:seed --force && \
+# Inicio: migrar → seed → servir. APP_KEY debe venir del entorno.
+CMD sh -c "php artisan migrate --force && \
+           php artisan app:seed-if-empty && \
            php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"

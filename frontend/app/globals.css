@@ -1,4 +1,6 @@
-/* Tailwind CSS se carga via CDN en layout.tsx — no requiere procesamiento PostCSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #ffffff;

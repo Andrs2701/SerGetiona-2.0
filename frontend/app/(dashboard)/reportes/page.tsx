@@ -5,7 +5,6 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { ComplianceReport } from '@/lib/types';
 import { ROLE_LABELS, GLOBAL_STATUS_LABELS } from '@/lib/types';
-import { MOCK_COMPLIANCE } from '@/lib/mock-data';
 import PageHeader from '@/components/PageHeader';
 import { Skeleton } from '@/components/LoadingSkeleton';
 import { CheckCircle2, XCircle, BarChart2 } from 'lucide-react';
@@ -31,12 +30,23 @@ export default function ReportesPage() {
     api
       .get<ComplianceReport>(ENDPOINTS.COMPLIANCE)
       .then(setData)
-      .catch(() => setData(MOCK_COMPLIANCE))
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, []);
 
-  const report = data ?? MOCK_COMPLIANCE;
-  const totalByStatus = Object.values(report.by_status).reduce((a, b) => a + b, 0);
+  if (!loading && !data) {
+    return (
+      <div className="p-6">
+        <PageHeader title="Reportes" />
+        <div className="mt-6 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          No fue posible cargar el reporte.
+        </div>
+      </div>
+    );
+  }
+
+  const report = data!;
+  const totalByStatus = data ? Object.values(data.by_status).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="p-4 md:p-6 space-y-6">

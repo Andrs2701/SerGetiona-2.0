@@ -28,27 +28,6 @@ interface FlowTemplate {
   offsets: Record<Role, number>;
 }
 
-const MOCK_TEMPLATES: FlowTemplate[] = [
-  {
-    id: 1,
-    name: 'Flujo Estándar Creación',
-    is_default: true,
-    offsets: { expert: 0, pedagogy: 5, design: 10, audiovisual: 15, engineering: 20, qa: 25 },
-  },
-  {
-    id: 2,
-    name: 'Flujo Rápido Actualización',
-    is_default: false,
-    offsets: { expert: 0, pedagogy: 3, design: 6, audiovisual: 9, engineering: 12, qa: 14 },
-  },
-  {
-    id: 3,
-    name: 'Flujo Complejo Multimedia',
-    is_default: false,
-    offsets: { expert: 0, pedagogy: 7, design: 14, audiovisual: 21, engineering: 28, qa: 35 },
-  },
-];
-
 const GLOBAL_STATUS_INFO = [
   { key: 'unpublished', label: 'Sin Publicar', color: 'bg-gray-200', description: 'El entregable aún no ha sido publicado.' },
   { key: 'pending_start', label: 'Pendiente Inicio', color: 'bg-amber-400', description: 'Listo para comenzar producción.' },
@@ -72,7 +51,7 @@ const ROLE_STATUS_INFO = [
 
 export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState<'flows' | 'statuses' | 'roles' | 'complexity' | 'parameters'>('flows');
-  const [templates, setTemplates] = useState<FlowTemplate[]>(MOCK_TEMPLATES);
+  const [templates, setTemplates] = useState<FlowTemplate[]>([]);
   const [editTemplate, setEditTemplate] = useState<FlowTemplate | null>(null);
   const [editOffsets, setEditOffsets] = useState<Record<Role, number>>({} as Record<Role, number>);
 

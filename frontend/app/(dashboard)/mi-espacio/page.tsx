@@ -10,7 +10,6 @@ import {
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink } from '@/lib/types';
-import { MOCK_WORKSPACE } from '@/lib/mock-data';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 
@@ -41,10 +40,13 @@ function computeAutoStatus(act: WorkspaceActivity): { label: string; cls: string
         : { label: 'Entregada fuera de tiempo', cls: 'bg-amber-100  text-amber-700'  };
     return { label: 'Aprobada', cls: 'bg-emerald-100 text-emerald-700' };
   }
+  // "Entregado" is a meaningful terminal state — show it clearly before overdue check
+  if (act.status === 'delivered')
+                                      return { label: 'Entregado',   cls: 'bg-teal-100   text-teal-700'   };
   if (act.date_status === 'overdue') return { label: 'Vencida',     cls: 'bg-red-100    text-red-700'    };
   if (['adjustments_requested', 'with_findings'].includes(act.status))
                                       return { label: 'Devuelta',    cls: 'bg-orange-100 text-orange-700' };
-  if (['delivered','in_review','in_testing','validating'].includes(act.status))
+  if (['in_review','in_testing','validating'].includes(act.status))
                                       return { label: 'En Revisión', cls: 'bg-purple-100 text-purple-700' };
   if (['in_progress','in_development','designing','production','implementing','draft','editing','adjusting'].includes(act.status))
                                       return { label: 'En Proceso',  cls: 'bg-blue-100   text-blue-700'   };
@@ -55,12 +57,15 @@ const DATE_STATUS_SORT: Record<string, number> = {
   overdue: 0, approaching: 1, on_time: 2, completed: 3, not_applicable: 4,
 };
 
+// Statuses that only admin/coordinator can set (backend enforces this too)
+const MANAGER_ONLY_STATUSES = ['approved', 'not_applicable'];
+
 const ROLE_STATES: Record<string, string[]> = {
   expert:      ['not_started','draft','in_development','delivered','adjustments_requested','approved','not_applicable'],
-  pedagogy:    ['not_started','in_progress','in_review','adjusting','approved','not_applicable'],
-  design:      ['not_started','designing','adjusting','approved','not_applicable'],
-  audiovisual: ['not_started','production','editing','approved','not_applicable'],
-  engineering: ['not_started','implementing','validating','approved','not_applicable'],
+  pedagogy:    ['not_started','in_progress','in_review','adjusting','delivered','approved','not_applicable'],
+  design:      ['not_started','designing','adjusting','delivered','approved','not_applicable'],
+  audiovisual: ['not_started','production','editing','delivered','approved','not_applicable'],
+  engineering: ['not_started','implementing','validating','delivered','approved','not_applicable'],
   qa:          ['pending','in_testing','with_findings','approved','not_applicable'],
 };
 
@@ -233,27 +238,49 @@ function DetailPanel({
   act,
   onClose,
   onStatusChange,
+  isManager,
+  onSaved,
 }: {
   act: WorkspaceActivity;
   onClose: () => void;
   onStatusChange: (id: number, status: string) => void;
+  isManager: boolean;
+  onSaved: () => void;
 }) {
   const [tab, setTab] = useState<PanelTab>('info');
   const [status, setStatus] = useState(act.status);
   const [notes, setNotes] = useState(act.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const roleStates = ROLE_STATES[act.role] ?? Object.keys(ROLE_STATUS_LABELS);
+  // Sync local state when a different activity is selected
+  useEffect(() => {
+    setStatus(act.status);
+    setNotes(act.notes ?? '');
+    setSaved(false);
+    setSaveError(null);
+  }, [act.id]);
+
+  const allStates = ROLE_STATES[act.role] ?? Object.keys(ROLE_STATUS_LABELS);
+  const roleStates = isManager
+    ? allStates
+    : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
 
   async function handleSave() {
     setSaving(true);
+    setSaveError(null);
     try {
       await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes });
-      onStatusChange(act.id, status);
+      onStatusChange(act.id, status);   // optimistic update
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { /* optimistic */ }
+      onSaved();                         // re-fetch from server so all users see fresh data
+    } catch {
+      setStatus(act.status);
+      setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
+      setTimeout(() => setSaveError(null), 4000);
+    }
     setSaving(false);
   }
 
@@ -271,8 +298,8 @@ function DetailPanel({
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-gray-400 mb-0.5">{act.program.name} › {act.subject.name}</p>
-            <h3 className="font-semibold text-gray-900 text-sm leading-snug">{act.deliverable.name}</h3>
+            <p className="text-xs text-gray-400 mb-0.5">{act.program?.name ?? '—'} › {act.subject?.name ?? '—'}</p>
+            <h3 className="font-semibold text-gray-900 text-sm leading-snug">{act.deliverable?.name ?? '—'}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5"><X size={18}/></button>
         </div>
@@ -296,12 +323,12 @@ function DetailPanel({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
                 {[
-                  ['Programa', act.program.name],
-                  ['Asignatura', act.subject.name],
-                  ['Semana / Módulo', act.deliverable.name],
-                  ['Tipo', DELIVERABLE_TYPE_LABELS[act.deliverable.type]],
-                  ...(act.deliverable.semestre ? [['Semestre', act.deliverable.semestre]] : []),
-                  ...(act.deliverable.ciclo    ? [['Ciclo',    act.deliverable.ciclo]]    : []),
+                  ['Programa', act.program?.name ?? '—'],
+                  ['Asignatura', act.subject?.name ?? '—'],
+                  ['Semana / Módulo', act.deliverable?.name ?? '—'],
+                  ...(act.deliverable?.type ? [['Tipo', DELIVERABLE_TYPE_LABELS[act.deliverable.type]]] : []),
+                  ...(act.deliverable?.semestre ? [['Semestre', act.deliverable.semestre]] : []),
+                  ...(act.deliverable?.ciclo    ? [['Ciclo',    act.deliverable.ciclo]]    : []),
                   ['Fecha límite', act.commitment_date ? formatDate(act.commitment_date) : '—'],
                   ...(act.actual_delivery_date ? [['Entregado el', formatDate(act.actual_delivery_date)]] : []),
                 ].map(([label, value]) => (
@@ -327,6 +354,11 @@ function DetailPanel({
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 placeholder:text-gray-400"/>
               </div>
 
+              {saveError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {saveError}
+                </p>
+              )}
               <button onClick={handleSave} disabled={saving}
                 className={clsx('w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors',
                   saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
@@ -336,7 +368,7 @@ function DetailPanel({
             </div>
           )}
           {tab === 'enlace'      && <><p className="text-xs text-gray-500 mb-3">Agrega enlaces de entrega (Drive, SharePoint, repositorio, etc.)</p><EvidenceLinksPanel activityId={act.id}/></>}
-          {tab === 'comentarios' && <CommentsPanel deliverableId={act.deliverable.id}/>}
+          {tab === 'comentarios' && act.deliverable && <CommentsPanel deliverableId={act.deliverable.id}/>}
           {tab === 'timeline'    && <><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Historial de cambios</p><TimelineView activityId={act.id}/></>}
         </div>
       </div>
@@ -382,13 +414,13 @@ function ActivityRow({
 
       {/* Semana / Módulo */}
       <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[160px]">
-        <p className="truncate" title={act.deliverable.name}>{act.deliverable.name}</p>
-        <p className="text-[10px] text-indigo-500 mt-0.5">{DELIVERABLE_TYPE_LABELS[act.deliverable.type]}</p>
+        <p className="truncate" title={act.deliverable?.name ?? '—'}>{act.deliverable?.name ?? '—'}</p>
+        {act.deliverable && <p className="text-[10px] text-indigo-500 mt-0.5">{DELIVERABLE_TYPE_LABELS[act.deliverable.type]}</p>}
       </td>
 
       {/* Asignatura */}
       <td className="px-3 py-2.5 text-gray-600 max-w-[140px]">
-        <p className="truncate text-xs" title={act.subject.name}>{act.subject.name}</p>
+        <p className="truncate text-xs" title={act.subject?.name ?? '—'}>{act.subject?.name ?? '—'}</p>
       </td>
 
       {/* Estado */}
@@ -492,6 +524,7 @@ type StatusFilter = '' | 'pending' | 'overdue' | 'approaching' | 'in_process' | 
 
 export default function MiEspacioPage() {
   const { user } = useAuthContext();
+  const isManager = user?.role === 'admin' || user?.role === 'coordinator';
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<WorkspaceActivity[]>([]);
@@ -502,14 +535,29 @@ export default function MiEspacioPage() {
   const [filterProgram, setFilterProgram] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   const [filterStatus, setFilterStatus]   = useState<StatusFilter>('');
+  const [showCompleted, setShowCompleted] = useState(false);
 
-  useEffect(() => {
+  const loadWorkspace = useCallback(() => {
     api.get<Workspace>(ENDPOINTS.MY_WORKSPACE)
-      .then(ws => { setWorkspace(ws); setActivities(ws.activities ?? []); })
-      .catch(() => { setWorkspace(MOCK_WORKSPACE); setActivities(MOCK_WORKSPACE.activities ?? []); })
+      .then(ws => {
+        setWorkspace(ws);
+        const fresh = ws.activities ?? [];
+        setActivities(fresh);
+        // Keep selected panel in sync with fresh data
+        setSelectedAct(prev => prev ? (fresh.find(a => a.id === prev.id) ?? null) : null);
+      })
+      .catch(() => { setWorkspace(null); setActivities([]); })
       .finally(() => setLoading(false));
   }, []);
 
+  // Initial load + poll every 60 s so all users see current statuses
+  useEffect(() => {
+    loadWorkspace();
+    const iv = setInterval(loadWorkspace, 60_000);
+    return () => clearInterval(iv);
+  }, [loadWorkspace]);
+
+  // Optimistic local update + schedule a server sync
   const handleStatusChange = useCallback((id: number, status: string) => {
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     setSelectedAct(prev => prev?.id === id ? { ...prev, status } : prev);
@@ -517,15 +565,15 @@ export default function MiEspacioPage() {
 
   // Derived lists for filter dropdowns
   const programOptions = useMemo(
-    () => [...new Set(activities.map(a => a.program.name))].sort(),
+    () => [...new Set(activities.map(a => a.program?.name).filter((n): n is string => !!n))].sort(),
     [activities]
   );
 
   const subjectOptions = useMemo(() => {
     const source = filterProgram
-      ? activities.filter(a => a.program.name === filterProgram)
+      ? activities.filter(a => a.program?.name === filterProgram)
       : activities;
-    return [...new Set(source.map(a => a.subject.name))].sort();
+    return [...new Set(source.map(a => a.subject?.name).filter((n): n is string => !!n))].sort();
   }, [activities, filterProgram]);
 
   // When program changes reset subject
@@ -541,12 +589,21 @@ export default function MiEspacioPage() {
   const approaching = activities.filter(a => a.date_status === 'approaching' && a.status !== 'approved').length;
   const completed = activities.filter(a => a.status === 'approved').length;
 
+  const completedHiddenCount = useMemo(
+    () => !showCompleted && filterStatus !== 'completed'
+      ? activities.filter(a => a.status === 'approved').length
+      : 0,
+    [activities, showCompleted, filterStatus]
+  );
+
   // Filter activities
   const filtered = useMemo(() => activities
     .filter(a => {
-      if (search && ![a.deliverable.name, a.subject.name, a.program.name].some(s => s.toLowerCase().includes(search.toLowerCase()))) return false;
-      if (filterProgram && a.program.name !== filterProgram) return false;
-      if (filterSubject && a.subject.name !== filterSubject) return false;
+      // Hide approved unless user toggled showCompleted or explicitly filtered for completed
+      if (!showCompleted && filterStatus !== 'completed' && a.status === 'approved') return false;
+      if (search && ![a.deliverable?.name ?? '', a.subject?.name ?? '', a.program?.name ?? ''].some(s => s.toLowerCase().includes(search.toLowerCase()))) return false;
+      if (filterProgram && (a.program?.name ?? '') !== filterProgram) return false;
+      if (filterSubject && (a.subject?.name ?? '') !== filterSubject) return false;
       if (filterStatus === 'pending')    return ['not_started','pending'].includes(a.status);
       if (filterStatus === 'overdue')    return a.date_status === 'overdue';
       if (filterStatus === 'approaching')return a.date_status === 'approaching';
@@ -555,21 +612,29 @@ export default function MiEspacioPage() {
       return true;
     })
     .sort((a, b) => {
-      if (a.program.name !== b.program.name) return a.program.name.localeCompare(b.program.name);
-      if (a.subject.name !== b.subject.name) return a.subject.name.localeCompare(b.subject.name);
+      if ((a.program?.name ?? '') !== (b.program?.name ?? '')) return (a.program?.name ?? '').localeCompare(b.program?.name ?? '');
+      if ((a.subject?.name ?? '') !== (b.subject?.name ?? '')) return (a.subject?.name ?? '').localeCompare(b.subject?.name ?? '');
       return (DATE_STATUS_SORT[a.date_status] ?? 9) - (DATE_STATUS_SORT[b.date_status] ?? 9);
     }),
-  [activities, search, filterProgram, filterSubject, filterStatus]);
+  [activities, search, filterProgram, filterSubject, filterStatus, showCompleted]);
 
-  // Group by program
+  // Group by program — active programs first, completed programs last and auto-collapsed
   const grouped = useMemo(() => {
     const map = new Map<string, WorkspaceActivity[]>();
     for (const act of filtered) {
-      const g = map.get(act.program.name) ?? [];
+      const progName = act.program?.name ?? '(Sin programa)';
+      const g = map.get(progName) ?? [];
       g.push(act);
-      map.set(act.program.name, g);
+      map.set(progName, g);
     }
-    return map;
+    return new Map(
+      [...map.entries()].sort(([nameA, actsA], [nameB, actsB]) => {
+        const aActive = actsA.some(a => a.status !== 'approved');
+        const bActive = actsB.some(a => a.status !== 'approved');
+        if (aActive !== bActive) return aActive ? -1 : 1;
+        return nameA.localeCompare(nameB);
+      })
+    );
   }, [filtered]);
 
   const hasFilters = search || filterProgram || filterSubject || filterStatus;
@@ -589,7 +654,7 @@ export default function MiEspacioPage() {
   return (
     <>
       {selectedAct && (
-        <DetailPanel act={selectedAct} onClose={() => setSelectedAct(null)} onStatusChange={handleStatusChange}/>
+        <DetailPanel act={selectedAct} onClose={() => setSelectedAct(null)} onStatusChange={handleStatusChange} isManager={isManager} onSaved={loadWorkspace}/>
       )}
 
       <div className="p-6 space-y-5">
@@ -599,13 +664,14 @@ export default function MiEspacioPage() {
           <p className="text-sm text-gray-500 mt-0.5">{roleLabel} · {total} actividades asignadas</p>
         </div>
 
-        {/* KPI pills */}
-        <div className="flex flex-wrap gap-2">
+        {/* KPI pills + completed toggle */}
+        <div className="flex flex-wrap items-center gap-2">
           {([
-            { id: '' as StatusFilter,          label: 'Todas',       count: total,      icon: null,         cls: '' },
+            { id: '' as StatusFilter,          label: 'Activas',     count: total - completed, icon: null,         cls: '' },
             { id: 'pending' as StatusFilter,    label: 'Pendientes',  count: pending,    icon: Clock,        cls: 'text-gray-600' },
             { id: 'overdue' as StatusFilter,    label: 'Vencidas',    count: overdue,    icon: XCircle,      cls: 'text-red-600' },
             { id: 'approaching' as StatusFilter,label: 'Por vencer',  count: approaching,icon: AlertTriangle,cls: 'text-amber-600' },
+            { id: 'in_process' as StatusFilter, label: 'En proceso',  count: activities.filter(a => ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting'].includes(a.status)).length, icon: null, cls: 'text-blue-600' },
             { id: 'completed' as StatusFilter,  label: 'Completadas', count: completed,  icon: CheckCircle2, cls: 'text-emerald-600' },
           ] as { id: StatusFilter; label: string; count: number; icon: React.ElementType | null; cls: string }[]).map(({ id, label, count, icon: Icon, cls }) => (
             <button key={id} onClick={() => setFilterStatus(id)}
@@ -623,6 +689,25 @@ export default function MiEspacioPage() {
               </span>
             </button>
           ))}
+
+          {/* Completed toggle */}
+          <button
+            onClick={() => setShowCompleted(p => !p)}
+            className={clsx(
+              'ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+              showCompleted
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 bg-white'
+            )}
+          >
+            <CheckCircle2 size={12} className={showCompleted ? 'text-emerald-500' : 'text-gray-300'} />
+            {showCompleted ? 'Ocultar completadas' : 'Ver completadas'}
+            {!showCompleted && completedHiddenCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
+                {completedHiddenCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Filters row */}
@@ -677,26 +762,38 @@ export default function MiEspacioPage() {
                   </tr>
                 </thead>
 
-                {[...grouped.entries()].map(([programName, acts]) => (
-                  <ProgramGroup
-                    key={programName}
-                    programName={programName}
-                    activities={acts}
-                    onSelect={setSelectedAct}
-                    selectedId={selectedAct?.id ?? null}
-                    defaultOpen={grouped.size <= 3}
-                  />
-                ))}
+                {[...grouped.entries()].map(([programName, acts]) => {
+                  const hasActive = acts.some(a => a.status !== 'approved');
+                  return (
+                    <ProgramGroup
+                      key={`${programName}-${showCompleted}`}
+                      programName={programName}
+                      activities={acts}
+                      onSelect={setSelectedAct}
+                      selectedId={selectedAct?.id ?? null}
+                      defaultOpen={hasActive}
+                    />
+                  );
+                })}
               </table>
             </div>
           )}
         </div>
 
         {/* Footer count */}
-        <p className="text-xs text-gray-400 text-right">
-          {filtered.length} actividad(es) en {grouped.size} programa(s)
-          {hasFilters && <> · <button onClick={() => { setSearch(''); setFilterProgram(''); setFilterSubject(''); setFilterStatus(''); }} className="text-indigo-500 hover:underline">Limpiar filtros</button></>}
-        </p>
+        <div className="flex items-center justify-between text-xs text-gray-400">
+          <span>
+            {filtered.length} actividad(es) en {grouped.size} programa(s)
+            {hasFilters && (
+              <> · <button onClick={() => { setSearch(''); setFilterProgram(''); setFilterSubject(''); setFilterStatus(''); }} className="text-indigo-500 hover:underline">Limpiar filtros</button></>
+            )}
+          </span>
+          {completedHiddenCount > 0 && (
+            <button onClick={() => setShowCompleted(true)} className="text-indigo-500 hover:text-indigo-700 underline">
+              {completedHiddenCount} completada{completedHiddenCount !== 1 ? 's' : ''} oculta{completedHiddenCount !== 1 ? 's' : ''} — ver
+            </button>
+          )}
+        </div>
       </div>
     </>
   );

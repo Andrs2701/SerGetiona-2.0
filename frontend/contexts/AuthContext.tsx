@@ -92,8 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (current: string, newPwd: string, confirm: string) => {
       await api.post(ENDPOINTS.CHANGE_PASSWORD, {
         current_password: current,
-        new_password: newPwd,
-        new_password_confirmation: confirm,
+        password: newPwd,
+        password_confirmation: confirm,
       });
     },
     []

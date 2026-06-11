@@ -8,12 +8,16 @@ use App\Models\Deliverable;
 use App\Models\User;
 use App\Services\MentionParser;
 use App\Services\NotificationService;
+use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
     public function index(Request $request, Deliverable $deliverable)
     {
+        $deliverable->loadMissing('subject.academicProgram.project');
+        abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
+
         $comments = $deliverable->comments()
             ->with('user', 'replies.user')
             ->whereNull('parent_id')
@@ -25,9 +29,20 @@ class CommentController extends Controller
 
     public function store(Request $request, Deliverable $deliverable)
     {
+        $deliverable->loadMissing('subject.academicProgram.project');
+        abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
+
         $data = $request->validate([
             'content'   => 'required|string',
-            'parent_id' => 'nullable|exists:comments,id',
+            'parent_id' => [
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($deliverable) {
+                    if (!Comment::whereKey($value)->where('deliverable_id', $deliverable->id)->exists()) {
+                        $fail('El comentario padre no pertenece a este entregable.');
+                    }
+                },
+            ],
         ]);
 
         $comment = $deliverable->comments()->create([

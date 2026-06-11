@@ -29,7 +29,8 @@ Smoke manual mínimo post-deploy (10 min): login admin (dashboard sin 403, KPIs 
 
 ## 3. Checklist de regresión completo
 
-Credenciales de prueba en `Rol Correo Contraseña.txt` (todas `password`).
+Las credenciales de prueba se administran mediante variables de entorno. Consultar
+`DEMO_USER_PASSWORD` en Render o en el entorno local autorizado.
 
 ### Auth
 - [ ] Login válido con cada uno de los 8 roles → redirige a `/`, token en localStorage.

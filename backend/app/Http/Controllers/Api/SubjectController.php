@@ -10,8 +10,16 @@ class SubjectController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Subject::with('academicProgram', 'creator')
             ->withCount('deliverables');
+
+        if (!in_array($user->role, ['admin', 'coordinator'], true)) {
+            $query->whereHas(
+                'deliverables.roleActivities',
+                fn ($q) => $q->where('responsible_id', $user->id)
+            );
+        }
 
         if ($request->filled('academic_program_id')) {
             $query->where('academic_program_id', $request->academic_program_id);
@@ -36,8 +44,16 @@ class SubjectController extends Controller
         return response()->json($subject->load('academicProgram', 'creator'), 201);
     }
 
-    public function show(Subject $subject)
+    public function show(Request $request, Subject $subject)
     {
+        abort_unless(
+            in_array($request->user()->role, ['admin', 'coordinator'], true)
+            || $subject->deliverables()
+                ->whereHas('roleActivities', fn ($q) => $q->where('responsible_id', $request->user()->id))
+                ->exists(),
+            403
+        );
+
         $subject->load([
             'academicProgram',
             'creator',

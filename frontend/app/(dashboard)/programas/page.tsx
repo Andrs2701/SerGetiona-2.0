@@ -6,7 +6,6 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { AcademicProgram, Deliverable, DashboardStats, ProgramBreakdown, RoleActivity, Role } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
-import { MOCK_PROGRAMS } from '@/lib/mock-data';
 import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 
@@ -411,7 +410,7 @@ export default function ProgramasPage() {
   // Load program list + breakdown
   useEffect(() => {
     Promise.all([
-      api.get<AcademicProgram[]>(ENDPOINTS.PROGRAMS).catch(() => MOCK_PROGRAMS as AcademicProgram[]),
+      api.get<AcademicProgram[]>(ENDPOINTS.PROGRAMS).catch(() => [] as AcademicProgram[]),
       api.get<DashboardStats>(ENDPOINTS.DASHBOARD).catch(() => null),
     ]).then(([progs, dash]) => {
       setPrograms(progs);

@@ -24,6 +24,12 @@ class DatabaseSeeder extends Seeder
     // Fechas base hoy: 2026-06-04
     public function run(): void
     {
+        $demoPassword = env('DEMO_USER_PASSWORD');
+        if (!$demoPassword && app()->isProduction()) {
+            throw new \RuntimeException('DEMO_USER_PASSWORD must be configured in production.');
+        }
+        $demoPassword ??= 'password';
+
         // Catálogos configurables (seeders idempotentes)
         $this->call([
             ComplexityLevelSeeder::class,
@@ -34,7 +40,7 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'name'      => 'Administrador',
             'email'     => 'admin@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'admin',
             'is_active' => true,
         ]);
@@ -42,7 +48,7 @@ class DatabaseSeeder extends Seeder
         $coordinator = User::create([
             'name'      => 'Coordinador General',
             'email'     => 'coordinador@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'coordinator',
             'is_active' => true,
         ]);
@@ -50,7 +56,7 @@ class DatabaseSeeder extends Seeder
         $expert = User::create([
             'name'      => 'Carlos Ramírez',
             'email'     => 'experto1@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'expert',
             'is_active' => true,
             'phone'     => '3001234567',
@@ -59,7 +65,7 @@ class DatabaseSeeder extends Seeder
         $pedagogy = User::create([
             'name'      => 'Ana Torres',
             'email'     => 'pedagogia@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'pedagogy',
             'is_active' => true,
         ]);
@@ -67,7 +73,7 @@ class DatabaseSeeder extends Seeder
         $design = User::create([
             'name'      => 'Luis Gómez',
             'email'     => 'disenio@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'design',
             'is_active' => true,
         ]);
@@ -75,7 +81,7 @@ class DatabaseSeeder extends Seeder
         $audiovisual = User::create([
             'name'      => 'Sara Mejía',
             'email'     => 'audiovisual@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'audiovisual',
             'is_active' => true,
         ]);
@@ -83,7 +89,7 @@ class DatabaseSeeder extends Seeder
         $engineering = User::create([
             'name'      => 'Pedro Vargas',
             'email'     => 'ingenieria@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'engineering',
             'is_active' => true,
         ]);
@@ -91,7 +97,7 @@ class DatabaseSeeder extends Seeder
         $qa = User::create([
             'name'      => 'María López',
             'email'     => 'calidad@sergestiona.co',
-            'password'  => Hash::make('password'),
+            'password'  => Hash::make($demoPassword),
             'role'      => 'qa',
             'is_active' => true,
         ]);

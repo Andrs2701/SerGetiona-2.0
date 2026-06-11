@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { clsx } from 'clsx';
+import { api, ENDPOINTS } from '@/lib/api';
 
 interface CommentUser {
   id: number;
@@ -75,51 +76,24 @@ function formatDayLabel(dateStr: string): string {
   return date.toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long' });
 }
 
-const MOCK_COMMENTS: Comment[] = [
-  {
-    id: 1,
-    user: { id: 1, name: 'Ana Rodríguez' },
-    content: 'Revisar la estructura de contenidos antes de enviar al siguiente rol.',
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-  {
-    id: 2,
-    user: { id: 2, name: 'Carlos Méndez' },
-    content: 'Aprobado en primera revisión. Pendiente ajuste menor en la introducción.',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 3,
-    user: { id: 1, name: 'Ana Rodríguez' },
-    content: 'Ajuste realizado. Listo para revisión final.',
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-];
-
 export default function CommentThread({ deliverableId }: CommentThreadProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sergestiona_token') : null;
-    if (!token) {
-      setComments(MOCK_COMMENTS);
-      setLoading(false);
-      return;
-    }
-    fetch(`http://localhost:8000/api/deliverables/${deliverableId}/comments`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        const list = Array.isArray(data) ? data : (data?.data ?? []);
-        setComments(list.length > 0 ? list : MOCK_COMMENTS);
+    setError('');
+    api
+      .get<Comment[]>(ENDPOINTS.DELIVERABLE_COMMENTS(deliverableId))
+      .then(setComments)
+      .catch(() => {
+        setComments([]);
+        setError('No fue posible cargar los comentarios.');
       })
-      .catch(() => setComments(MOCK_COMMENTS))
       .finally(() => setLoading(false));
   }, [deliverableId]);
 
@@ -130,38 +104,19 @@ export default function CommentThread({ deliverableId }: CommentThreadProps) {
   async function handleSend() {
     if (!text.trim()) return;
     setSending(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sergestiona_token') : null;
+    setError('');
     try {
-      if (token) {
-        const res = await fetch(`http://localhost:8000/api/deliverables/${deliverableId}/comments`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: text }),
-        });
-        if (res.ok) {
-          const saved: Comment = await res.json();
-          setComments((prev) => [...prev, saved]);
-          setText('');
-          setSending(false);
-          return;
-        }
-      }
+      const saved = await api.post<Comment>(
+        ENDPOINTS.DELIVERABLE_COMMENTS(deliverableId),
+        { content: text.trim() }
+      );
+      setComments((prev) => [...prev, saved]);
+      setText('');
     } catch {
-      // fallback
+      setError('El comentario no se guardó. Intenta nuevamente.');
+    } finally {
+      setSending(false);
     }
-    // Mock fallback
-    const newComment: Comment = {
-      id: Date.now(),
-      user: { id: 99, name: 'Yo' },
-      content: text,
-      created_at: new Date().toISOString(),
-    };
-    setComments((prev) => [...prev, newComment]);
-    setText('');
-    setSending(false);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -243,6 +198,7 @@ export default function CommentThread({ deliverableId }: CommentThreadProps) {
 
       {/* Input */}
       <div className="border-t border-gray-100 px-6 py-4">
+        {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
         <div className="flex gap-2 items-end">
           <textarea
             value={text}

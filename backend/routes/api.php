@@ -26,9 +26,9 @@ use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 // Públicas
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
-Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,1');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 
 // Protegidas con Sanctum
 Route::middleware('auth:sanctum')->group(function () {
@@ -98,8 +98,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('settings', [SystemSettingController::class, 'update']);
     });
 
-    // Usuarios — solo admin
-    Route::apiResource('users', UserController::class)->middleware('role:admin');
+    // Usuarios: lectura para gestión de asignaciones; escritura solo admin.
+    Route::apiResource('users', UserController::class)->only(['index', 'show'])
+        ->middleware('role:admin,coordinator');
+    Route::apiResource('users', UserController::class)->except(['index', 'show'])
+        ->middleware('role:admin');
 
     // Reportes, importación y exportación — información gerencial
     Route::middleware('role:admin,coordinator')->group(function () {

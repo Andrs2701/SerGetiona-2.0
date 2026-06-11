@@ -10,8 +10,16 @@ class ProgramController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = AcademicProgram::with('project', 'creator')
             ->withCount('subjects');
+
+        if (!in_array($user->role, ['admin', 'coordinator'], true)) {
+            $query->whereHas(
+                'subjects.deliverables.roleActivities',
+                fn ($q) => $q->where('responsible_id', $user->id)
+            );
+        }
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->project_id);
@@ -36,8 +44,16 @@ class ProgramController extends Controller
         return response()->json($program->load('project', 'creator'), 201);
     }
 
-    public function show(AcademicProgram $program)
+    public function show(Request $request, AcademicProgram $program)
     {
+        abort_unless(
+            in_array($request->user()->role, ['admin', 'coordinator'], true)
+            || $program->subjects()
+                ->whereHas('deliverables.roleActivities', fn ($q) => $q->where('responsible_id', $request->user()->id))
+                ->exists(),
+            403
+        );
+
         $program->load([
             'project',
             'creator',

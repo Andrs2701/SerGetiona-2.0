@@ -15,7 +15,6 @@ import { clsx } from 'clsx';
 import { useRouter } from 'next/navigation';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Project } from '@/lib/types';
-import { MOCK_PROJECTS } from '@/lib/mock-data';
 import StatusBadge from '@/components/StatusBadge';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 
@@ -87,7 +86,7 @@ export default function ProyectosTable({ limit }: ProyectosTableProps) {
     api
       .get<Project[]>(ENDPOINTS.PROJECTS)
       .then((projects) => setData(limit ? projects.slice(0, limit) : projects))
-      .catch(() => setData(limit ? MOCK_PROJECTS.slice(0, limit) : MOCK_PROJECTS))
+      .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, [limit]);
 

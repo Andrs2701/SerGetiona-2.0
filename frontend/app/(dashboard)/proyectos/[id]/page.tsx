@@ -1,16 +1,12 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { clsx } from 'clsx';
 import { Search, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType } from '@/lib/types';
 import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
-import {
-  MOCK_PROJECTS,
-  MOCK_PROGRAMS,
-  MOCK_DELIVERABLES,
-} from '@/lib/mock-data';
+import { useAuthContext } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import SidePanel from '@/components/SidePanel';
@@ -26,13 +22,15 @@ type Role = RoleType;
 
 const ROLES: Role[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
 
-// Role-specific status options (Task 7)
+const MANAGER_ONLY_STATUSES = ['approved', 'not_applicable'];
+
+// Role-specific status options
 const ROLE_STATES: Record<string, string[]> = {
   expert:      ['not_started', 'draft', 'in_development', 'delivered', 'adjustments_requested', 'approved', 'not_applicable'],
-  pedagogy:    ['not_started', 'in_progress', 'in_review', 'adjusting', 'approved', 'not_applicable'],
-  design:      ['not_started', 'designing', 'adjusting', 'approved', 'not_applicable'],
-  audiovisual: ['not_started', 'production', 'editing', 'approved', 'not_applicable'],
-  engineering: ['not_started', 'implementing', 'validating', 'approved', 'not_applicable'],
+  pedagogy:    ['not_started', 'in_progress', 'in_review', 'adjusting', 'delivered', 'approved', 'not_applicable'],
+  design:      ['not_started', 'designing', 'adjusting', 'delivered', 'approved', 'not_applicable'],
+  audiovisual: ['not_started', 'production', 'editing', 'delivered', 'approved', 'not_applicable'],
+  engineering: ['not_started', 'implementing', 'validating', 'delivered', 'approved', 'not_applicable'],
   qa:          ['pending', 'in_testing', 'with_findings', 'approved', 'not_applicable'],
 };
 
@@ -97,6 +95,8 @@ interface ProgramGroup {
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const projectId = Number(id);
+  const { user } = useAuthContext();
+  const isManager = user?.role === 'admin' || user?.role === 'coordinator';
 
   const [project, setProject] = useState<Project | null>(null);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
@@ -113,8 +113,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   } | null>(null);
   const [activityStatus, setActivityStatus] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<'info' | 'flow' | 'evidence' | 'comments'>('info');
+  const [loadError, setLoadError] = useState(false);
+
+  const loadDeliverables = useCallback(() => {
+    api.get<Deliverable[]>(ENDPOINTS.PROJECT_DELIVERABLES(projectId))
+      .then(data => {
+        setDeliverables(data);
+        // Keep selected activity panel in sync
+        setSelectedActivity(prev => {
+          if (!prev) return null;
+          const freshDel = data.find(d => d.id === prev.deliverable.id);
+          if (!freshDel) return null;
+          const freshAct = (freshDel.role_activities ?? []).find(a => a.id === prev.activity.id);
+          return freshAct ? { activity: freshAct, deliverable: freshDel } : null;
+        });
+      })
+      .catch(() => {});
+  }, [projectId]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -128,15 +146,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         setDeliverables(delivs);
         setPrograms(progs);
       } catch {
-        setProject(MOCK_PROJECTS.find((p) => p.id === projectId) ?? MOCK_PROJECTS[0]);
-        setDeliverables(MOCK_DELIVERABLES.filter((d) => d.project_name === (MOCK_PROJECTS.find(p => p.id === projectId)?.name ?? MOCK_PROJECTS[0].name) || true).slice(0, 7));
-        setPrograms(MOCK_PROGRAMS.filter((p) => p.project_id === projectId));
+        setProject(null);
+        setDeliverables([]);
+        setPrograms([]);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     }
     fetchAll();
-  }, [projectId]);
+    // Poll every 60 s so coordinators see updated statuses without manual refresh
+    const iv = setInterval(loadDeliverables, 60_000);
+    return () => clearInterval(iv);
+  }, [projectId, loadDeliverables]);
 
   // Keep local status in sync with selected activity
   useEffect(() => {
@@ -147,11 +169,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   async function handleStatusChange(newStatus: string) {
     if (!selectedActivity) return;
+    const previousStatus = selectedActivity.activity.status;
     setActivityStatus(newStatus);
+    setStatusError(null);
     setSavingStatus(true);
     try {
       await api.put(ENDPOINTS.ROLE_ACTIVITY(selectedActivity.activity.id), { status: newStatus });
-      // Update local state
+      // Optimistic local update
       setDeliverables((prev) =>
         prev.map((d) => {
           if (d.id !== selectedActivity.deliverable.id) return d;
@@ -163,8 +187,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           };
         })
       );
+      // Re-fetch from server so all users see the change
+      loadDeliverables();
     } catch {
-      // ignore — optimistic update already applied
+      setActivityStatus(previousStatus);
+      setStatusError('No se pudo guardar. Verifica tus permisos.');
+      setTimeout(() => setStatusError(null), 4000);
     } finally {
       setSavingStatus(false);
     }
@@ -213,8 +241,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const proj = project ?? MOCK_PROJECTS[0];
-  const roleStates = selectedActivity ? (ROLE_STATES[selectedActivity.activity.role] ?? Object.keys(ROLE_STATUS_LABELS)) : [];
+  if (loadError || !project) {
+    return (
+      <div className="p-6">
+        <PageHeader title="Proyecto no disponible" />
+        <div className="mt-6 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          No fue posible cargar el proyecto o no tienes permiso para consultarlo.
+        </div>
+      </div>
+    );
+  }
+
+  const proj = project;
+  const roleStates = selectedActivity
+    ? (ROLE_STATES[selectedActivity.activity.role] ?? Object.keys(ROLE_STATUS_LABELS))
+        .filter((s) => isManager || !MANAGER_ONLY_STATUSES.includes(s))
+    : [];
   const flowSteps = selectedActivity ? buildFlowSteps(selectedActivity.deliverable) : [];
 
   return (
@@ -421,7 +463,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       {/* Tab: Programas */}
       {activeTab === 'programs' && (
         <div className="space-y-4">
-          {(programs.length > 0 ? programs : MOCK_PROGRAMS).map((prog) => (
+          {programs.map((prog) => (
             <div key={prog.id} className="bg-white rounded-lg border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -570,6 +612,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       </select>
                       {savingStatus && <span className="text-xs text-gray-400">Guardando...</span>}
                     </div>
+                    {statusError && (
+                      <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        {statusError}
+                      </p>
+                    )}
                   </div>
 
                   {/* Next responsible */}

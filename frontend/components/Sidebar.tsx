@@ -15,6 +15,7 @@ import {
   Gauge,
   ClipboardList,
   MessagesSquare,
+  Activity,
   X,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -71,6 +72,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     href: '/decisiones',
     label: 'Decisiones',
     icon: ClipboardList,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/seguimiento',
+    label: 'Seguimiento',
+    icon: Activity,
     roles: ['admin', 'coordinator'],
   },
   {

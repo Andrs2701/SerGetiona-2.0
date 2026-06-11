@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Deliverable;
 use App\Models\EvidenceLink;
 use App\Models\RoleActivity;
+use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
 
 class EvidenceLinkController extends Controller
@@ -15,8 +16,11 @@ class EvidenceLinkController extends Controller
      * Retorna todos los evidence_links de todas las role_activities del entregable,
      * agrupados por rol.
      */
-    public function byDeliverable(Deliverable $deliverable)
+    public function byDeliverable(Request $request, Deliverable $deliverable)
     {
+        $deliverable->loadMissing('subject.academicProgram.project');
+        abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
+
         $activities = $deliverable->roleActivities()->with([
             'evidenceLinks.user',
         ])->get();
@@ -49,6 +53,12 @@ class EvidenceLinkController extends Controller
      */
     public function store(Request $request, RoleActivity $activity)
     {
+        abort_unless(
+            ResourceAccess::isManager($request->user())
+            || $activity->responsible_id === $request->user()->id,
+            403
+        );
+
         $data = $request->validate([
             'type'     => 'required|in:file,url,drive,onedrive,sharepoint,repository',
             'title'    => 'required|string|max:255',
@@ -86,8 +96,10 @@ class EvidenceLinkController extends Controller
      * GET /role-activities/{activity}/evidence
      * Retorna los evidence_links de una role_activity específica.
      */
-    public function byActivity(RoleActivity $activity)
+    public function byActivity(Request $request, RoleActivity $activity)
     {
+        abort_unless(ResourceAccess::canAccessActivity($request->user(), $activity), 403);
+
         $links = $activity->evidenceLinks()->with('user')->orderBy('created_at', 'asc')->get();
         return response()->json($links->map(function ($link) {
             return [
