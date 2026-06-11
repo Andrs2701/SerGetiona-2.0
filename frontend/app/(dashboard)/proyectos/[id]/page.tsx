@@ -20,6 +20,7 @@ import CommentThread from '@/components/CommentThread';
 import ImportModal from '@/components/ImportModal';
 import EvidencePanel from '@/components/EvidencePanel';
 import NextResponsibleCard from '@/components/NextResponsibleCard';
+import ComplexitySelect from '@/components/ComplexitySelect';
 
 type Role = RoleType;
 
@@ -535,6 +536,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       </p>
                     </div>
                   )}
+
+                  {/* Complexity selector */}
+                  <ComplexitySelect
+                    deliverableId={selectedActivity.deliverable.id}
+                    value={selectedActivity.deliverable.complexity_level_id}
+                    onChanged={(levelId) =>
+                      setDeliverables((prev) =>
+                        prev.map((d) =>
+                          d.id === selectedActivity.deliverable.id
+                            ? { ...d, complexity_level_id: levelId }
+                            : d
+                        )
+                      )
+                    }
+                  />
 
                   {/* Status selector */}
                   <div>

@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -79,20 +79,20 @@ export const ENDPOINTS = {
   PROJECT: (id: number) => `/projects/${id}`,
 
   // Programs
-  PROGRAMS: '/academic-programs',
-  PROJECT_PROGRAMS: (projectId: number) => `/projects/${projectId}/academic-programs`,
+  PROGRAMS: '/programs',
+  PROJECT_PROGRAMS: (projectId: number) => `/programs?project_id=${projectId}`,
 
   // Subjects
-  PROGRAM_SUBJECTS: (programId: number) => `/academic-programs/${programId}/subjects`,
+  PROGRAM_SUBJECTS: (programId: number) => `/subjects?academic_program_id=${programId}`,
 
   // Deliverables
   DELIVERABLES: '/deliverables',
-  PROJECT_DELIVERABLES: (projectId: number) => `/projects/${projectId}/deliverables`,
+  PROJECT_DELIVERABLES: (projectId: number) => `/deliverables?project_id=${projectId}`,
   DELIVERABLE: (id: number) => `/deliverables/${id}`,
   DELIVERABLE_COMMENTS: (id: number) => `/deliverables/${id}/comments`,
 
   // Role activities
-  ROLE_ACTIVITY: (id: number) => `/role-activities/${id}`,
+  ROLE_ACTIVITY: (id: number) => `/activities/${id}`,
 
   // Users
   USERS: '/users',

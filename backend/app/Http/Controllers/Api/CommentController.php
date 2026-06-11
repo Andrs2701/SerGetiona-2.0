@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\Deliverable;
 use App\Models\User;
+use App\Services\MentionParser;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
@@ -35,6 +36,8 @@ class CommentController extends Controller
             'content'    => $data['content'],
             'created_at' => now(),
         ]);
+
+        MentionParser::record($comment->content, null, $comment->id);
 
         // Notify the responsible of the deliverable (expert role activity)
         $expertActivity = $deliverable->roleActivities()

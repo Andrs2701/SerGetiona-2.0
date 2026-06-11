@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { Upload, Download, X, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Modal from '@/components/Modal';
-import { downloadCsv } from '@/lib/api';
+import { BASE_URL, downloadCsv } from '@/lib/api';
 
 interface ImportResult {
   imported: number;
@@ -65,7 +65,7 @@ export default function ImportModal({ open, onClose, projectId }: ImportModalPro
       formData.append('file', file);
       if (projectId) formData.append('project_id', String(projectId));
 
-      const res = await fetch('http://localhost:8000/api/import/deliverables', {
+      const res = await fetch(`${BASE_URL}/import/deliverables`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,

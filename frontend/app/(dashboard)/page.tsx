@@ -16,11 +16,21 @@ import {
   MessageSquare,
   X,
   CalendarDays,
+  Gauge,
 } from 'lucide-react';
 import DashboardOperativo from '@/components/DashboardOperativo';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
+import HealthBadge from '@/components/HealthBadge';
+import CapacityBar from '@/components/CapacityBar';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { DashboardStats, ProgramBreakdown, ActivityByRoleDetail } from '@/lib/types';
+import type {
+  DashboardStats,
+  ProgramBreakdown,
+  ActivityByRoleDetail,
+  HealthReport,
+  CapacitySummary,
+  CapacityUser,
+} from '@/lib/types';
 import { ROLE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -407,6 +417,8 @@ function DashboardAdmin() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [workload, setWorkload] = useState<WorkloadUser[]>([]);
+  const [health, setHealth] = useState<HealthReport | null>(null);
+  const [capacity, setCapacity] = useState<{ summary: CapacitySummary; users: CapacityUser[] } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -417,6 +429,12 @@ function DashboardAdmin() {
       .finally(() => setLoading(false));
     api.get<WorkloadUser[]>('/reports/workload')
       .then(data => setWorkload(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    api.get<HealthReport>('/reports/health')
+      .then(setHealth)
+      .catch(() => {});
+    api.get<{ summary: CapacitySummary; users: CapacityUser[] }>('/capacity')
+      .then(setCapacity)
       .catch(() => {});
   }, []);
 
@@ -534,6 +552,97 @@ function DashboardAdmin() {
             </button>
           ))}
         </div>
+
+        {/* ── Row 1.5: Salud de proyectos + Capacidad del equipo (evolución 2026) ── */}
+        {(health || capacity) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {health && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity size={16} className="text-gray-400" />
+                  <h3 className="text-sm font-semibold text-gray-700">Salud de Proyectos</h3>
+                  <span className="ml-auto">
+                    <HealthBadge level={health.portfolio_level} score={health.portfolio_score} size="sm" />
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {health.projects.map((p) => (
+                    <button
+                      key={p.project_id}
+                      onClick={() => router.push(`/proyectos/${p.project_id}`)}
+                      className="w-full flex items-center gap-3 group hover:bg-gray-50 rounded-lg px-1 py-1 transition-colors"
+                      title={p.factors
+                        .filter((f) => f.penalty > 0)
+                        .map((f) => `${f.label}: −${f.penalty}`)
+                        .join(' · ')}
+                    >
+                      <span className="text-xs text-gray-600 flex-1 truncate text-left group-hover:text-gray-900">
+                        {p.project_name}
+                      </span>
+                      <div className="w-28">
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-2 rounded-full ${
+                              p.level === 'green' ? 'bg-emerald-500' : p.level === 'yellow' ? 'bg-amber-400' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${p.score}%` }}
+                          />
+                        </div>
+                      </div>
+                      <HealthBadge level={p.level} score={p.score} size="sm" />
+                    </button>
+                  ))}
+                  {health.projects.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Sin proyectos activos</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {capacity && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Gauge size={16} className="text-gray-400" />
+                  <h3 className="text-sm font-semibold text-gray-700">Capacidad del Equipo</h3>
+                  <button
+                    onClick={() => router.push('/capacidad')}
+                    className="ml-auto text-xs text-indigo-600 hover:text-indigo-800"
+                  >
+                    Ver todo →
+                  </button>
+                </div>
+                <div className="flex items-center gap-4 mb-4">
+                  <p
+                    className={`text-2xl font-bold ${
+                      capacity.summary.status === 'overloaded'
+                        ? 'text-red-600'
+                        : capacity.summary.status === 'high'
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                    }`}
+                  >
+                    {capacity.summary.utilization_pct.toFixed(0)}%
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    utilización semanal · {capacity.summary.active_points} de{' '}
+                    {capacity.summary.capacity_points} pts ·{' '}
+                    {capacity.summary.overloaded_users} sobrecargado(s)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {capacity.users.slice(0, 5).map((u) => (
+                    <div key={u.user_id} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-32 shrink-0 truncate">{u.user_name}</span>
+                      <div className="flex-1">
+                        <CapacityBar utilizationPct={u.utilization_pct} status={u.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Row 2: Mini bar charts CSS puro ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

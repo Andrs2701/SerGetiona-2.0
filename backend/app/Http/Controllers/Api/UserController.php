@@ -34,6 +34,7 @@ class UserController extends Controller
             'role' => 'required|in:admin,coordinator,expert,pedagogy,design,audiovisual,engineering,qa',
             'is_active' => 'nullable|boolean',
             'phone' => 'nullable|string|max:30',
+            'weekly_capacity_points' => 'nullable|integer|min:1|max:200',
         ]);
 
         $data['password'] = Hash::make($data['password']);
@@ -57,6 +58,7 @@ class UserController extends Controller
             'role' => 'sometimes|in:admin,coordinator,expert,pedagogy,design,audiovisual,engineering,qa',
             'is_active' => 'nullable|boolean',
             'phone' => 'nullable|string|max:30',
+            'weekly_capacity_points' => 'nullable|integer|min:1|max:200',
         ]);
 
         if (isset($data['password'])) {

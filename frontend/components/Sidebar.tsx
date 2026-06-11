@@ -12,6 +12,9 @@ import {
   Settings,
   CalendarDays,
   UserCircle,
+  Gauge,
+  ClipboardList,
+  MessagesSquare,
   X,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -57,6 +60,24 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Entregables',
     icon: FileText,
     roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/capacidad',
+    label: 'Capacidad',
+    icon: Gauge,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/decisiones',
+    label: 'Decisiones',
+    icon: ClipboardList,
+    roles: ['admin', 'coordinator'],
+  },
+  {
+    href: '/colaboracion',
+    label: 'Colaboración',
+    icon: MessagesSquare,
+    roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
   },
   {
     href: '/calendario',

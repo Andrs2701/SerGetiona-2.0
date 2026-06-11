@@ -33,6 +33,7 @@ interface UserForm {
   role: UserRole;
   phone: string;
   is_active: boolean;
+  weekly_capacity_points: string;
 }
 
 const emptyForm: UserForm = {
@@ -42,6 +43,7 @@ const emptyForm: UserForm = {
   role: 'expert',
   phone: '',
   is_active: true,
+  weekly_capacity_points: '',
 };
 
 export default function UsuariosPage() {
@@ -76,18 +78,25 @@ export default function UsuariosPage() {
       role: u.role,
       phone: u.phone ?? '',
       is_active: u.is_active,
+      weekly_capacity_points:
+        u.weekly_capacity_points != null ? String(u.weekly_capacity_points) : '',
     });
     setShowModal(true);
   }
 
   async function handleSave() {
     setSaving(true);
+    const payload = {
+      ...form,
+      weekly_capacity_points:
+        form.weekly_capacity_points === '' ? null : Number(form.weekly_capacity_points),
+    };
     try {
       if (editUser) {
-        const updated = await api.put<User>(ENDPOINTS.USER(editUser.id), form);
+        const updated = await api.put<User>(ENDPOINTS.USER(editUser.id), payload);
         setData((prev) => prev.map((u) => (u.id === editUser.id ? updated : u)));
       } else {
-        const created = await api.post<User>(ENDPOINTS.USERS, form);
+        const created = await api.post<User>(ENDPOINTS.USERS, payload);
         setData((prev) => [...prev, created]);
       }
     } catch {
@@ -310,6 +319,23 @@ export default function UsuariosPage() {
                 placeholder="300 000 0000"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Capacidad semanal (puntos)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={form.weekly_capacity_points}
+              onChange={(e) => setForm((f) => ({ ...f, weekly_capacity_points: e.target.value }))}
+              className="w-40 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="10 (por defecto)"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Vacío = usa la capacidad por defecto definida en Configuración → Parámetros.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button

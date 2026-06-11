@@ -44,6 +44,7 @@ export interface User {
   role: UserRole;
   is_active: boolean;
   phone?: string;
+  weekly_capacity_points?: number | null;
 }
 
 export interface Project {
@@ -104,6 +105,8 @@ export interface Deliverable {
   program_id?: number;
   project_name?: string;
   compliance_percentage?: number;
+  complexity_level_id?: number | null;
+  complexity?: { id: number; name: string; points: number } | null;
 }
 
 export interface Comment {
@@ -325,3 +328,167 @@ export interface Workspace {
   activities: WorkspaceActivity[];
   calendar_activities: WorkspaceActivity[];
 }
+
+// ── Evolución 2026: complejidad, capacidad, salud, decisiones, colaboración ──
+
+export interface ComplexityLevel {
+  id: number;
+  name: string;
+  points: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface SystemSetting {
+  id: number;
+  key: string;
+  value: string;
+  label: string;
+  group: string;
+}
+
+export type CapacityStatus = 'ok' | 'high' | 'overloaded';
+
+export interface CapacityUser {
+  user_id: number;
+  user_name: string;
+  role: UserRole;
+  capacity_points: number;
+  active_points: number;
+  active_activities: number;
+  overdue: number;
+  utilization_pct: number;
+  status: CapacityStatus;
+}
+
+export interface CapacityRole {
+  role: UserRole;
+  users: number;
+  capacity_points: number;
+  active_points: number;
+  utilization_pct: number;
+  overloaded_users: number;
+}
+
+export interface CapacitySummary {
+  capacity_points: number;
+  active_points: number;
+  available_points: number;
+  utilization_pct: number;
+  overloaded_users: number;
+  status: CapacityStatus;
+}
+
+export interface CapacityTrendPoint {
+  week_start: string;
+  active_points: number;
+  capacity_points: number;
+  utilization_pct: number;
+  overdue: number;
+}
+
+export interface ReassignmentSuggestion {
+  user_id: number;
+  name: string;
+  utilization_pct: number;
+  active_points: number;
+  capacity_points: number;
+  utilization_after: number;
+}
+
+export type HealthLevel = 'green' | 'yellow' | 'red';
+
+export interface HealthFactor {
+  key: string;
+  label: string;
+  raw: number;
+  weight: number;
+  penalty: number;
+}
+
+export interface ProjectHealth {
+  project_id: number;
+  project_name: string;
+  score: number;
+  level: HealthLevel;
+  factors: HealthFactor[];
+}
+
+export interface HealthReport {
+  portfolio_score: number;
+  portfolio_level: HealthLevel;
+  projects: ProjectHealth[];
+}
+
+export type DecisionStatus = 'pending' | 'in_progress' | 'implemented' | 'cancelled';
+export type DecisionImpact = 'low' | 'medium' | 'high';
+
+export interface DecisionRecord {
+  id: number;
+  decision_date: string;
+  project_id?: number | null;
+  academic_program_id?: number | null;
+  description: string;
+  responsible_id?: number | null;
+  status: DecisionStatus;
+  impact: DecisionImpact;
+  observations?: string | null;
+  responsible?: User | null;
+  project?: { id: number; name: string } | null;
+  program?: { id: number; name: string } | null;
+  created_at?: string;
+}
+
+export interface Channel {
+  id: number;
+  name: string;
+  type: 'general' | 'project' | 'program';
+  project_id?: number | null;
+  academic_program_id?: number | null;
+  is_archived: boolean;
+  unread_count?: number;
+  last_message_at?: string | null;
+  project?: { id: number; name: string } | null;
+  program?: { id: number; name: string } | null;
+}
+
+export interface ChannelMessage {
+  id: number;
+  channel_id: number;
+  parent_id?: number | null;
+  content: string;
+  user: { id: number; name: string; role: UserRole };
+  created_at: string;
+  replies?: ChannelMessage[];
+}
+
+export type PortfolioView = 'table' | 'cards' | 'timeline';
+
+export interface UserPreferences {
+  portfolio_view?: PortfolioView;
+}
+
+export const HEALTH_LEVEL_LABELS: Record<HealthLevel, string> = {
+  green: 'Saludable',
+  yellow: 'Con alertas',
+  red: 'Crítico',
+};
+
+export const CAPACITY_STATUS_LABELS: Record<CapacityStatus, string> = {
+  ok: 'Disponible',
+  high: 'Ocupación alta',
+  overloaded: 'Sobrecargado',
+};
+
+export const DECISION_STATUS_LABELS: Record<DecisionStatus, string> = {
+  pending: 'Pendiente',
+  in_progress: 'En Progreso',
+  implemented: 'Implementada',
+  cancelled: 'Cancelada',
+};
+
+export const DECISION_IMPACT_LABELS: Record<DecisionImpact, string> = {
+  low: 'Bajo',
+  medium: 'Medio',
+  high: 'Alto',
+};

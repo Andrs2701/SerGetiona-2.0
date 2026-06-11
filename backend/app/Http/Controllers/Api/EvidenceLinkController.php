@@ -103,9 +103,19 @@ class EvidenceLinkController extends Controller
 
     /**
      * DELETE /evidence/{link}
+     * Solo admin/coordinator, el autor del link o el responsable de la actividad.
      */
-    public function destroy(EvidenceLink $link)
+    public function destroy(Request $request, EvidenceLink $link)
     {
+        $user = $request->user();
+        $canDelete = in_array($user->role, ['admin', 'coordinator'])
+            || $link->user_id === $user->id
+            || $link->roleActivity?->responsible_id === $user->id;
+
+        if (!$canDelete) {
+            return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
+        }
+
         $link->delete();
 
         return response()->json(['message' => 'Evidencia eliminada.']);

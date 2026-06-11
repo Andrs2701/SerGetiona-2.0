@@ -4,11 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Plus, Download, ChevronDown,
   Calendar, Users2, FileText, TrendingUp, ArrowRight,
+  LayoutGrid, List, GitBranch,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useRouter } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Project, ProjectStatus } from '@/lib/types';
+import type { Project, ProjectStatus, PortfolioView } from '@/lib/types';
 import { PROJECT_STATUS_LABELS } from '@/lib/types';
 import { MOCK_PROJECTS, MOCK_USERS } from '@/lib/mock-data';
 import StatusBadge from '@/components/StatusBadge';
@@ -138,6 +139,70 @@ function ProjectCardSkeleton() {
   );
 }
 
+// ── Table view ─────────────────────────────────────────────────────────────────
+function ProjectsTable({ projects, onRowClick }: { projects: Project[]; onRowClick: (id: number) => void }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+            <th className="px-4 py-3">Nombre</th>
+            <th className="px-4 py-3">Estado</th>
+            <th className="px-4 py-3">Responsable</th>
+            <th className="px-4 py-3">Entregables</th>
+            <th className="px-4 py-3">Cumplimiento</th>
+            <th className="px-4 py-3">Inicio</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {projects.map((p) => (
+            <tr
+              key={p.id}
+              onClick={() => onRowClick(p.id)}
+              className="hover:bg-indigo-50 cursor-pointer transition-colors"
+            >
+              <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{p.name}</td>
+              <td className="px-4 py-3"><StatusBadge status={p.status} type="project" /></td>
+              <td className="px-4 py-3 text-gray-600">{p.responsible?.name ?? '—'}</td>
+              <td className="px-4 py-3 text-gray-600 text-center">{p.deliverables_count}</td>
+              <td className="px-4 py-3 w-32"><ComplianceBar value={p.compliance_percentage} /></td>
+              <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.start_date ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Timeline view ──────────────────────────────────────────────────────────────
+function ProjectsTimeline({ projects, onRowClick }: { projects: Project[]; onRowClick: (id: number) => void }) {
+  const sorted = [...projects].sort((a, b) =>
+    (a.start_date ?? '').localeCompare(b.start_date ?? '')
+  );
+  return (
+    <div className="space-y-2">
+      {sorted.map((p) => (
+        <button
+          key={p.id}
+          onClick={() => onRowClick(p.id)}
+          className="w-full flex items-center gap-4 bg-white rounded-xl border border-gray-200 px-5 py-4 text-left hover:border-indigo-300 hover:shadow-sm transition-all"
+        >
+          <div className="w-2 h-2 rounded-full flex-none bg-indigo-400" />
+          <div className="flex-none w-28 text-xs text-gray-500">
+            {p.start_date ?? 'Sin fecha'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-900 truncate">{p.name}</p>
+          </div>
+          <StatusBadge status={p.status} type="project" />
+          <ComplianceBar value={p.compliance_percentage} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ProyectosPage() {
   const router = useRouter();
   const [data, setData] = useState<Project[]>([]);
@@ -148,6 +213,7 @@ export default function ProyectosPage() {
   const [form, setForm] = useState<ProjectForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [view, setView] = useState<PortfolioView>('cards');
 
   useEffect(() => {
     api
@@ -155,7 +221,16 @@ export default function ProyectosPage() {
       .then(setData)
       .catch(() => setData(MOCK_PROJECTS))
       .finally(() => setLoading(false));
+    // Load persisted view preference
+    api.get<{ preferences: { portfolio_view?: PortfolioView } }>('/preferences')
+      .then((res) => { if (res.preferences?.portfolio_view) setView(res.preferences.portfolio_view); })
+      .catch(() => null);
   }, []);
+
+  function changeView(v: PortfolioView) {
+    setView(v);
+    api.put('/preferences', { portfolio_view: v }).catch(() => null);
+  }
 
   const filtered = useMemo(() => {
     return data.filter((p) => {
@@ -244,8 +319,8 @@ export default function ProyectosPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Filters + view toggle */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
@@ -265,9 +340,29 @@ export default function ProyectosPage() {
             <option key={s} value={s}>{PROJECT_STATUS_LABELS[s]}</option>
           ))}
         </select>
+        {/* View toggle */}
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+          {([
+            { v: 'cards',    Icon: LayoutGrid, title: 'Tarjetas' },
+            { v: 'table',    Icon: List,        title: 'Tabla' },
+            { v: 'timeline', Icon: GitBranch,   title: 'Línea de tiempo' },
+          ] as { v: PortfolioView; Icon: React.ElementType; title: string }[]).map(({ v, Icon, title }) => (
+            <button
+              key={v}
+              onClick={() => changeView(v)}
+              title={title}
+              className={clsx(
+                'px-3 py-2 transition-colors',
+                view === v ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'
+              )}
+            >
+              <Icon size={15} />
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Cards grid */}
+      {/* Project views */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => <ProjectCardSkeleton key={i} />)}
@@ -278,15 +373,29 @@ export default function ProyectosPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onClick={() => router.push(`/proyectos/${project.id}`)}
-              />
-            ))}
-          </div>
+          {view === 'cards' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onClick={() => router.push(`/proyectos/${project.id}`)}
+                />
+              ))}
+            </div>
+          )}
+          {view === 'table' && (
+            <ProjectsTable
+              projects={filtered}
+              onRowClick={(id) => router.push(`/proyectos/${id}`)}
+            />
+          )}
+          {view === 'timeline' && (
+            <ProjectsTimeline
+              projects={filtered}
+              onRowClick={(id) => router.push(`/proyectos/${id}`)}
+            />
+          )}
           <p className="text-xs text-gray-400">{filtered.length} proyecto(s)</p>
         </>
       )}

@@ -20,6 +20,7 @@ class DeliverableController extends Controller
         $query = Deliverable::with([
             'subject.academicProgram.project',
             'roleActivities.responsible',
+            'complexityLevel',
         ]);
 
         // Operational roles only see deliverables where they have an assigned activity
@@ -69,6 +70,12 @@ class DeliverableController extends Controller
                 'project_id'           => $project?->id,
                 'project_name'         => $project?->name,
                 'compliance_percentage'=> $compliance,
+                'complexity_level_id'  => $d->complexity_level_id,
+                'complexity'           => $d->complexityLevel ? [
+                    'id'     => $d->complexityLevel->id,
+                    'name'   => $d->complexityLevel->name,
+                    'points' => $d->complexityLevel->points,
+                ] : null,
                 'role_activities'      => $activities->map(fn($a) => [
                     'id'                   => $a->id,
                     'role'                 => $a->role,
@@ -98,6 +105,7 @@ class DeliverableController extends Controller
             'global_status' => 'nullable|in:unpublished,pending_start,in_progress,in_review,with_observations,finished,cancelled,not_applicable',
             'start_date' => 'nullable|date',
             'notes' => 'nullable|string',
+            'complexity_level_id' => 'nullable|exists:complexity_levels,id',
         ]);
 
         $data['created_by'] = $request->user()->id;
@@ -122,6 +130,7 @@ class DeliverableController extends Controller
             'global_status' => 'nullable|in:unpublished,pending_start,in_progress,in_review,with_observations,finished,cancelled,not_applicable',
             'start_date' => 'nullable|date',
             'notes' => 'nullable|string',
+            'complexity_level_id' => 'nullable|exists:complexity_levels,id',
         ]);
 
         $deliverable->update($data);

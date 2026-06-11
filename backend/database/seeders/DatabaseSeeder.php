@@ -24,6 +24,12 @@ class DatabaseSeeder extends Seeder
     // Fechas base hoy: 2026-06-04
     public function run(): void
     {
+        // Catálogos configurables (seeders idempotentes)
+        $this->call([
+            ComplexityLevelSeeder::class,
+            SystemSettingSeeder::class,
+        ]);
+
         // ── Usuarios ──────────────────────────────────────────────────────────
         $admin = User::create([
             'name'      => 'Administrador',

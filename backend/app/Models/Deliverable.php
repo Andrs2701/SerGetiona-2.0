@@ -23,6 +23,7 @@ class Deliverable extends Model
         'notes',
         'requirement',
         'observation',
+        'complexity_level_id',
         'created_by',
     ];
 
@@ -48,6 +49,11 @@ class Deliverable extends Model
     public function comments()
     {
         return $this->hasMany(Comment::class);
+    }
+
+    public function complexityLevel()
+    {
+        return $this->belongsTo(ComplexityLevel::class);
     }
 
     public function scopeByStatus($query, $status)

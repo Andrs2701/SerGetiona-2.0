@@ -20,6 +20,7 @@ class User extends Authenticatable
         'role',
         'is_active',
         'phone',
+        'weekly_capacity_points',
     ];
 
     protected $hidden = [

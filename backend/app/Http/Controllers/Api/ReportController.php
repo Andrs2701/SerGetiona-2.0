@@ -64,6 +64,12 @@ class ReportController extends Controller
         return response()->json($workload);
     }
 
+    /** GET /reports/executive-summary */
+    public function executiveSummary()
+    {
+        return response()->json(\App\Services\ExecutiveSummaryService::build());
+    }
+
     public function dashboard()
     {
         $projectsByStatus = Project::select('status', DB::raw('count(*) as count'))

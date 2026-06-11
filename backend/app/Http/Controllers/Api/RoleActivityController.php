@@ -13,6 +13,42 @@ use Illuminate\Support\Facades\Auth;
 
 class RoleActivityController extends Controller
 {
+    private const ROLE_CHAIN = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
+    /**
+     * Solo admin/coordinator, el responsable de la actividad o — para acciones
+     * de revisión — el responsable del rol siguiente en la cadena (quien valida
+     * la entrega del rol anterior) pueden operar sobre la actividad.
+     */
+    private function authorizeActivity(Request $request, RoleActivity $activity, bool $allowChainReviewer = false): ?\Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        if (in_array($user->role, ['admin', 'coordinator'])) {
+            return null;
+        }
+
+        if ($activity->responsible_id === $user->id) {
+            return null;
+        }
+
+        if ($allowChainReviewer) {
+            $currentIdx = array_search($activity->role, self::ROLE_CHAIN);
+            if ($currentIdx !== false && $currentIdx < count(self::ROLE_CHAIN) - 1) {
+                $reviewerRole = self::ROLE_CHAIN[$currentIdx + 1];
+                $isReviewer = $activity->deliverable?->roleActivities()
+                    ->where('role', $reviewerRole)
+                    ->where('responsible_id', $user->id)
+                    ->exists();
+                if ($isReviewer) {
+                    return null;
+                }
+            }
+        }
+
+        return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
+    }
+
     public static function translateStatus(string $status): string
     {
         return match($status) {
@@ -40,6 +76,10 @@ class RoleActivityController extends Controller
 
     public function update(Request $request, RoleActivity $activity)
     {
+        if ($denied = $this->authorizeActivity($request, $activity)) {
+            return $denied;
+        }
+
         $data = $request->validate([
             'responsible_id'       => 'nullable|exists:users,id',
             'assigned_at'          => 'nullable|date',
@@ -118,6 +158,10 @@ class RoleActivityController extends Controller
      */
     public function quickAction(Request $request, RoleActivity $activity)
     {
+        if ($denied = $this->authorizeActivity($request, $activity, allowChainReviewer: true)) {
+            return $denied;
+        }
+
         $data = $request->validate([
             'action' => 'required|in:deliver,approve,request_adjustments,reject',
         ]);
@@ -188,7 +232,7 @@ class RoleActivityController extends Controller
         );
 
         // Resolver siguiente rol en la cadena
-        $roleChain   = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+        $roleChain   = self::ROLE_CHAIN;
         $currentIdx  = array_search($activity->role, $roleChain);
         $nextRole    = null;
         $nextResponsible     = null;

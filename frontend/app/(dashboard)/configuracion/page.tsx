@@ -5,6 +5,8 @@ import { Pencil, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
+import ComplexityLevelsConfig from '@/components/ComplexityLevelsConfig';
+import SystemParametersConfig from '@/components/SystemParametersConfig';
 
 type Role = 'expert' | 'pedagogy' | 'design' | 'audiovisual' | 'engineering' | 'qa';
 
@@ -69,7 +71,7 @@ const ROLE_STATUS_INFO = [
 ];
 
 export default function ConfiguracionPage() {
-  const [activeTab, setActiveTab] = useState<'flows' | 'statuses' | 'roles'>('flows');
+  const [activeTab, setActiveTab] = useState<'flows' | 'statuses' | 'roles' | 'complexity' | 'parameters'>('flows');
   const [templates, setTemplates] = useState<FlowTemplate[]>(MOCK_TEMPLATES);
   const [editTemplate, setEditTemplate] = useState<FlowTemplate | null>(null);
   const [editOffsets, setEditOffsets] = useState<Record<Role, number>>({} as Record<Role, number>);
@@ -97,7 +99,7 @@ export default function ConfiguracionPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-6">
-        {(['flows', 'statuses', 'roles'] as const).map((tab) => (
+        {(['flows', 'statuses', 'roles', 'complexity', 'parameters'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -108,7 +110,15 @@ export default function ConfiguracionPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             )}
           >
-            {tab === 'flows' ? 'Flujos de Producción' : tab === 'statuses' ? 'Estados' : 'Roles'}
+            {tab === 'flows'
+              ? 'Flujos de Producción'
+              : tab === 'statuses'
+              ? 'Estados'
+              : tab === 'roles'
+              ? 'Roles'
+              : tab === 'complexity'
+              ? 'Complejidad'
+              : 'Parámetros'}
           </button>
         ))}
       </div>
@@ -221,6 +231,12 @@ export default function ConfiguracionPage() {
           ))}
         </div>
       )}
+
+      {/* Tab: Niveles de Complejidad */}
+      {activeTab === 'complexity' && <ComplexityLevelsConfig />}
+
+      {/* Tab: Parámetros del sistema */}
+      {activeTab === 'parameters' && <SystemParametersConfig />}
 
       {/* Edit template modal */}
       <Modal
