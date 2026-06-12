@@ -115,9 +115,11 @@ const ALL_NAV_ITEMS: NavItem[] = [
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  /** Visibilidad en escritorio; el usuario la controla desde el Header */
+  desktopOpen?: boolean;
 }
 
-export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen = true }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuthContext();
   const [overdueCount, setOverdueCount] = useState<number>(0);
@@ -224,8 +226,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex min-h-screen flex-shrink-0">
+      {/* Desktop sidebar (ocultable para todos los roles) */}
+      <div className={clsx('min-h-screen flex-shrink-0', desktopOpen ? 'hidden md:flex' : 'hidden')}>
         {sidebarInner}
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight } from 'lucide-react';
+import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { api, ENDPOINTS } from '@/lib/api';
@@ -37,9 +37,17 @@ interface HeaderProps {
   title?: string;
   rightSidebarOpen?: boolean;
   onToggleRightSidebar?: () => void;
+  leftSidebarOpen?: boolean;
+  onToggleLeftSidebar?: () => void;
 }
 
-export default function Header({ title, rightSidebarOpen, onToggleRightSidebar }: HeaderProps) {
+export default function Header({
+  title,
+  rightSidebarOpen,
+  onToggleRightSidebar,
+  leftSidebarOpen,
+  onToggleLeftSidebar,
+}: HeaderProps) {
   const { user, logout } = useAuthContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -107,8 +115,22 @@ export default function Header({ title, rightSidebarOpen, onToggleRightSidebar }
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      {/* Left: title */}
-      <div>
+      {/* Left: sidebar toggle + title */}
+      <div className="flex items-center gap-2">
+        {onToggleLeftSidebar && (
+          <button
+            onClick={onToggleLeftSidebar}
+            className={clsx(
+              'hidden md:block p-2 rounded-lg transition-colors',
+              leftSidebarOpen
+                ? 'text-gray-500 hover:bg-gray-100'
+                : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+            )}
+            title={leftSidebarOpen ? 'Ocultar menú lateral' : 'Mostrar menú lateral'}
+          >
+            <PanelLeft size={18} />
+          </button>
+        )}
         {title && <h2 className="text-base font-semibold text-gray-800">{title}</h2>}
       </div>
 

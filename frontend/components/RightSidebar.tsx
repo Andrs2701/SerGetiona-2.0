@@ -59,9 +59,11 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
     if (!user) return;
     try {
       if (isManager) {
-        const res = await api.get<{ activities: AllActivity[] }>(ENDPOINTS.CALENDAR_ALL_ACTIVITIES);
+        // El endpoint devuelve un array plano de actividades
+        const res = await api.get<AllActivity[] | { activities: AllActivity[] }>(ENDPOINTS.CALENDAR_ALL_ACTIVITIES);
+        const list = Array.isArray(res) ? res : res.activities ?? [];
         setItems(
-          (res.activities ?? []).map((a) => ({
+          list.map((a) => ({
             id: a.id,
             title: a.deliverable_name ?? '—',
             subtitle: [a.role_label, a.responsible_name].filter(Boolean).join(' · '),

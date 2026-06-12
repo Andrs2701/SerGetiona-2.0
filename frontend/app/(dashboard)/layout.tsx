@@ -11,11 +11,24 @@ import type { UserPreferences } from '@/lib/types';
 import { Menu } from 'lucide-react';
 
 const RIGHT_SIDEBAR_KEY = 'sergestiona_right_sidebar';
+const LEFT_SIDEBAR_KEY = 'sergestiona_left_sidebar';
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthContext();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Barra izquierda ocultable para todos los roles (persistencia local)
+  const [leftOpen, setLeftOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem(LEFT_SIDEBAR_KEY) !== '0';
+  });
+
+  const toggleLeftSidebar = useCallback(() => {
+    const next = !leftOpen;
+    setLeftOpen(next);
+    localStorage.setItem(LEFT_SIDEBAR_KEY, next ? '1' : '0');
+  }, [leftOpen]);
 
   // Estado local inmediato desde localStorage; el backend es la fuente de verdad
   const [rightOpen, setRightOpen] = useState<boolean>(() => {
@@ -45,13 +58,11 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated]);
 
   const toggleRightSidebar = useCallback(() => {
-    setRightOpen((prev) => {
-      const next = !prev;
-      localStorage.setItem(RIGHT_SIDEBAR_KEY, next ? '1' : '0');
-      api.put('/preferences', { right_sidebar_open: next }).catch(() => {});
-      return next;
-    });
-  }, []);
+    const next = !rightOpen;
+    setRightOpen(next);
+    localStorage.setItem(RIGHT_SIDEBAR_KEY, next ? '1' : '0');
+    api.put('/preferences', { right_sidebar_open: next }).catch(() => {});
+  }, [rightOpen]);
 
   if (isLoading) {
     return (
@@ -68,7 +79,11 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
+      <Sidebar
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
+        desktopOpen={leftOpen}
+      />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile header bar with hamburger */}
         <div className="md:hidden h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 flex-shrink-0">
@@ -81,7 +96,12 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           <span className="font-bold text-indigo-700 tracking-tight">Sergestiona</span>
           <span className="text-xs text-gray-400">2.0</span>
         </div>
-        <Header rightSidebarOpen={rightOpen} onToggleRightSidebar={toggleRightSidebar} />
+        <Header
+          rightSidebarOpen={rightOpen}
+          onToggleRightSidebar={toggleRightSidebar}
+          leftSidebarOpen={leftOpen}
+          onToggleLeftSidebar={toggleLeftSidebar}
+        />
         <div className="flex-1 flex overflow-hidden min-h-0">
           <main className="flex-1 overflow-y-auto bg-gray-50 min-w-0">
             {children}

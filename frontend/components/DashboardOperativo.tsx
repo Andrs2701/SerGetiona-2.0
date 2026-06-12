@@ -11,11 +11,6 @@ import {
   CalendarDays,
   Timer,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Send,
-  RotateCcw,
-  Eye,
 } from 'lucide-react';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity } from '@/lib/types';
@@ -102,163 +97,6 @@ function urgencyOrder(act: WorkspaceActivity): number {
   if (act.date_status === 'overdue') return 0;
   if (act.date_status === 'approaching') return 1;
   return 2;
-}
-
-// ─── Priority badge ──────────────────────────────────────────────────────────
-
-function PriorityBadge({ act }: { act: WorkspaceActivity }) {
-  if (act.status === 'approved') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-        Verde
-      </span>
-    );
-  }
-  if (act.date_status === 'overdue') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700">
-        Rojo
-      </span>
-    );
-  }
-  if (act.date_status === 'approaching') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-orange-100 text-orange-700">
-        Naranja
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-700">
-      Verde
-    </span>
-  );
-}
-
-// ─── Quick Action Button ─────────────────────────────────────────────────────
-
-function QuickActionBtn({
-  act,
-  onNavigate,
-}: {
-  act: WorkspaceActivity;
-  onNavigate: () => void;
-}) {
-  if (act.status === 'adjustments_requested') {
-    return (
-      <button
-        onClick={onNavigate}
-        className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 hover:bg-orange-100 transition-colors font-medium flex-shrink-0"
-      >
-        <RotateCcw size={11} /> Corregir
-      </button>
-    );
-  }
-  if (act.status === 'delivered') {
-    return (
-      <button
-        onClick={onNavigate}
-        className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 border border-purple-200 rounded-lg px-2 py-1 hover:bg-purple-100 transition-colors font-medium flex-shrink-0"
-      >
-        <Eye size={11} /> Ver estado
-      </button>
-    );
-  }
-  return (
-    <button
-      onClick={onNavigate}
-      className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-100 transition-colors font-medium flex-shrink-0"
-    >
-      <Send size={11} /> Entregar
-    </button>
-  );
-}
-
-// ─── Priority Section ─────────────────────────────────────────────────────────
-
-interface PriorityGroup {
-  key: string;
-  title: string;
-  dot: string;
-  emptyMsg: string;
-  items: WorkspaceActivity[];
-}
-
-function PriorityGroupPanel({
-  group,
-  onNavigate,
-}: {
-  group: PriorityGroup;
-  onNavigate: () => void;
-}) {
-  const [open, setOpen] = useState(group.items.length > 0);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${group.dot}`} />
-          <span className="text-sm font-semibold text-gray-800">{group.title}</span>
-          <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
-            {group.items.length}
-          </span>
-        </div>
-        {open ? (
-          <ChevronUp size={16} className="text-gray-400" />
-        ) : (
-          <ChevronDown size={16} className="text-gray-400" />
-        )}
-      </button>
-
-      {/* Items */}
-      {open && (
-        <div className="border-t border-gray-100 divide-y divide-gray-50">
-          {group.items.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">{group.emptyMsg}</p>
-          ) : (
-            group.items.map((act) => {
-              const diff = act.commitment_date ? daysDiff(act.commitment_date) : null;
-              return (
-                <div
-                  key={act.id}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">{act.deliverable?.name ?? '—'}</p>
-                    <p className="text-[10px] text-gray-400 truncate mt-0.5">
-                      {act.program?.name ?? '—'} · {act.subject?.name ?? '—'}
-                    </p>
-                  </div>
-                  {diff !== null && (
-                    <span
-                      className={`text-[10px] font-semibold flex-shrink-0 ${
-                        diff < 0
-                          ? 'text-red-600'
-                          : diff <= 3
-                          ? 'text-orange-500'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {diff < 0
-                        ? `−${Math.abs(diff)}d`
-                        : diff === 0
-                        ? 'Hoy'
-                        : `+${diff}d`}
-                    </span>
-                  )}
-                  <QuickActionBtn act={act} onNavigate={onNavigate} />
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ─── Countdown Timer ─────────────────────────────────────────────────────────
@@ -427,7 +265,6 @@ export default function DashboardOperativo() {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tableExpanded, setTableExpanded] = useState(false);
 
   useEffect(() => {
     api
@@ -490,60 +327,7 @@ export default function DashboardOperativo() {
     })
     .slice(0, 9);
 
-  // Mis Prioridades groups
-  const overdueActs = activities
-    .filter((a) => a.date_status === 'overdue' && a.status !== 'approved')
-    .sort((a, b) => (a.commitment_date ?? '').localeCompare(b.commitment_date ?? ''));
-
-  const approachingActs = activities
-    .filter((a) => {
-      if (a.status === 'approved' || a.date_status === 'overdue') return false;
-      const d = a.commitment_date ? daysDiff(a.commitment_date) : null;
-      return d !== null && d >= 0 && d <= 3;
-    })
-    .sort((a, b) => (a.commitment_date ?? '').localeCompare(b.commitment_date ?? ''));
-
-  const returnedActs = activities
-    .filter((a) => a.status === 'adjustments_requested')
-    .sort((a, b) => (a.commitment_date ?? '').localeCompare(b.commitment_date ?? ''));
-
-  const pendingApprovalActs = activities
-    .filter((a) => a.status === 'delivered')
-    .sort((a, b) => (a.commitment_date ?? '').localeCompare(b.commitment_date ?? ''));
-
-  const priorityGroups: PriorityGroup[] = [
-    {
-      key: 'overdue',
-      title: 'Vencidas',
-      dot: 'bg-red-500',
-      emptyMsg: 'Sin actividades vencidas',
-      items: overdueActs,
-    },
-    {
-      key: 'approaching',
-      title: 'Por Vencer (próximos 3 días)',
-      dot: 'bg-yellow-400',
-      emptyMsg: 'Sin actividades por vencer pronto',
-      items: approachingActs,
-    },
-    {
-      key: 'returned',
-      title: 'Devueltas — Requieren acción',
-      dot: 'bg-blue-400',
-      emptyMsg: 'Sin actividades devueltas',
-      items: returnedActs,
-    },
-    {
-      key: 'pending_approval',
-      title: 'Pendientes Aprobación',
-      dot: 'bg-gray-300',
-      emptyMsg: 'Sin actividades esperando aprobación',
-      items: pendingApprovalActs,
-    },
-  ];
-
   const userRoleLabel = (USER_ROLE_LABELS as Record<string, string>)[data.role] ?? data.role;
-  const TABLE_COMPACT_ROWS = 5;
 
   return (
     <div className="p-6 space-y-6">
@@ -621,23 +405,6 @@ export default function DashboardOperativo() {
       {/* Countdown banner */}
       <CountdownBanner activities={activities} />
 
-      {/* ── MIS PRIORIDADES ── */}
-      <div>
-        <div className="mb-3">
-          <h2 className="text-base font-semibold text-gray-900">Mis Prioridades</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Actividades que requieren tu atención inmediata</p>
-        </div>
-        <div className="space-y-2">
-          {priorityGroups.map((group) => (
-            <PriorityGroupPanel
-              key={group.key}
-              group={group}
-              onNavigate={() => router.push('/mi-espacio')}
-            />
-          ))}
-        </div>
-      </div>
-
       {/* Priority tasks */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -670,85 +437,6 @@ export default function DashboardOperativo() {
         )}
       </div>
 
-      {/* ── Tabla de actividades — compacta por defecto ── */}
-      {activities.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Resumen de actividades</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Ordenadas por urgencia</p>
-            </div>
-            <button
-              onClick={() => setTableExpanded(v => !v)}
-              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-            >
-              {tableExpanded ? 'Ver menos' : `Ver todas (${activities.length})`}
-            </button>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Entregable</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Programa</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] hidden md:table-cell">Fecha</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Estado</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Prioridad</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {[...activities]
-                    .sort((a, b) => urgencyOrder(a) - urgencyOrder(b))
-                    .slice(0, tableExpanded ? activities.length : TABLE_COMPACT_ROWS)
-                    .map((act) => {
-                      const autoStatus = computeAutoStatus(act);
-                      return (
-                        <tr
-                          key={act.id}
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          onClick={() => router.push('/mi-espacio')}
-                        >
-                          <td className="px-4 py-2.5">
-                            <p className="font-medium text-gray-900 truncate max-w-[200px]">{act.deliverable?.name ?? '—'}</p>
-                            <p className="text-gray-400 truncate max-w-[200px] text-[10px]">{act.subject?.name ?? '—'}</p>
-                          </td>
-                          <td className="px-4 py-2.5 text-gray-500 truncate max-w-[160px]">{act.program?.name ?? '—'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 hidden md:table-cell">
-                            {act.commitment_date ? (() => {
-                              const d = daysDiff(act.commitment_date!);
-                              return (
-                                <span className={d < 0 ? 'text-red-600 font-semibold' : d <= 3 ? 'text-orange-500 font-medium' : ''}>
-                                  {formatDate(act.commitment_date!)}
-                                </span>
-                              );
-                            })() : '—'}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${autoStatus.cls}`}>
-                              {autoStatus.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5"><PriorityBadge act={act} /></td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-            {!tableExpanded && activities.length > TABLE_COMPACT_ROWS && (
-              <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 text-center">
-                <button
-                  onClick={() => setTableExpanded(true)}
-                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                >
-                  Mostrar {activities.length - TABLE_COMPACT_ROWS} actividades más
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
