@@ -252,7 +252,7 @@ class RoleActivityController extends Controller
         $action  = $data['action'];
         $user = $request->user();
         $isManager = in_array($user->role, ['admin', 'coordinator'], true);
-        $isOwner = $activity->responsible_id === $user->id;
+        $isOwner = (int)$activity->responsible_id === (int)$user->id;
 
         if ($action === 'deliver' && !$isManager && !$isOwner) {
             abort(403, 'Solo el responsable puede entregar esta actividad.');

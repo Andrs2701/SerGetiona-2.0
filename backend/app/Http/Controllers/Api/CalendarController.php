@@ -100,10 +100,11 @@ class CalendarController extends Controller
             'qa'          => 'Calidad',
         ];
 
-        $activities = RoleActivity::with([
-            'deliverable.subject.academicProgram.project',
-            'responsible',
-        ])->get()->map(function ($activity) use ($roleLabelMap) {
+        $activities = RoleActivity::whereHas('deliverable')
+            ->with([
+                'deliverable.subject.academicProgram.project',
+                'responsible',
+            ])->get()->map(function ($activity) use ($roleLabelMap) {
             $deliverable = $activity->deliverable;
             $subject     = $deliverable?->subject;
             $program     = $subject?->academicProgram;
