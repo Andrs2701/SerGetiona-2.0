@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck } from 'lucide-react';
+import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { api, ENDPOINTS } from '@/lib/api';
@@ -35,9 +35,11 @@ function notifIcon(type: string) {
 
 interface HeaderProps {
   title?: string;
+  rightSidebarOpen?: boolean;
+  onToggleRightSidebar?: () => void;
 }
 
-export default function Header({ title }: HeaderProps) {
+export default function Header({ title, rightSidebarOpen, onToggleRightSidebar }: HeaderProps) {
   const { user, logout } = useAuthContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -110,8 +112,24 @@ export default function Header({ title }: HeaderProps) {
         {title && <h2 className="text-base font-semibold text-gray-800">{title}</h2>}
       </div>
 
-      {/* Right: bell + avatar */}
+      {/* Right: panel toggle + bell + avatar */}
       <div className="flex items-center gap-3">
+        {/* Right sidebar toggle (solo escritorio amplio) */}
+        {onToggleRightSidebar && (
+          <button
+            onClick={onToggleRightSidebar}
+            className={clsx(
+              'hidden xl:block p-2 rounded-lg transition-colors',
+              rightSidebarOpen
+                ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                : 'text-gray-500 hover:bg-gray-100'
+            )}
+            title={rightSidebarOpen ? 'Ocultar panel lateral' : 'Mostrar panel lateral'}
+          >
+            <PanelRight size={18} />
+          </button>
+        )}
+
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button

@@ -762,19 +762,18 @@ export default function MiEspacioPage() {
                   </tr>
                 </thead>
 
-                {[...grouped.entries()].map(([programName, acts]) => {
-                  const hasActive = acts.some(a => a.status !== 'approved');
-                  return (
-                    <ProgramGroup
-                      key={`${programName}-${showCompleted}`}
-                      programName={programName}
-                      activities={acts}
-                      onSelect={setSelectedAct}
-                      selectedId={selectedAct?.id ?? null}
-                      defaultOpen={hasActive}
-                    />
-                  );
-                })}
+                {[...grouped.entries()].map(([programName, acts]) => (
+                  // Carga contraída por programa; con filtros activos se expande
+                  // para que los resultados sean visibles (el key fuerza remount)
+                  <ProgramGroup
+                    key={`${programName}-${showCompleted}-${hasFilters ? 'f' : 'c'}`}
+                    programName={programName}
+                    activities={acts}
+                    onSelect={setSelectedAct}
+                    selectedId={selectedAct?.id ?? null}
+                    defaultOpen={!!hasFilters}
+                  />
+                ))}
               </table>
             </div>
           )}

@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ComplexityLevelSeeder::class,
             SystemSettingSeeder::class,
+            SystemConfigSeeder::class,
         ]);
 
         // ── Usuarios ──────────────────────────────────────────────────────────

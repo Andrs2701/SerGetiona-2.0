@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { Fragment, useState, useEffect, useCallback, use } from 'react';
 import { clsx } from 'clsx';
 import { Search, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
@@ -166,6 +166,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       setActivityStatus(selectedActivity.activity.status);
     }
   }, [selectedActivity]);
+
+  // Sin entrada explícita del usuario, los grupos cargan contraídos por
+  // programa; al buscar o filtrar se expanden para mostrar los resultados.
+  const hasFilters = !!(search || filterProgram || filterStatus);
 
   async function handleStatusChange(newStatus: string) {
     if (!selectedActivity) return;
@@ -367,17 +371,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <tbody>
                   {programGroups.map((group) => {
                     const ci = group.colorIdx % PROGRAM_HEADER_COLORS.length;
-                    const isCollapsed = collapsed[group.program_id];
+                    const isCollapsed = collapsed[group.program_id] ?? !hasFilters;
                     return (
-                      <>
+                      <Fragment key={`group-${group.program}`}>
                         {/* Program header row */}
                         <tr
-                          key={`group-${group.program}`}
                           className={clsx('cursor-pointer', PROGRAM_HEADER_COLORS[ci])}
                           onClick={() =>
                             setCollapsed((prev) => ({
                               ...prev,
-                              [group.program_id]: !prev[group.program_id],
+                              [group.program_id]: !(prev[group.program_id] ?? !hasFilters),
                             }))
                           }
                         >
@@ -443,7 +446,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                               </tr>
                             );
                           })}
-                      </>
+                      </Fragment>
                     );
                   })}
                   {programGroups.length === 0 && (

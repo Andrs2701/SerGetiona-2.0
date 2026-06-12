@@ -447,10 +447,19 @@ export interface Channel {
   project_id?: number | null;
   academic_program_id?: number | null;
   is_archived: boolean;
+  is_private?: boolean;
   unread_count?: number;
+  member_count?: number;
   last_message_at?: string | null;
   project?: { id: number; name: string } | null;
   program?: { id: number; name: string } | null;
+}
+
+export interface ChannelMember {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
 }
 
 export interface ChannelMessage {
@@ -467,6 +476,49 @@ export type PortfolioView = 'table' | 'cards' | 'timeline';
 
 export interface UserPreferences {
   portfolio_view?: PortfolioView;
+  right_sidebar_open?: boolean;
+}
+
+// ── Configuración avanzada dinámica ──────────────────────────────────────────
+
+export interface SystemRole {
+  slug: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+}
+
+export interface SystemPermission {
+  id: number;
+  module: string;
+  action: string;
+  view_path?: string | null;
+  allowed_roles: string[];
+  description?: string | null;
+}
+
+export interface SystemStatus {
+  id: number;
+  type: 'deliverable' | 'task';
+  slug: string;
+  label: string;
+  color?: string | null;
+  description?: string | null;
+  is_active: boolean;
+}
+
+export interface StateTransition {
+  id: number;
+  type: 'deliverable' | 'task';
+  from_status: string;
+  to_status: string;
+  allowed_roles: string[];
+}
+
+export interface VisibilityRule {
+  id: number;
+  role_slug: string;
+  scope: 'all' | 'assigned_only';
 }
 
 export const HEALTH_LEVEL_LABELS: Record<HealthLevel, string> = {

@@ -50,6 +50,67 @@ class RoleActivityController extends Controller
         return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
     }
 
+    /**
+     * Al pasar una actividad a delivered/approved, habilita la actividad del
+     * siguiente rol de la cadena (not_started/pending → in_progress) y notifica
+     * a su responsable. Devuelve la siguiente actividad o null si no aplica.
+     */
+    private function advanceChain(RoleActivity $activity): ?RoleActivity
+    {
+        if (!in_array($activity->status, ['delivered', 'approved'], true)) {
+            return null;
+        }
+
+        $currentIdx = array_search($activity->role, self::ROLE_CHAIN);
+        if ($currentIdx === false || $currentIdx >= count(self::ROLE_CHAIN) - 1) {
+            return null;
+        }
+
+        $nextRole     = self::ROLE_CHAIN[$currentIdx + 1];
+        $nextActivity = $activity->deliverable?->roleActivities()
+            ->where('role', $nextRole)
+            ->with('responsible')
+            ->first();
+
+        if (!$nextActivity) {
+            return null;
+        }
+
+        if (in_array($nextActivity->status, ['not_started', 'pending'], true)) {
+            $oldNextStatus        = $nextActivity->status;
+            $nextActivity->status = 'in_progress';
+            $nextActivity->save();
+
+            AuditLog::create([
+                'user_id'      => Auth::id() ?? 1,
+                'action'       => 'updated',
+                'entity_type'  => 'RoleActivity',
+                'entity_id'    => $nextActivity->id,
+                'field_changed'=> 'status',
+                'old_value'    => $oldNextStatus,
+                'new_value'    => 'in_progress',
+                'ip_address'   => request()->ip(),
+                'created_at'   => now(),
+            ]);
+        }
+
+        if ($nextActivity->responsible) {
+            $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+            $currentLabel    = NotificationService::translateRole($activity->role);
+            $nextLabel       = NotificationService::translateRole($nextRole);
+            $verb            = $activity->status === 'delivered' ? 'entregó' : 'aprobó';
+            NotificationService::notify(
+                $nextActivity->responsible,
+                'next_in_chain',
+                'Tu turno en el flujo',
+                "El rol '{$currentLabel}' {$verb} su actividad en '{$deliverableName}'. Tu rol '{$nextLabel}' es el siguiente en el flujo.",
+                ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
+            );
+        }
+
+        return $nextActivity;
+    }
+
     public static function translateStatus(string $status): string
     {
         return match($status) {
@@ -139,13 +200,7 @@ class RoleActivityController extends Controller
         if (isset($dirty['responsible_id']) && $activity->responsible_id) {
             $newResponsible = User::find($activity->responsible_id);
             if ($newResponsible) {
-                NotificationService::notify(
-                    $newResponsible,
-                    'task_assigned',
-                    'Nueva actividad asignada',
-                    "Se te ha asignado la actividad de rol '{$activity->role}' en '{$deliverableName}'.",
-                    ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
-                );
+                NotificationService::notifyTaskAssigned($activity, $newResponsible);
             }
         }
 
@@ -175,29 +230,8 @@ class RoleActivityController extends Controller
                 }
             }
 
-            // Notify next responsible in the chain when current role marks as delivered or approved
-            if (in_array($activity->status, ['delivered', 'approved'])) {
-                $currentIdx = array_search($activity->role, self::ROLE_CHAIN);
-                if ($currentIdx !== false && $currentIdx < count(self::ROLE_CHAIN) - 1) {
-                    $nextRole     = self::ROLE_CHAIN[$currentIdx + 1];
-                    $nextActivity = $activity->deliverable?->roleActivities()
-                        ->where('role', $nextRole)
-                        ->with('responsible')
-                        ->first();
-                    $nextUser = $nextActivity?->responsible;
-                    if ($nextUser) {
-                        $currentLabel = ucfirst($activity->role);
-                        $verb = $activity->status === 'delivered' ? 'entregó' : 'aprobó';
-                        NotificationService::notify(
-                            $nextUser,
-                            'next_in_chain',
-                            'Tu turno en el flujo',
-                            "El rol '{$currentLabel}' {$verb} su actividad en '{$deliverableName}'. Tu rol '{$nextRole}' es el siguiente.",
-                            ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
-                        );
-                    }
-                }
-            }
+            // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
+            $this->advanceChain($activity);
         }
 
         // Notification: commitment date changed → notify responsible
@@ -342,36 +376,11 @@ class RoleActivityController extends Controller
             }
         }
 
-        // Resolver siguiente rol en la cadena
-        $roleChain   = self::ROLE_CHAIN;
-        $currentIdx  = array_search($activity->role, $roleChain);
-        $nextRole    = null;
-        $nextResponsible     = null;
-        $nextCommitmentDate  = null;
-        $nextActivity        = null;
-
-        if ($currentIdx !== false && $currentIdx < count($roleChain) - 1 && $activity->status === 'approved') {
-            $nextRole     = $roleChain[$currentIdx + 1];
-            $nextActivity = $activity->deliverable?->roleActivities()
-                ->where('role', $nextRole)
-                ->with('responsible')
-                ->first();
-            $nextResponsible    = $nextActivity?->responsible?->name;
-            $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
-
-            // Notify the next responsible
-            $nextUser = $nextActivity?->responsible;
-            if ($nextUser) {
-                $currentLabel = ucfirst($activity->role);
-                NotificationService::notify(
-                    $nextUser,
-                    'next_in_chain',
-                    'Tu turno en el flujo',
-                    "El rol '{$currentLabel}' aprobó su actividad en '{$delName}'. Tu rol '{$nextRole}' es el siguiente en el proceso.",
-                    ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
-                );
-            }
-        }
+        // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
+        $nextActivity       = $this->advanceChain($activity);
+        $nextRole           = $nextActivity?->role;
+        $nextResponsible    = $nextActivity?->responsible?->name;
+        $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
 
         $activity->load('responsible', 'assignedBy', 'deliverable');
 

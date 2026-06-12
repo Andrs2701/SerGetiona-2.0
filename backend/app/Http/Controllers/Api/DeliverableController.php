@@ -105,13 +105,7 @@ class DeliverableController extends Controller
             if (!empty($act['responsible_id'])) {
                 $responsible = User::find($act['responsible_id']);
                 if ($responsible) {
-                    NotificationService::notify(
-                        $responsible,
-                        'task_assigned',
-                        'Nueva actividad asignada',
-                        "Se te ha asignado la actividad de rol '{$act['role']}' en el entregable '{$deliverable->name}'.",
-                        ['entity_type' => 'RoleActivity', 'entity_id' => $created->id]
-                    );
+                    \App\Services\NotificationService::notifyTaskAssigned($created, $responsible);
                 }
             }
         }
@@ -205,13 +199,7 @@ class DeliverableController extends Controller
                         if ($newId && $newId !== $oldResponsibleId) {
                             $responsible = User::find($newId);
                             if ($responsible) {
-                                NotificationService::notify(
-                                    $responsible,
-                                    'task_assigned',
-                                    'Nueva actividad asignada',
-                                    "Se te ha asignado la actividad de rol '{$act['role']}' en el entregable '{$deliverable->name}'.",
-                                    ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
-                                );
+                                \App\Services\NotificationService::notifyTaskAssigned($activity, $responsible);
                             }
                         }
                     }
@@ -227,13 +215,7 @@ class DeliverableController extends Controller
                     if (!empty($act['responsible_id'])) {
                         $responsible = User::find($act['responsible_id']);
                         if ($responsible) {
-                            NotificationService::notify(
-                                $responsible,
-                                'task_assigned',
-                                'Nueva actividad asignada',
-                                "Se te ha asignado la actividad de rol '{$act['role']}' en el entregable '{$deliverable->name}'.",
-                                ['entity_type' => 'RoleActivity', 'entity_id' => $created->id]
-                            );
+                            \App\Services\NotificationService::notifyTaskAssigned($created, $responsible);
                         }
                     }
                 }

@@ -12,7 +12,22 @@ class CheckRole
     {
         $user = $request->user();
 
-        if (!$user || !in_array($user->role, $roles)) {
+        if (!$user) {
+            return response()->json(['message' => 'No autenticado.'], 401);
+        }
+
+        // Verify role is active in DB
+        $roleRecord = \App\Models\SystemRole::where('slug', $user->role)->first();
+        if ($roleRecord && !$roleRecord->is_active) {
+            return response()->json(['message' => 'Tu rol ha sido desactivado por el administrador.'], 403);
+        }
+
+        // Admin always has access
+        if ($user->role === 'admin') {
+            return $next($request);
+        }
+
+        if (!in_array($user->role, $roles, true)) {
             return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
         }
 

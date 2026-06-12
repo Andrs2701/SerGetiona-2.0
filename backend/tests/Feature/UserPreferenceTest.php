@@ -11,6 +11,32 @@ class UserPreferenceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_user_can_toggle_right_sidebar_preference(): void
+    {
+        $user = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        // Default: abierta
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/preferences')
+            ->assertOk()
+            ->assertJsonPath('preferences.right_sidebar_open', true);
+
+        // Cerrar y verificar persistencia
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/preferences', ['right_sidebar_open' => false])
+            ->assertOk()
+            ->assertJsonPath('preferences.right_sidebar_open', false);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/preferences')
+            ->assertJsonPath('preferences.right_sidebar_open', false);
+
+        // Cambiar otra preferencia no pisa la barra lateral
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/preferences', ['portfolio_view' => 'cards'])
+            ->assertJsonPath('preferences.right_sidebar_open', false);
+    }
+
     public function test_user_gets_default_preference_on_first_request(): void
     {
         $user = User::factory()->create(['role' => 'admin', 'is_active' => true]);

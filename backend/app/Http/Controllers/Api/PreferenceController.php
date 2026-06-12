@@ -12,7 +12,7 @@ class PreferenceController extends Controller
     {
         $pref = UserPreference::firstOrCreate(
             ['user_id' => $request->user()->id],
-            ['portfolio_view' => 'table']
+            ['portfolio_view' => 'table', 'right_sidebar_open' => true]
         );
         return response()->json(['preferences' => $pref]);
     }
@@ -20,7 +20,8 @@ class PreferenceController extends Controller
     public function update(Request $request)
     {
         $data = $request->validate([
-            'portfolio_view' => 'nullable|in:table,cards,timeline',
+            'portfolio_view'     => 'nullable|in:table,cards,timeline',
+            'right_sidebar_open' => 'nullable|boolean',
         ]);
 
         $pref = UserPreference::updateOrCreate(

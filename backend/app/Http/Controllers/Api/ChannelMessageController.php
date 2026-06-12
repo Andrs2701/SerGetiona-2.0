@@ -10,8 +10,10 @@ use Illuminate\Http\Request;
 
 class ChannelMessageController extends Controller
 {
-    public function index(Channel $channel)
+    public function index(Request $request, Channel $channel)
     {
+        abort_unless($channel->isVisibleTo($request->user()), 403, 'No tienes acceso a este canal.');
+
         $messages = $channel->messages()
             ->with(['user:id,name,role', 'replies.user:id,name,role'])
             ->whereNull('parent_id')
@@ -23,6 +25,8 @@ class ChannelMessageController extends Controller
 
     public function store(Request $request, Channel $channel)
     {
+        abort_unless($channel->isVisibleTo($request->user()), 403, 'No tienes acceso a este canal.');
+
         $data = $request->validate([
             'content'   => 'required|string',
             'parent_id' => 'nullable|exists:channel_messages,id',

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleActivityController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Http\Controllers\Api\SystemConfigurationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\EvidenceLinkController;
 use App\Http\Controllers\Api\WorkspaceController;
@@ -96,6 +97,27 @@ Route::middleware('auth:sanctum')->group(function () {
         // Parámetros del sistema (salud, capacidad)
         Route::get('settings', [SystemSettingController::class, 'index']);
         Route::put('settings', [SystemSettingController::class, 'update']);
+
+        // Configuración avanzada dinámica
+        Route::get('config/roles', [SystemConfigurationController::class, 'getRoles']);
+        Route::post('config/roles', [SystemConfigurationController::class, 'storeRole']);
+        Route::put('config/roles/{slug}', [SystemConfigurationController::class, 'updateRole']);
+        Route::delete('config/roles/{slug}', [SystemConfigurationController::class, 'destroyRole']);
+
+        Route::get('config/permissions', [SystemConfigurationController::class, 'getPermissions']);
+        Route::put('config/permissions', [SystemConfigurationController::class, 'updatePermissions']);
+
+        Route::get('config/statuses', [SystemConfigurationController::class, 'getStatuses']);
+        Route::post('config/statuses', [SystemConfigurationController::class, 'storeStatus']);
+        Route::put('config/statuses/{id}', [SystemConfigurationController::class, 'updateStatus']);
+        Route::delete('config/statuses/{id}', [SystemConfigurationController::class, 'destroyStatus']);
+
+        Route::get('config/transitions', [SystemConfigurationController::class, 'getTransitions']);
+        Route::post('config/transitions', [SystemConfigurationController::class, 'storeTransition']);
+        Route::delete('config/transitions/{id}', [SystemConfigurationController::class, 'destroyTransition']);
+
+        Route::get('config/visibility-rules', [SystemConfigurationController::class, 'getVisibilityRules']);
+        Route::put('config/visibility-rules', [SystemConfigurationController::class, 'updateVisibilityRules']);
     });
 
     // Usuarios: lectura para gestión de asignaciones; escritura solo admin.
@@ -143,14 +165,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // Canales de colaboración (todos los roles autenticados)
     Route::get('channels', [ChannelController::class, 'index']);
     Route::get('channels/{channel}', [ChannelController::class, 'show']);
+    Route::get('channels/{channel}/members', [ChannelController::class, 'members']);
     Route::post('channels/{channel}/join', [ChannelController::class, 'join']);
     Route::post('channels/{channel}/read', [ChannelController::class, 'markRead']);
     Route::get('channels/{channel}/messages', [ChannelMessageController::class, 'index']);
     Route::post('channels/{channel}/messages', [ChannelMessageController::class, 'store']);
     Route::delete('channels/{channel}/messages/{message}', [ChannelMessageController::class, 'destroy']);
 
-    // Solo admin/coordinator pueden crear canales
+    // Administración de canales: solo admin/coordinator
     Route::middleware('role:admin,coordinator')->group(function () {
         Route::post('channels', [ChannelController::class, 'store']);
+        Route::put('channels/{channel}', [ChannelController::class, 'update']);
+        Route::delete('channels/{channel}', [ChannelController::class, 'destroy']);
+        Route::post('channels/{channel}/members', [ChannelController::class, 'addMember']);
+        Route::delete('channels/{channel}/members/{user}', [ChannelController::class, 'removeMember']);
     });
 });

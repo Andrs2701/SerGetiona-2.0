@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign } from 'lucide-react';
+import { MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign, Lock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { Channel, ChannelMessage, User } from '@/lib/types';
 import Modal from '@/components/Modal';
+import ChannelMembersModal from '@/components/ChannelMembersModal';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function formatTime(iso: string) {
@@ -103,7 +104,12 @@ export default function ColaboracionPage() {
   // New channel modal
   const [newOpen, setNewOpen]   = useState(false);
   const [newName, setNewName]   = useState('');
+  const [newIsPrivate, setNewIsPrivate] = useState(false);
+  const [newMemberIds, setNewMemberIds] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
+
+  // Members management modal
+  const [membersChannel, setMembersChannel] = useState<Channel | null>(null);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -210,8 +216,15 @@ export default function ColaboracionPage() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      await api.post('/channels', { name: newName.trim(), type: 'general' });
+      await api.post('/channels', {
+        name: newName.trim(),
+        type: 'general',
+        is_private: newIsPrivate,
+        member_ids: newIsPrivate ? newMemberIds : [],
+      });
       setNewName('');
+      setNewIsPrivate(false);
+      setNewMemberIds([]);
       setNewOpen(false);
       loadChannels();
     } finally {
@@ -254,7 +267,9 @@ export default function ColaboracionPage() {
                     : 'text-gray-600 hover:bg-gray-50'
                 )}
               >
-                <Hash size={13} className="flex-none opacity-60" />
+                {ch.is_private
+                  ? <Lock size={13} className="flex-none opacity-60 text-amber-500" />
+                  : <Hash size={13} className="flex-none opacity-60" />}
                 <span className="flex-1 truncate">{ch.name}</span>
                 {(ch.unread_count ?? 0) > 0 && (
                   <span className="ml-auto text-xs bg-indigo-500 text-white rounded-full px-1.5 py-0.5 leading-none">
@@ -280,7 +295,9 @@ export default function ColaboracionPage() {
         {/* Header */}
         {activeChannel ? (
           <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
-            <Hash size={15} className="text-gray-400" />
+            {activeChannel.is_private
+              ? <Lock size={15} className="text-amber-500" />
+              : <Hash size={15} className="text-gray-400" />}
             <span className="font-semibold text-gray-800 text-sm">{activeChannel.name}</span>
             {activeChannel.project && (
               <>
@@ -288,6 +305,21 @@ export default function ColaboracionPage() {
                 <span className="text-xs text-gray-400">{activeChannel.project.name}</span>
               </>
             )}
+            <button
+              onClick={() => setMembersChannel(activeChannel)}
+              className="ml-auto flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+              title={isManager ? 'Gestionar miembros' : 'Ver miembros'}
+            >
+              <Users size={14} />
+              <span className="hidden sm:inline">
+                {isManager ? 'Gestionar miembros' : 'Miembros'}
+              </span>
+              {typeof activeChannel.member_count === 'number' && (
+                <span className="bg-gray-100 rounded-full px-1.5 py-0.5 leading-none">
+                  {activeChannel.member_count}
+                </span>
+              )}
+            </button>
           </div>
         ) : (
           <div className="px-5 py-3 border-b border-gray-100" />
@@ -427,20 +459,71 @@ export default function ColaboracionPage() {
           </>
         }
       >
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del canal</label>
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
-            placeholder="ej: diseño-general, qa-revisiones"
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            autoFocus
-          />
-          <p className="text-xs text-gray-400 mt-1.5">Usa guiones en lugar de espacios.</p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del canal</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
+              placeholder="ej: diseño-general, qa-revisiones"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              autoFocus
+            />
+            <p className="text-xs text-gray-400 mt-1.5">Usa guiones en lugar de espacios.</p>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={newIsPrivate}
+              onChange={(e) => setNewIsPrivate(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <Lock size={13} className="text-amber-500" />
+            Canal privado (solo los miembros que agregues podrán verlo)
+          </label>
+
+          {newIsPrivate && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Miembros iniciales</label>
+              <div className="space-y-1.5 max-h-44 overflow-y-auto border border-gray-100 rounded-lg p-3">
+                {allUsers
+                  .filter((u) => u.id !== user?.id)
+                  .map((u) => (
+                    <label key={u.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={newMemberIds.includes(u.id)}
+                        onChange={(e) =>
+                          setNewMemberIds((prev) =>
+                            e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id)
+                          )
+                        }
+                        className="rounded border-gray-300"
+                      />
+                      {u.name}
+                    </label>
+                  ))}
+                {allUsers.length === 0 && (
+                  <p className="text-xs text-gray-400">No hay usuarios disponibles.</p>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">Tú quedas incluido automáticamente.</p>
+            </div>
+          )}
         </div>
       </Modal>
+
+      {/* Members management modal */}
+      <ChannelMembersModal
+        channel={membersChannel}
+        canManage={isManager}
+        allUsers={allUsers}
+        onClose={() => setMembersChannel(null)}
+        onChanged={loadChannels}
+      />
     </div>
   );
 }

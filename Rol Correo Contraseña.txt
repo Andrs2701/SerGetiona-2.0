@@ -1,9 +1,0 @@
-Rol	Correo	Contraseña
-Administrador	admin@sergestiona.co	password
-Coordinador	coordinador@sergestiona.co	password
-Experto	experto1@sergestiona.co	password
-Pedagogía	pedagogia@sergestiona.co	password
-Diseño	disenio@sergestiona.co	password
-Audiovisual	audiovisual@sergestiona.co	password
-Ingeniería	ingenieria@sergestiona.co	password
-Calidad	calidad@sergestiona.co	password

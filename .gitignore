@@ -12,3 +12,9 @@ backend/database/database.sqlite
 # OS
 .DS_Store
 Thumbs.db
+
+# Tool internals
+.claude/
+
+# Archivos sensibles
+*.txt

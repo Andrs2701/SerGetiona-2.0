@@ -11,6 +11,10 @@ class ResourceAccess
 {
     public static function isManager(User $user): bool
     {
+        $rule = \App\Models\VisibilityRule::where('role_slug', $user->role)->first();
+        if ($rule) {
+            return $rule->scope === 'all';
+        }
         return in_array($user->role, ['admin', 'coordinator'], true);
     }
 
