@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Eye, EyeOff, CheckCircle2, AlertCircle,
   Mail, Phone, Shield, CheckCheck, AlertTriangle, TrendingUp,
-  Camera, User, Briefcase, MapPin, Save,
+  Camera, User, Briefcase, MapPin, Save, Sun, Moon, Monitor,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { api, ENDPOINTS } from '@/lib/api';
 import { USER_ROLE_LABELS } from '@/lib/types';
 import type { WorkspaceStats } from '@/lib/types';
@@ -24,26 +25,24 @@ function getStrength(pwd: string): { label: string; color: string; width: string
   if (/[A-Z]/.test(pwd)) score++;
   if (/[0-9]/.test(pwd)) score++;
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
-
   if (score <= 2) return { label: 'Débil', color: 'bg-red-400', width: '33%' };
   if (score <= 3) return { label: 'Media', color: 'bg-amber-400', width: '66%' };
   return { label: 'Fuerte', color: 'bg-emerald-500', width: '100%' };
 }
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
-  admin: 'bg-red-100 text-red-700',
-  coordinator: 'bg-purple-100 text-purple-700',
-  expert: 'bg-blue-100 text-blue-700',
-  pedagogy: 'bg-teal-100 text-teal-700',
-  design: 'bg-pink-100 text-pink-700',
-  audiovisual: 'bg-orange-100 text-orange-700',
-  engineering: 'bg-indigo-100 text-indigo-700',
-  qa: 'bg-emerald-100 text-emerald-700',
+  admin:        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  coordinator:  'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  expert:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  pedagogy:     'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  design:       'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  audiovisual:  'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  engineering:  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+  qa:           'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
 };
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
 
-// Mock compliance history (last 6 months) — replace with real endpoint when available
 function getMockHistory(): number[] {
   return [72, 85, 68, 90, 78, 88];
 }
@@ -53,6 +52,7 @@ function getMockHistory(): number[] {
 // ─────────────────────────────────────────────
 export default function PerfilPage() {
   const { user, changePassword } = useAuthContext();
+  const { theme, setTheme } = useTheme();
 
   // ── Avatar / photo ──
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,12 +82,10 @@ export default function PerfilPage() {
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Populate form from user
   useEffect(() => {
     if (user) {
       setFullName(user.name ?? '');
       setPhone(user.phone ?? '');
-      // position and department may not exist on User type; default to empty
       setPosition((user as unknown as Record<string, string>).position ?? '');
       setDepartment((user as unknown as Record<string, string>).department ?? '');
     }
@@ -115,24 +113,20 @@ export default function PerfilPage() {
   const history = getMockHistory();
   const maxBar = Math.max(...history, 1);
 
-  const currentMonth = new Date().getMonth(); // 0-indexed
+  const currentMonth = new Date().getMonth();
   const monthLabels = Array.from({ length: 6 }, (_, i) => {
     const idx = (currentMonth - 5 + i + 12) % 12;
     return MONTH_LABELS[idx] ?? MONTH_LABELS[i] ?? '';
   });
 
-  // ── Photo handler ──
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setPhotoPreview(ev.target?.result as string);
-    };
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
   }
 
-  // ── Save personal data ──
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -140,12 +134,7 @@ export default function PerfilPage() {
     setProfileSuccess(false);
     setSavingProfile(true);
     try {
-      await api.put(ENDPOINTS.USER(user.id), {
-        name: fullName,
-        position,
-        phone,
-        department,
-      });
+      await api.put(ENDPOINTS.USER(user.id), { name: fullName, position, phone, department });
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch {
@@ -155,28 +144,17 @@ export default function PerfilPage() {
     }
   }
 
-  // ── Password handler ──
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setSuccess(false);
-
-    if (newPwd !== confirm) {
-      setError('La nueva contraseña y la confirmación no coinciden.');
-      return;
-    }
-    if (newPwd.length < 8) {
-      setError('La nueva contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
-
+    if (newPwd !== confirm) { setError('La nueva contraseña y la confirmación no coinciden.'); return; }
+    if (newPwd.length < 8) { setError('La nueva contraseña debe tener al menos 8 caracteres.'); return; }
     setLoading(true);
     try {
       await changePassword(current, newPwd, confirm);
       setSuccess(true);
-      setCurrent('');
-      setNewPwd('');
-      setConfirm('');
+      setCurrent(''); setNewPwd(''); setConfirm('');
     } catch {
       setError('No se pudo actualizar la contraseña. Verifica que la contraseña actual sea correcta.');
     } finally {
@@ -184,11 +162,21 @@ export default function PerfilPage() {
     }
   }
 
+  const themeOptions: { value: Theme; label: string; desc: string; Icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+    { value: 'light',  label: 'Claro',   desc: 'Fondo blanco, texto oscuro',    Icon: Sun },
+    { value: 'dark',   label: 'Oscuro',  desc: 'Fondo oscuro, texto claro',     Icon: Moon },
+    { value: 'system', label: 'Sistema', desc: 'Sigue la preferencia del SO',   Icon: Monitor },
+  ];
+
+  const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500';
+  const labelCls = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5';
+  const cardCls  = 'bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700';
+
   return (
     <div className="p-4 md:p-6 max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Gestiona tu información personal y seguridad</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Gestiona tu información personal y seguridad</p>
       </div>
 
       {/* ── 2-column layout ── */}
@@ -198,9 +186,8 @@ export default function PerfilPage() {
         <div className="space-y-6">
 
           {/* Avatar card */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className={`${cardCls} p-6`}>
             <div className="flex flex-col items-center gap-4">
-              {/* Avatar circle */}
               <div className="relative">
                 <div
                   className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md overflow-hidden"
@@ -215,45 +202,36 @@ export default function PerfilPage() {
                 </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-gray-200 shadow flex items-center justify-center text-gray-500 hover:text-gray-700 hover:shadow-md transition-all"
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:shadow-md transition-all"
                 >
                   <Camera size={13} />
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handlePhotoChange}
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
               </div>
 
               <div className="text-center">
-                <h2 className="text-lg font-bold text-gray-900">{user?.name ?? '—'}</h2>
-                <span
-                  className={clsx(
-                    'inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                    ROLE_BADGE_COLORS[user?.role ?? 'admin'] ?? 'bg-gray-100 text-gray-600'
-                  )}
-                >
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">{user?.name ?? '—'}</h2>
+                <span className={clsx(
+                  'inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                  ROLE_BADGE_COLORS[user?.role ?? 'admin'] ?? 'bg-gray-100 text-gray-600'
+                )}>
                   {user ? USER_ROLE_LABELS[user.role] : '—'}
                 </span>
               </div>
 
-              {/* Quick info */}
-              <div className="w-full space-y-2 border-t border-gray-100 pt-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail size={14} className="text-gray-400 flex-shrink-0" />
+              <div className="w-full space-y-2 border-t border-gray-100 dark:border-gray-700 pt-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Mail size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
                   <span className="truncate">{user?.email ?? '—'}</span>
                 </div>
                 {user?.phone && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone size={14} className="text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <Phone size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
                     <span>{user.phone}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Shield size={14} className="text-gray-400 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <Shield size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
                   <span>Cuenta activa</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 </div>
@@ -262,20 +240,20 @@ export default function PerfilPage() {
           </div>
 
           {/* Personal data form */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className={`${cardCls} p-5`}>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <User size={16} className="text-indigo-500" />
               Datos Personales
             </h2>
 
             {profileSuccess && (
-              <div className="mb-4 flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <div className="mb-4 flex items-start gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-lg p-3">
                 <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
                 <span>¡Cambios guardados exitosamente!</span>
               </div>
             )}
             {profileError && (
-              <div className="mb-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="mb-4 flex items-start gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg p-3">
                 <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
                 <span>{profileError}</span>
               </div>
@@ -283,7 +261,7 @@ export default function PerfilPage() {
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre completo</label>
+                <label className={labelCls}>Nombre completo</label>
                 <div className="relative">
                   <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -291,13 +269,13 @@ export default function PerfilPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Tu nombre completo"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pl-8`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Cargo</label>
+                <label className={labelCls}>Cargo</label>
                 <div className="relative">
                   <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -305,13 +283,13 @@ export default function PerfilPage() {
                     value={position}
                     onChange={(e) => setPosition(e.target.value)}
                     placeholder="Ej. Coordinador de contenidos"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pl-8`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className={labelCls}>
                   Correo electrónico <span className="text-gray-400 font-normal text-xs">(no editable)</span>
                 </label>
                 <div className="relative">
@@ -320,13 +298,13 @@ export default function PerfilPage() {
                     type="email"
                     value={user?.email ?? ''}
                     readOnly
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Teléfono</label>
+                <label className={labelCls}>Teléfono</label>
                 <div className="relative">
                   <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -334,13 +312,13 @@ export default function PerfilPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+57 300 000 0000"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pl-8`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Área / Departamento</label>
+                <label className={labelCls}>Área / Departamento</label>
                 <div className="relative">
                   <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -348,7 +326,7 @@ export default function PerfilPage() {
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     placeholder="Ej. Producción académica"
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pl-8`}
                   />
                 </div>
               </div>
@@ -366,12 +344,57 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        {/* RIGHT — stats + history + flow + password */}
+        {/* RIGHT — apariencia + stats + history + flow + password */}
         <div className="space-y-6">
 
+          {/* Apariencia */}
+          <div className={`${cardCls} p-5`}>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <Sun size={16} className="text-indigo-500" />
+              Apariencia
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Elige cómo se ve la plataforma</p>
+
+            <div className="grid grid-cols-3 gap-3">
+              {themeOptions.map(({ value, label, desc, Icon }) => {
+                const active = theme === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    className={clsx(
+                      'flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center',
+                      active
+                        ? 'border-[#194276] bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
+                      active
+                        ? 'text-white'
+                        : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700'
+                    )}
+                      style={active ? { background: '#194276' } : undefined}
+                    >
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <p className={clsx(
+                        'text-xs font-semibold',
+                        active ? 'text-[#194276] dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
+                      )}>{label}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">{desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Stats */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className={`${cardCls} p-5`}>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <TrendingUp size={16} className="text-indigo-500" />
               Mis Estadísticas
             </h2>
@@ -382,38 +405,40 @@ export default function PerfilPage() {
             ) : stats ? (
               <>
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <CheckCheck size={18} className="text-emerald-600 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-emerald-700">{stats.completed}</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Completadas</p>
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 text-center">
+                    <CheckCheck size={18} className="text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{stats.completed}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Completadas</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <AlertTriangle size={18} className="text-red-500 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-red-600">{stats.overdue}</p>
-                    <p className="text-xs text-red-500 mt-0.5">Vencidas</p>
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+                    <AlertTriangle size={18} className="text-red-500 dark:text-red-400 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-red-600 dark:text-red-400">{stats.overdue}</p>
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">Vencidas</p>
                   </div>
-                  <div className="bg-amber-50 rounded-lg p-3 text-center">
-                    <AlertCircle size={18} className="text-amber-500 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-amber-600">{stats.approaching}</p>
-                    <p className="text-xs text-amber-500 mt-0.5">Por vencer</p>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                    <AlertCircle size={18} className="text-amber-500 dark:text-amber-400 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.approaching}</p>
+                    <p className="text-xs text-amber-500 dark:text-amber-400 mt-0.5">Por vencer</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
                     <Shield size={18} className="text-gray-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-gray-700">{stats.pending}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Pendientes</p>
+                    <p className="text-xl font-bold text-gray-700 dark:text-gray-300">{stats.pending}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pendientes</p>
                   </div>
                 </div>
 
                 {/* Compliance bar */}
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-gray-500 font-medium">% Cumplimiento personal</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">% Cumplimiento personal</span>
                     <span className={clsx(
                       'text-sm font-bold',
-                      compliance >= 80 ? 'text-emerald-600' : compliance >= 50 ? 'text-amber-600' : 'text-red-500'
+                      compliance >= 80 ? 'text-emerald-600 dark:text-emerald-400'
+                        : compliance >= 50 ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-500 dark:text-red-400'
                     )}>{compliance}%</span>
                   </div>
-                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className={clsx(
                         'h-full rounded-full transition-all',
@@ -424,9 +449,9 @@ export default function PerfilPage() {
                   </div>
                 </div>
 
-                {/* Compliance history — 6 vertical bars */}
+                {/* Compliance history */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-3">Historial de cumplimiento (últimos 6 meses)</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Historial de cumplimiento (últimos 6 meses)</p>
                   <div className="flex items-end gap-2 h-16">
                     {history.map((val, i) => (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -438,21 +463,21 @@ export default function PerfilPage() {
                           style={{ height: `${(val / maxBar) * 52}px` }}
                           title={`${val}%`}
                         />
-                        <span className="text-[9px] text-gray-400">{monthLabels[i]}</span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500">{monthLabels[i]}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-400 text-center py-4">No disponible para tu rol</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No disponible para tu rol</p>
             )}
           </div>
 
           {/* Role in flow */}
           {user && !['admin', 'coordinator'].includes(user.role) && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className={`${cardCls} p-5`}>
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <TrendingUp size={16} className="text-indigo-500" />
                 Rol en el flujo de producción
               </h2>
@@ -464,9 +489,7 @@ export default function PerfilPage() {
                       <div
                         className={clsx(
                           'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all',
-                          isMe
-                            ? 'text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-500'
+                          isMe ? 'text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                         )}
                         style={isMe ? { background: '#194276' } : undefined}
                       >
@@ -474,34 +497,34 @@ export default function PerfilPage() {
                         {USER_ROLE_LABELS[r]}
                       </div>
                       {i < arr.length - 1 && (
-                        <span className="text-gray-300 text-xs">›</span>
+                        <span className="text-gray-300 dark:text-gray-600 text-xs">›</span>
                       )}
                     </div>
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-400 mt-3">
-                Tu etapa es <span className="font-medium text-gray-600">{USER_ROLE_LABELS[user.role]}</span> (paso {(['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'] as const).indexOf(user.role as 'expert' | 'pedagogy' | 'design' | 'audiovisual' | 'engineering' | 'qa') + 1} de 6).
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+                Tu etapa es <span className="font-medium text-gray-600 dark:text-gray-300">{USER_ROLE_LABELS[user.role]}</span>{' '}
+                (paso {(['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'] as const).indexOf(user.role as 'expert' | 'pedagogy' | 'design' | 'audiovisual' | 'engineering' | 'qa') + 1} de 6).
               </p>
             </div>
           )}
 
           {/* Change password */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <div className={`${cardCls} p-5`}>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
               <Shield size={16} className="text-indigo-500" />
               Cambiar contraseña
             </h2>
 
             {success && (
-              <div className="mb-5 flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <div className="mb-5 flex items-start gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-lg p-3">
                 <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
                 <span>¡Contraseña actualizada exitosamente!</span>
               </div>
             )}
-
             {error && (
-              <div className="mb-5 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="mb-5 flex items-start gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-lg p-3">
                 <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -509,7 +532,7 @@ export default function PerfilPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña actual</label>
+                <label className={labelCls}>Contraseña actual</label>
                 <div className="relative">
                   <input
                     type={showCurrent ? 'text' : 'password'}
@@ -517,16 +540,16 @@ export default function PerfilPage() {
                     onChange={(e) => setCurrent(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="w-full px-3 py-2 pr-10 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pr-10`}
                   />
-                  <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                     {showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nueva contraseña</label>
+                <label className={labelCls}>Nueva contraseña</label>
                 <div className="relative">
                   <input
                     type={showNew ? 'text' : 'password'}
@@ -534,29 +557,26 @@ export default function PerfilPage() {
                     onChange={(e) => setNewPwd(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="w-full px-3 py-2 pr-10 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`${inputCls} pr-10`}
                   />
-                  <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                     {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {newPwd.length > 0 && (
                   <div className="mt-2">
-                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={clsx('h-full rounded-full transition-all', strength.color)}
-                        style={{ width: strength.width }}
-                      />
+                    <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className={clsx('h-full rounded-full transition-all', strength.color)} style={{ width: strength.width }} />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Fortaleza: <span className="font-medium text-gray-700">{strength.label}</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Fortaleza: <span className="font-medium text-gray-700 dark:text-gray-300">{strength.label}</span>
                     </p>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmar nueva contraseña</label>
+                <label className={labelCls}>Confirmar nueva contraseña</label>
                 <div className="relative">
                   <input
                     type={showConfirm ? 'text' : 'password'}
@@ -565,16 +585,17 @@ export default function PerfilPage() {
                     required
                     placeholder="••••••••"
                     className={clsx(
-                      'w-full px-3 py-2 pr-10 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
-                      confirm.length > 0 && confirm !== newPwd ? 'border-red-300' : 'border-gray-200'
+                      inputCls,
+                      'pr-10',
+                      confirm.length > 0 && confirm !== newPwd ? 'border-red-300 dark:border-red-600' : ''
                     )}
                   />
-                  <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                     {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
                 {confirm.length > 0 && confirm !== newPwd && (
-                  <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden.</p>
+                  <p className="text-xs text-red-500 dark:text-red-400 mt-1">Las contraseñas no coinciden.</p>
                 )}
               </div>
 

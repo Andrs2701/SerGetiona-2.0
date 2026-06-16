@@ -34,15 +34,15 @@ function daysLeftLabel(date: string): { label: string; cls: string } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((new Date(date + 'T00:00:00').getTime() - today.getTime()) / 86400000);
-  if (diff < 0) return { label: `Vencida hace ${Math.abs(diff)}d`, cls: 'text-red-600 font-semibold' };
-  if (diff === 0) return { label: 'Vence hoy', cls: 'text-amber-600 font-semibold' };
-  if (diff <= 5) return { label: `En ${diff}d`, cls: 'text-amber-600' };
-  return { label: `En ${diff}d`, cls: 'text-gray-400' };
+  if (diff < 0) return { label: `Vencida hace ${Math.abs(diff)}d`, cls: 'text-red-600 dark:text-red-400 font-semibold' };
+  if (diff === 0) return { label: 'Vence hoy', cls: 'text-amber-600 dark:text-amber-400 font-semibold' };
+  if (diff <= 5) return { label: `En ${diff}d`, cls: 'text-amber-600 dark:text-amber-400' };
+  return { label: `En ${diff}d`, cls: 'text-gray-400 dark:text-gray-500' };
 }
 
 function startOfWeek(d: Date): Date {
   const r = new Date(d);
-  const day = (r.getDay() + 6) % 7; // lunes = 0
+  const day = (r.getDay() + 6) % 7;
   r.setDate(r.getDate() - day);
   r.setHours(0, 0, 0, 0);
   return r;
@@ -59,7 +59,6 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
     if (!user) return;
     try {
       if (isManager) {
-        // El endpoint devuelve un array plano de actividades
         const res = await api.get<AllActivity[] | { activities: AllActivity[] }>(ENDPOINTS.CALENDAR_ALL_ACTIVITIES);
         const list = Array.isArray(res) ? res : res.activities ?? [];
         setItems(
@@ -103,19 +102,16 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
 
   const active = items.filter((i) => !DONE_STATUSES.includes(i.status));
 
-  // Top 5 próximos vencimientos (con fecha, no vencidas)
   const upcoming = active
     .filter((i) => i.date && i.dateStatus !== 'overdue')
     .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
     .slice(0, 5);
 
-  // Críticas: vencidas
   const critical = active
     .filter((i) => i.dateStatus === 'overdue')
     .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
     .slice(0, 5);
 
-  // Resumen semanal
   const weekStart = startOfWeek(new Date());
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
@@ -130,15 +126,15 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
   const detailHref = isManager ? '/seguimiento' : '/mi-espacio';
 
   return (
-    <aside className="hidden xl:flex w-72 flex-none flex-col border-l border-gray-200 bg-white overflow-y-auto">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-        <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+    <aside className="hidden xl:flex w-72 flex-none flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
           <CalendarClock size={15} className="text-indigo-500" />
           {isManager ? 'Panorama del equipo' : 'Mi día'}
         </h3>
         <button
           onClick={onClose}
-          className="text-gray-300 hover:text-gray-500 transition-colors"
+          className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
           title="Ocultar panel"
         >
           <X size={15} />
@@ -148,32 +144,32 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
       {loading ? (
         <div className="p-4 space-y-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse" />
+            <div key={i} className="h-12 bg-gray-50 dark:bg-gray-700 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : (
         <div className="p-4 space-y-6">
           {/* Resumen semanal */}
           <section>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
               <TrendingUp size={12} />
               Resumen semanal
             </h4>
-            <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-              <div className="flex justify-between text-xs text-gray-600">
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 space-y-2">
+              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
                 <span>Programadas</span>
                 <strong>{inWeek.length}</strong>
               </div>
-              <div className="flex justify-between text-xs text-gray-600">
+              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-300">
                 <span>Entregadas</span>
-                <strong className="text-emerald-600">{weekDone}</strong>
+                <strong className="text-emerald-600 dark:text-emerald-400">{weekDone}</strong>
               </div>
               <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <span>Cumplimiento</span>
-                  <span className="font-semibold text-gray-700">{weekPct}%</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-200">{weekPct}%</span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
                   <div
                     className={clsx(
                       'h-full rounded-full transition-all',
@@ -189,7 +185,7 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
           {/* Críticas */}
           {critical.length > 0 && (
             <section>
-              <h4 className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+              <h4 className="text-xs font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1">
                 <AlertTriangle size={12} />
                 Críticas / vencidas
               </h4>
@@ -198,10 +194,10 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
                   <Link
                     key={i.id}
                     href={detailHref}
-                    className="block bg-red-50/60 border border-red-100 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors"
+                    className="block bg-red-50/60 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-lg px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                   >
-                    <p className="text-xs font-medium text-gray-800 truncate">{i.title}</p>
-                    <p className="text-[10px] text-gray-500 truncate">{i.subtitle}</p>
+                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{i.title}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{i.subtitle}</p>
                     {i.date && (
                       <p className={clsx('text-[10px] mt-0.5', daysLeftLabel(i.date).cls)}>
                         {daysLeftLabel(i.date).label}
@@ -215,12 +211,12 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
 
           {/* Próximos vencimientos */}
           <section>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
               <CalendarClock size={12} />
               Próximos vencimientos
             </h4>
             {upcoming.length === 0 ? (
-              <p className="text-xs text-gray-400 flex items-center gap-1.5 bg-gray-50 rounded-lg px-3 py-3">
+              <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-3">
                 <CheckCircle2 size={13} className="text-emerald-400" />
                 Sin entregas próximas. ¡Al día!
               </p>
@@ -230,10 +226,10 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
                   <Link
                     key={i.id}
                     href={detailHref}
-                    className="block border border-gray-100 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                    className="block border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
-                    <p className="text-xs font-medium text-gray-800 truncate">{i.title}</p>
-                    <p className="text-[10px] text-gray-500 truncate">{i.subtitle}</p>
+                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{i.title}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{i.subtitle}</p>
                     {i.date && (
                       <p className={clsx('text-[10px] mt-0.5', daysLeftLabel(i.date).cls)}>
                         {daysLeftLabel(i.date).label} · {new Date(i.date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}

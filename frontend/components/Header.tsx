@@ -21,15 +21,15 @@ function timeAgo(dateStr: string): string {
 }
 
 function notifIcon(type: string) {
-  if (type === 'task_assigned')       return '📋';
-  if (type === 'status_changed')      return '🔄';
-  if (type === 'date_changed')        return '📅';
+  if (type === 'task_assigned')         return '📋';
+  if (type === 'status_changed')        return '🔄';
+  if (type === 'date_changed')          return '📅';
   if (type === 'adjustments_requested') return '↩️';
-  if (type === 'activity_modified')   return '✏️';
-  if (type === 'next_in_chain')       return '▶️';
-  if (type === 'deadline_approaching') return '⏰';
-  if (type === 'overdue')             return '🔴';
-  if (type === 'comment_added')       return '💬';
+  if (type === 'activity_modified')     return '✏️';
+  if (type === 'next_in_chain')         return '▶️';
+  if (type === 'deadline_approaching')  return '⏰';
+  if (type === 'overdue')               return '🔴';
+  if (type === 'comment_added')         return '💬';
   return '🔔';
 }
 
@@ -66,43 +66,29 @@ export default function Header({
       .catch(() => {});
   }
 
-  // Initial load + poll every 30 s
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30_000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
-      }
-      if (userRef.current && !userRef.current.contains(e.target as Node)) {
-        setUserOpen(false);
-      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
   async function markAllRead() {
-    try {
-      await api.post(ENDPOINTS.NOTIFICATION_READ_ALL, {});
-    } catch {
-      // ignore
-    }
+    try { await api.post(ENDPOINTS.NOTIFICATION_READ_ALL, {}); } catch { /* ignore */ }
     setNotifications((prev) => prev.map((n) => ({ ...n, read_at: new Date().toISOString() })));
     setUnread(0);
   }
 
   async function markRead(id: number) {
-    try {
-      await api.post(ENDPOINTS.NOTIFICATION_READ(id), {});
-    } catch {
-      // ignore
-    }
+    try { await api.post(ENDPOINTS.NOTIFICATION_READ(id), {}); } catch { /* ignore */ }
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
     );
@@ -114,7 +100,7 @@ export default function Header({
     : 'US';
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+    <header className="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
       {/* Left: sidebar toggle + title */}
       <div className="flex items-center gap-2">
         {onToggleLeftSidebar && (
@@ -123,28 +109,27 @@ export default function Header({
             className={clsx(
               'hidden md:block p-2 rounded-lg transition-colors',
               leftSidebarOpen
-                ? 'text-gray-500 hover:bg-gray-100'
-                : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                ? 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                : 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
             )}
             title={leftSidebarOpen ? 'Ocultar menú lateral' : 'Mostrar menú lateral'}
           >
             <PanelLeft size={18} />
           </button>
         )}
-        {title && <h2 className="text-base font-semibold text-gray-800">{title}</h2>}
+        {title && <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>}
       </div>
 
       {/* Right: panel toggle + bell + avatar */}
       <div className="flex items-center gap-3">
-        {/* Right sidebar toggle (solo escritorio amplio) */}
         {onToggleRightSidebar && (
           <button
             onClick={onToggleRightSidebar}
             className={clsx(
               'hidden xl:block p-2 rounded-lg transition-colors',
               rightSidebarOpen
-                ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             )}
             title={rightSidebarOpen ? 'Ocultar panel lateral' : 'Mostrar panel lateral'}
           >
@@ -155,8 +140,13 @@ export default function Header({
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
-            onClick={() => { const opening = !notifOpen; setNotifOpen(opening); setUserOpen(false); if (opening) fetchNotifications(); }}
-            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            onClick={() => {
+              const opening = !notifOpen;
+              setNotifOpen(opening);
+              setUserOpen(false);
+              if (opening) fetchNotifications();
+            }}
+            className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Bell size={18} />
             {unread > 0 && (
@@ -167,13 +157,13 @@ export default function Header({
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-12 w-96 bg-white rounded-xl border border-gray-200 shadow-lg z-50">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-900 text-sm">Notificaciones</h3>
+            <div className="absolute right-0 top-12 w-96 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Notificaciones</h3>
                 {unread > 0 && (
                   <button
                     onClick={markAllRead}
-                    className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800"
+                    className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
                   >
                     <CheckCheck size={13} />
                     Marcar todas como leídas
@@ -181,35 +171,40 @@ export default function Header({
                 )}
               </div>
 
-              <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+              <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
                 {notifications.length === 0 && (
-                  <p className="text-center text-sm text-gray-400 py-8">Sin notificaciones</p>
+                  <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">Sin notificaciones</p>
                 )}
                 {notifications.map((n) => (
                   <div
                     key={n.id}
                     onClick={() => !n.read_at && markRead(n.id)}
                     className={clsx(
-                      'px-4 py-3 flex gap-3 cursor-pointer hover:bg-gray-50 transition-colors',
-                      !n.read_at && 'bg-blue-50'
+                      'px-4 py-3 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors',
+                      !n.read_at && 'bg-blue-50 dark:bg-blue-900/20'
                     )}
                   >
                     <span className="text-lg flex-shrink-0">{notifIcon(n.type)}</span>
                     <div className="flex-1 min-w-0">
-                      <p className={clsx('text-sm', !n.read_at ? 'font-semibold text-gray-900' : 'font-medium text-gray-700')}>
+                      <p className={clsx(
+                        'text-sm',
+                        !n.read_at
+                          ? 'font-semibold text-gray-900 dark:text-white'
+                          : 'font-medium text-gray-700 dark:text-gray-300'
+                      )}>
                         {n.title}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-gray-100 px-4 py-2">
+              <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-2">
                 <Link
                   href="/notificaciones"
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
                   onClick={() => setNotifOpen(false)}
                 >
                   Ver todas
@@ -223,29 +218,29 @@ export default function Header({
         <div className="relative" ref={userRef}>
           <button
             onClick={() => { setUserOpen(!userOpen); setNotifOpen(false); }}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
               {initials}
             </div>
             <div className="hidden md:block text-left">
-              <p className="text-xs font-medium text-gray-900 leading-tight">{user?.name ?? 'Usuario'}</p>
-              <p className="text-[10px] text-gray-500 leading-tight">
+              <p className="text-xs font-medium text-gray-900 dark:text-gray-100 leading-tight">{user?.name ?? 'Usuario'}</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
                 {user ? USER_ROLE_LABELS[user.role] : ''}
               </p>
             </div>
-            <ChevronDown size={14} className="text-gray-400" />
+            <ChevronDown size={14} className="text-gray-400 dark:text-gray-500" />
           </button>
 
           {userOpen && (
-            <div className="absolute right-0 top-12 w-52 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1">
-              <div className="px-4 py-2 border-b border-gray-100 mb-1">
-                <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+            <div className="absolute right-0 top-12 w-52 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 py-1">
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
               </div>
               <Link
                 href="/perfil"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => setUserOpen(false)}
               >
                 <User size={15} />
@@ -253,16 +248,16 @@ export default function Header({
               </Link>
               <Link
                 href="/perfil"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => setUserOpen(false)}
               >
                 <KeyRound size={15} />
                 Cambiar contraseña
               </Link>
-              <div className="border-t border-gray-100 mt-1 pt-1">
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
                 <button
                   onClick={() => { setUserOpen(false); logout(); }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full text-left"
                 >
                   <LogOut size={15} />
                   Cerrar sesión
