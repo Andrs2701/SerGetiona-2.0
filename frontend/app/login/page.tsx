@@ -130,8 +130,15 @@ export default function LoginPage() {
       localStorage.setItem('sergestiona_user', JSON.stringify(response.user));
       if (remember) localStorage.setItem('sergestiona_remember', 'true');
       router.push('/');
-    } catch {
-      setError('Correo o contraseña incorrectos. Por favor verifica tus datos.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.startsWith('HTTP 401') || message.startsWith('HTTP 422')) {
+        setError('Correo o contraseña incorrectos. Por favor verifica tus datos.');
+      } else if (message) {
+        setError('No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.');
+      } else {
+        setError('Ocurrió un error inesperado. Intenta de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
