@@ -2,10 +2,13 @@ FROM php:8.2-cli
 
 WORKDIR /app
 
-# Dependencias del sistema — libsqlite3-dev es requerida para pdo_sqlite
+# Dependencias del sistema — libsqlite3-dev (pdo_sqlite), libzip-dev (zip),
+# libpng/libjpeg/freetype (gd, requerida por phpoffice/phpspreadsheet para import/export)
 RUN apt-get update && apt-get install -y \
     zip unzip git curl libzip-dev libsqlite3-dev \
-    && docker-php-ext-install pdo pdo_sqlite zip \
+    libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype \
+    && docker-php-ext-install pdo pdo_sqlite zip gd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Composer
