@@ -16,8 +16,9 @@ services:
         value: "false"
       - key: APP_KEY
         generateValue: true
+      # Fija durante pruebas piloto — cambiar a generateValue: true para producción real
       - key: DEMO_USER_PASSWORD
-        generateValue: true
+        value: password
       - key: SANCTUM_EXPIRATION
         value: "480"
       - key: DB_CONNECTION
