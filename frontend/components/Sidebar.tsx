@@ -8,14 +8,11 @@ import {
   BookOpen,
   FileText,
   Users,
-  BarChart3,
   Settings,
   CalendarDays,
   UserCircle,
-  Gauge,
   ClipboardList,
   MessagesSquare,
-  Activity,
   X,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -63,21 +60,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'coordinator'],
   },
   {
-    href: '/capacidad',
-    label: 'Capacidad',
-    icon: Gauge,
-    roles: ['admin', 'coordinator'],
-  },
-  {
     href: '/decisiones',
     label: 'Decisiones',
     icon: ClipboardList,
-    roles: ['admin', 'coordinator'],
-  },
-  {
-    href: '/seguimiento',
-    label: 'Seguimiento',
-    icon: Activity,
     roles: ['admin', 'coordinator'],
   },
   {
@@ -97,12 +82,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Usuarios',
     icon: Users,
     roles: ['admin'],
-  },
-  {
-    href: '/reportes',
-    label: 'Reportes',
-    icon: BarChart3,
-    roles: ['admin', 'coordinator'],
   },
   {
     href: '/configuracion',
@@ -209,8 +188,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate transition-colors" style={{ color: undefined }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#194276')}
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate transition-colors"
+              onMouseEnter={e => (e.currentTarget.style.color = '#5b8fd6')}
               onMouseLeave={e => (e.currentTarget.style.color = '')}
             >
               {user?.name ?? 'Usuario'}
