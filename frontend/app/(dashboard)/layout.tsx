@@ -66,10 +66,10 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Cargando...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Cargando...</p>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
       />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile header bar with hamburger */}
-        <div className="md:hidden h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 flex-shrink-0">
+        <div className="md:hidden h-14 bg-[var(--header-bg)] border-b border-[var(--header-border)] flex items-center px-4 gap-3 flex-shrink-0">
           <button
             onClick={() => setMobileMenuOpen(true)}
             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
@@ -103,7 +103,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           onToggleLeftSidebar={toggleLeftSidebar}
         />
         <div className="flex-1 flex overflow-hidden min-h-0">
-          <main className="flex-1 overflow-y-auto bg-gray-50 min-w-0">
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 min-w-0 transition-colors">
             {children}
           </main>
           <RightSidebar open={rightOpen} onClose={toggleRightSidebar} />

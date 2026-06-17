@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft } from 'lucide-react';
+import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { api, ENDPOINTS } from '@/lib/api';
@@ -49,6 +50,7 @@ export default function Header({
   onToggleLeftSidebar,
 }: HeaderProps) {
   const { user, logout } = useAuthContext();
+  const { theme, toggleTheme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function Header({
     : 'US';
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+    <header className="h-14 bg-[var(--header-bg)] border-b border-[var(--header-border)] flex items-center justify-between px-6 flex-shrink-0 transition-colors">
       {/* Left: sidebar toggle + title */}
       <div className="flex items-center gap-2">
         {onToggleLeftSidebar && (
@@ -123,15 +125,15 @@ export default function Header({
             className={clsx(
               'hidden md:block p-2 rounded-lg transition-colors',
               leftSidebarOpen
-                ? 'text-gray-500 hover:bg-gray-100'
-                : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                ? 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50'
             )}
             title={leftSidebarOpen ? 'Ocultar menú lateral' : 'Mostrar menú lateral'}
           >
             <PanelLeft size={18} />
           </button>
         )}
-        {title && <h2 className="text-base font-semibold text-gray-800">{title}</h2>}
+        {title && <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>}
       </div>
 
       {/* Right: panel toggle + bell + avatar */}
@@ -143,8 +145,8 @@ export default function Header({
             className={clsx(
               'hidden xl:block p-2 rounded-lg transition-colors',
               rightSidebarOpen
-                ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50'
+                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
             )}
             title={rightSidebarOpen ? 'Ocultar panel lateral' : 'Mostrar panel lateral'}
           >
@@ -152,11 +154,20 @@ export default function Header({
           </button>
         )}
 
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => { const opening = !notifOpen; setNotifOpen(opening); setUserOpen(false); if (opening) fetchNotifications(); }}
-            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
           >
             <Bell size={18} />
             {unread > 0 && (
@@ -167,7 +178,7 @@ export default function Header({
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-12 w-96 bg-white rounded-xl border border-gray-200 shadow-lg z-50">
+            <div className="absolute right-0 top-12 w-96 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-900 text-sm">Notificaciones</h3>
                 {unread > 0 && (
@@ -238,14 +249,14 @@ export default function Header({
           </button>
 
           {userOpen && (
-            <div className="absolute right-0 top-12 w-52 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1">
-              <div className="px-4 py-2 border-b border-gray-100 mb-1">
-                <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+            <div className="absolute right-0 top-12 w-52 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 py-1">
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user?.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
               </div>
               <Link
                 href="/perfil"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => setUserOpen(false)}
               >
                 <User size={15} />
@@ -253,16 +264,24 @@ export default function Header({
               </Link>
               <Link
                 href="/perfil"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => setUserOpen(false)}
               >
                 <KeyRound size={15} />
                 Cambiar contraseña
               </Link>
-              <div className="border-t border-gray-100 mt-1 pt-1">
+              {/* Dark mode toggle inline */}
+              <button
+                onClick={() => { toggleTheme(); }}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors w-full text-left"
+              >
+                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              </button>
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
                 <button
                   onClick={() => { setUserOpen(false); logout(); }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full text-left"
                 >
                   <LogOut size={15} />
                   Cerrar sesión

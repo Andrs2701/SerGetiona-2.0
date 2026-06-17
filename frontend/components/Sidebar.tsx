@@ -149,8 +149,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
     : 'US';
 
   const sidebarInner = (
-    <aside className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
-      <div className="h-14 flex items-center justify-between px-6 border-b border-gray-200 flex-shrink-0">
+    <aside className="w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col transition-colors">
+      <div className="h-14 flex items-center justify-between px-6 border-b border-[var(--sidebar-border)] flex-shrink-0">
         <div className="flex items-baseline gap-1">
           <span className="font-bold text-lg tracking-tight" style={{ color: '#194276' }}>Sergestiona</span>
           <span className="text-xs font-medium text-gray-400">2.0</span>
@@ -178,7 +178,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active
                   ? "text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
               )}
               style={active ? { background: '#194276' } : undefined}
             >
@@ -199,11 +199,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200 flex-shrink-0">
+      <div className="p-4 border-t border-[var(--sidebar-border)] flex-shrink-0">
         <Link
           href="/perfil"
           onClick={onMobileClose}
-          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors group"
+          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
         >
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: '#194276' }}>
             {initials}
@@ -215,7 +215,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
             >
               {user?.name ?? 'Usuario'}
             </p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {user ? USER_ROLE_LABELS[user.role] : ''}
             </p>
           </div>
