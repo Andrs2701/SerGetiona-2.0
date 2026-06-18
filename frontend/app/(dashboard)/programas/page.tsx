@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, BookOpen, AlertTriangle, TrendingDown, Users, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Search, BookOpen, AlertTriangle, TrendingDown, Users, ChevronRight, ArrowLeft, BarChart3, Clock, CheckCircle2, XCircle, Activity, Gauge } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { AcademicProgram, Deliverable, DashboardStats, ProgramBreakdown, RoleActivity, Role } from '@/lib/types';
@@ -69,6 +69,46 @@ function formatDate(iso?: string): string {
 }
 
 // ─── Program card (left panel) ────────────────────────────────────────────────
+type ProgramSort = 'risk' | 'progress' | 'overdue' | 'pending' | 'name';
+
+function riskLevel(pb: ProgramBreakdown): 'critical' | 'risk' | 'healthy' {
+  if (pb.overdue_count > 0 || pb.compliance_percentage < 35) return 'critical';
+  if (pb.pending_count > 0 || pb.compliance_percentage < 75) return 'risk';
+  return 'healthy';
+}
+
+function riskScore(pb: ProgramBreakdown) {
+  return (pb.overdue_count * 12) + (pb.pending_count * 3) + Math.max(0, 100 - pb.compliance_percentage);
+}
+
+function MetricCard({ label, value, tone, icon: Icon, sub }: {
+  label: string;
+  value: string | number;
+  tone: 'blue' | 'red' | 'amber' | 'emerald' | 'slate';
+  icon: React.ElementType;
+  sub?: string;
+}) {
+  const styles = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/30 dark:text-blue-200 dark:border-blue-900/50',
+    red: 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/30 dark:text-red-200 dark:border-red-900/50',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/50',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900/50',
+    slate: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
+  }[tone];
+  return (
+    <div className={clsx('rounded-xl border p-4', styles)}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium opacity-80">{label}</p>
+          <p className="text-2xl font-black mt-1">{value}</p>
+          {sub && <p className="text-[11px] opacity-70 mt-0.5">{sub}</p>}
+        </div>
+        <Icon size={20} className="opacity-70" />
+      </div>
+    </div>
+  );
+}
+
 function ProgramCard({
   pb,
   selected,
@@ -295,6 +335,30 @@ function ProgramDetail({
   }, [deliverables]);
 
   const bottlenecks = useMemo(() => analyzeBottlenecks(deliverables), [deliverables]);
+  const roleDistribution = useMemo(() => ROLE_COLS.map(({ key, abbr }) => ({
+    key,
+    abbr,
+    label: ROLE_LABELS[key],
+    total: deliverables.reduce((sum, d) => sum + (d.role_activities ?? []).filter(a => a.role === key && a.status !== 'not_applicable').length, 0),
+    overdue: deliverables.reduce((sum, d) => sum + (d.role_activities ?? []).filter(a => a.role === key && isOverdue(a)).length, 0),
+  })), [deliverables]);
+  const maxRoleTotal = Math.max(1, ...roleDistribution.map(r => r.total));
+  const responsibleLoad = useMemo(() => {
+    const map = new Map<string, number>();
+    deliverables.forEach(d => (d.role_activities ?? []).forEach(a => {
+      if (a.responsible?.name && a.status !== 'not_applicable') map.set(a.responsible.name, (map.get(a.responsible.name) ?? 0) + 1);
+    }));
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [deliverables]);
+  const nextMilestones = useMemo(() => {
+    const now = new Date();
+    return deliverables
+      .flatMap(d => (d.role_activities ?? []).map(a => ({ deliverable: d.name, role: ROLE_LABELS[a.role], date: a.commitment_date, overdue: isOverdue(a), status: a.status })))
+      .filter(i => i.date && i.status !== 'approved' && i.status !== 'not_applicable')
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .filter(i => i.overdue || new Date(String(i.date)) >= now)
+      .slice(0, 6);
+  }, [deliverables]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -351,6 +415,63 @@ function ProgramDetail({
         </div>
       )}
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+            <BarChart3 size={15} className="text-indigo-500" /> Entregables por rol
+          </h3>
+          <div className="space-y-2">
+            {roleDistribution.map(r => (
+              <div key={r.key}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-600 dark:text-gray-300">{r.label}</span>
+                  <span className={r.overdue > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}>{r.total} {r.overdue > 0 ? `· ${r.overdue} venc.` : ''}</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                  <div className={clsx('h-full rounded-full', r.overdue > 0 ? 'bg-red-500' : 'bg-indigo-500')} style={{ width: `${(r.total / maxRoleTotal) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+            <Users size={15} className="text-indigo-500" /> Responsables con más carga
+          </h3>
+          {responsibleLoad.length === 0 ? <p className="text-xs text-gray-400">Sin responsables asignados.</p> : (
+            <div className="space-y-2">
+              {responsibleLoad.map(([name, count], i) => (
+                <div key={name} className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                  <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate">{name}</span>
+                  <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+            <Clock size={15} className="text-indigo-500" /> Próximos hitos
+          </h3>
+          {nextMilestones.length === 0 ? <p className="text-xs text-gray-400">Sin hitos pendientes.</p> : (
+            <div className="space-y-2">
+              {nextMilestones.map((m, i) => (
+                <div key={`${m.deliverable}-${m.role}-${i}`} className="flex items-start gap-2">
+                  <span className={clsx('mt-1 h-2 w-2 rounded-full shrink-0', m.overdue ? 'bg-red-500' : 'bg-amber-400')} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{m.deliverable}</p>
+                    <p className="text-[11px] text-gray-400">{m.role} · {formatDate(m.date)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Gantt table */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
@@ -406,6 +527,7 @@ export default function ProgramasPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<ProgramSort>('risk');
 
   // Load program list + breakdown
   useEffect(() => {
@@ -453,6 +575,36 @@ export default function ProgramasPage() {
   }, [selectedPb]);
 
   const filtered = useMemo(() => {
+    const base = !search ? breakdown : breakdown.filter(
+      (pb) =>
+        pb.name.toLowerCase().includes(search.toLowerCase()) ||
+        pb.project_name.toLowerCase().includes(search.toLowerCase())
+    );
+    return [...base].sort((a, b) => {
+      if (sortBy === 'risk') return riskScore(b) - riskScore(a);
+      if (sortBy === 'progress') return b.compliance_percentage - a.compliance_percentage;
+      if (sortBy === 'overdue') return b.overdue_count - a.overdue_count;
+      if (sortBy === 'pending') return b.pending_count - a.pending_count;
+      return a.name.localeCompare(b.name);
+    });
+  }, [breakdown, search, sortBy]);
+
+  const summary = useMemo(() => {
+    const total = breakdown.length;
+    const critical = breakdown.filter(pb => riskLevel(pb) === 'critical').length;
+    const risk = breakdown.filter(pb => riskLevel(pb) === 'risk').length;
+    const healthy = breakdown.filter(pb => riskLevel(pb) === 'healthy').length;
+    const overdue = breakdown.reduce((sum, pb) => sum + pb.overdue_count, 0);
+    const pending = breakdown.reduce((sum, pb) => sum + pb.pending_count, 0);
+    const active = breakdown.reduce((sum, pb) => sum + pb.active_count, 0);
+    const avg = total ? Math.round(breakdown.reduce((sum, pb) => sum + pb.compliance_percentage, 0) / total) : 0;
+    return { total, critical, risk, healthy, overdue, pending, active, avg };
+  }, [breakdown]);
+
+  const topRisk = filtered[0];
+
+  /*
+  const filteredLegacy = useMemo(() => {
     if (!search) return breakdown;
     const q = search.toLowerCase();
     return breakdown.filter(
@@ -461,6 +613,7 @@ export default function ProgramasPage() {
         pb.project_name.toLowerCase().includes(q)
     );
   }, [breakdown, search, programs]);
+  */
 
   // Mobile view state: when a program is selected on small screens, hide the list
   const showListOnMobile = !selectedPb;
@@ -473,14 +626,41 @@ export default function ProgramasPage() {
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Programas Académicos' }]}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 lg:gap-5 mt-2 items-start" style={{ minHeight: '70vh' }}>
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-5">
+        <MetricCard label="Programas" value={summary.total} tone="slate" icon={BookOpen} />
+        <MetricCard label="Críticos" value={summary.critical} tone="red" icon={XCircle} />
+        <MetricCard label="En riesgo" value={summary.risk} tone="amber" icon={AlertTriangle} />
+        <MetricCard label="Al día" value={summary.healthy} tone="emerald" icon={CheckCircle2} />
+        <MetricCard label="Vencidos" value={summary.overdue} tone="red" icon={Clock} />
+        <MetricCard label="Pendientes" value={summary.pending} tone="blue" icon={Activity} />
+        <MetricCard label="Avance prom." value={`${summary.avg}%`} tone="blue" icon={Gauge} />
+      </div>
+
+      {topRisk && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/25">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 text-amber-600 dark:text-amber-300" size={18} />
+              <div>
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-100">Prioridad ejecutiva</p>
+                <p className="text-sm text-amber-800 dark:text-amber-200">{topRisk.name} concentra el mayor nivel de riesgo por vencidos, pendientes y avance.</p>
+              </div>
+            </div>
+            <button onClick={() => setSelectedPb(topRisk)} className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700">
+              Revisar programa
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(420px,520px)_1fr] gap-4 lg:gap-5 mt-2 items-start" style={{ minHeight: '70vh' }}>
         {/* ── Left: program list ── */}
         <div className={clsx('flex-col gap-3', showListOnMobile ? 'flex' : 'hidden lg:flex')}>
           {/* Header + counter */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-[#194276] dark:text-indigo-400" />
-              <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Programas</span>
+              <BarChart3 size={16} className="text-[#194276] dark:text-indigo-400" />
+              <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Ranking ejecutivo</span>
             </div>
             <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full px-2 py-0.5">
               {filtered.length}
@@ -498,6 +678,18 @@ export default function ProgramasPage() {
             />
           </div>
 
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as ProgramSort)}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#194276]/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          >
+            <option value="risk">Ordenar por criticidad</option>
+            <option value="overdue">Más vencidos</option>
+            <option value="pending">Más pendientes</option>
+            <option value="progress">Mayor avance</option>
+            <option value="name">Nombre</option>
+          </select>
+
           {/* List */}
           {loadingList ? (
             <div className="space-y-2">
@@ -506,7 +698,7 @@ export default function ProgramasPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-2 overflow-y-auto lg:max-h-[calc(100vh-260px)] pr-1">
+            <div className="space-y-2 overflow-y-auto lg:max-h-[calc(100vh-360px)] pr-1">
               {filtered.map((pb) => (
                 <ProgramCard
                   key={pb.id}

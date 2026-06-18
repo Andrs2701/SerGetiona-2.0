@@ -226,7 +226,7 @@ export default function CapacidadPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Capacidad Operativa"
         subtitle="Carga semanal del equipo según complejidad de entregables"
@@ -250,7 +250,7 @@ export default function CapacidadPage() {
         <div className="space-y-8">
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <KpiCard
               icon={<Gauge size={18} />}
               label="Utilización global"

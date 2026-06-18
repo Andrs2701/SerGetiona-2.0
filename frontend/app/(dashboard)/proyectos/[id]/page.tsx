@@ -264,7 +264,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const flowSteps = selectedActivity ? buildFlowSteps(selectedActivity.deliverable) : [];
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title={proj.name}
         breadcrumbs={[
@@ -276,13 +276,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex gap-1 border-b border-gray-200 mb-6 overflow-x-auto pb-px">
         {(['deliverables', 'programs', 'audit'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={clsx(
-              'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+              'px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
               activeTab === tab
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -298,7 +298,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <div>
           {/* Filters + Export/Import */}
           <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="relative flex-1 max-w-xs">
+            <div className="relative flex-1 min-w-full sm:min-w-[220px] sm:max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 value={search}
@@ -310,7 +310,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <select
               value={filterProgram}
               onChange={(e) => setFilterProgram(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
             >
               <option value="">Todos los programas</option>
               {uniquePrograms.map((p) => (
@@ -322,26 +322,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
             >
               <option value="">Todos los estados</option>
               {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
               <button
                 onClick={() =>
                   downloadCsv(`/export/deliverables?project_id=${projectId}&format=csv`, `entregables_proyecto_${projectId}.csv`).catch(() => {})
                 }
-                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 sm:py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
               >
                 <Download size={14} />
                 Exportar CSV
               </button>
               <button
                 onClick={() => setShowImport(true)}
-                className="flex items-center gap-2 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 border border-indigo-200 text-indigo-700 px-3 py-2 sm:py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors"
               >
                 <Upload size={14} />
                 Importar

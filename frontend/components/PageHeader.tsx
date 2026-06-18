@@ -20,12 +20,12 @@ export default function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="flex items-start justify-between mb-6">
-      <div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6 min-w-0">
+      <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+          <nav className="flex items-center gap-1 text-xs text-gray-500 mb-1 overflow-x-auto pb-1 sm:overflow-visible sm:pb-0">
             {breadcrumbs.map((item, index) => (
-              <span key={index} className="flex items-center gap-1">
+              <span key={index} className="flex items-center gap-1 shrink-0">
                 {index > 0 && <ChevronRight size={12} />}
                 {item.href ? (
                   <Link href={item.href} className="hover:text-indigo-600 transition-colors">
@@ -38,10 +38,10 @@ export default function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{title}</h1>
+        {subtitle && <p className="text-sm text-gray-500 mt-0.5 break-words">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">{actions}</div>}
     </div>
   );
 }

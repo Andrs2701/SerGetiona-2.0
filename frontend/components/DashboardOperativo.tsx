@@ -277,9 +277,9 @@ export default function DashboardOperativo() {
   // ← loading guard MUST come before the null guard
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse h-24" />
           ))}
@@ -296,7 +296,7 @@ export default function DashboardOperativo() {
 
   if (!workspace) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="rounded-xl border border-red-100 bg-red-50 p-5 text-sm text-red-700">
           No fue posible cargar la información operativa.
           <br />
@@ -330,7 +330,7 @@ export default function DashboardOperativo() {
   const userRoleLabel = (USER_ROLE_LABELS as Record<string, string>)[data.role] ?? data.role;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Heading */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -338,7 +338,7 @@ export default function DashboardOperativo() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
         {/* Pendientes */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
           <div className="bg-gray-100 rounded-lg p-2 flex-shrink-0">

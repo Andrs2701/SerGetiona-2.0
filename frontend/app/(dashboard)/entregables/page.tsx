@@ -91,6 +91,15 @@ function isOverdue(d: Deliverable): boolean {
   });
 }
 
+function isApproaching(d: Deliverable): boolean {
+  if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
+  return (d.role_activities ?? []).some(a => {
+    if (a.status === 'not_applicable' || a.status === 'approved') return false;
+    const days = daysUntil(a.commitment_date);
+    return days !== null && days >= 0 && days <= 5;
+  });
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 interface ToastMsg { id: number; message: string; type: 'success' | 'error'; }
@@ -335,7 +344,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
 
 // ─── Group header (shared between views) ──────────────────────────────────────
 
-function GroupHeader({
+function GroupHeaderLegacy({
   programName, projectName, items, groupKey, isCollapsed, onToggle,
 }: {
   programName: string; projectName: string; items: Deliverable[];
@@ -373,6 +382,71 @@ function GroupHeader({
 }
 
 // ─── Delete confirm ───────────────────────────────────────────────────────────
+
+function GroupHeader({
+  programName, projectName, items, groupKey, isCollapsed, onToggle,
+}: {
+  programName: string; projectName: string; items: Deliverable[];
+  groupKey: string; isCollapsed: boolean; onToggle: () => void;
+}) {
+  const overdueCount = items.filter(isOverdue).length;
+  const approachingCount = items.filter(isApproaching).length;
+  const activeCount = items.filter(d => !['finished', 'cancelled'].includes(d.global_status)).length;
+  const totalRelevant = items.reduce((s, d) => s + calcProgressExcNA(d.role_activities ?? []).total, 0);
+  const totalDone = items.reduce((s, d) => s + calcProgressExcNA(d.role_activities ?? []).done, 0);
+  const avg = totalRelevant > 0 ? Math.round((totalDone / totalRelevant) * 100) : 0;
+  const risk = overdueCount > 0 ? 'critical' : approachingCount > 0 || avg < 50 ? 'warning' : 'healthy';
+  const riskLabel = risk === 'critical' ? 'Crítico' : risk === 'warning' ? 'Atención' : 'Al día';
+  const statusLabel = avg >= 100 ? 'Finalizado' : avg > 0 ? 'En progreso' : 'Pendiente';
+
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex flex-col gap-3 px-4 sm:px-5 py-4 hover:bg-gray-50 transition-colors text-left border-b border-gray-100"
+      title={groupKey}
+    >
+      <div className="flex w-full items-start gap-3">
+        <ChevronDown size={16} className={clsx('mt-1 text-gray-400 transition-transform shrink-0 duration-200', isCollapsed && '-rotate-90')} />
+        <span className={clsx('mt-1.5 h-2.5 w-2.5 rounded-full shrink-0',
+          risk === 'critical' ? 'bg-red-500' : risk === 'warning' ? 'bg-amber-400' : 'bg-emerald-500'
+        )} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-gray-900 text-sm break-words">{programName}</span>
+            <span className={clsx('text-[10px] font-bold px-2 py-0.5 rounded-full',
+              risk === 'critical' ? 'bg-red-100 text-red-700' : risk === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+            )}>{riskLabel}</span>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{statusLabel}</span>
+          </div>
+          <p className="text-xs text-gray-500 truncate mt-0.5">{projectName}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={clsx('text-lg font-black leading-none',
+            avg >= 70 ? 'text-emerald-600' : avg >= 40 ? 'text-amber-600' : 'text-red-600'
+          )}>{avg}%</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">avance</p>
+        </div>
+      </div>
+      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5">
+        <span className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">Total <strong className="text-gray-800">{items.length}</strong></span>
+        <span className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">Vencidos <strong>{overdueCount}</strong></span>
+        <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">Próx. vencer <strong>{approachingCount}</strong></span>
+        <span className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Activos <strong>{activeCount}</strong></span>
+        <span className={clsx('rounded-lg px-3 py-2 text-xs font-semibold',
+          risk === 'critical' ? 'bg-red-100 text-red-700' : risk === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'
+        )}>Riesgo {riskLabel}</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+        <div
+          className={clsx('h-full rounded-full',
+            avg >= 70 ? 'bg-emerald-500' : avg >= 40 ? 'bg-amber-400' : 'bg-red-500'
+          )}
+          style={{ width: `${avg}%` }}
+        />
+      </div>
+    </button>
+  );
+}
 
 function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
   return (
@@ -473,20 +547,20 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
     <>
       <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-full sm:w-[540px] max-w-full bg-white dark:bg-gray-800 z-50 shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div>
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
+          <div className="min-w-0">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               {mode === 'create' ? <Plus size={16} style={{ color: '#194276' }} /> : <Pencil size={16} style={{ color: '#194276' }} />}
               {mode === 'create' ? 'Agregar entregable' : 'Editar entregable'}
             </h2>
             {mode === 'edit' && deliverable && (
-              <p className="text-xs text-gray-400 mt-0.5">{deliverable.subject_name} / {deliverable.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5 truncate">{deliverable.subject_name} / {deliverable.name}</p>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 flex-shrink-0"><X size={18} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-5">
           {/* Location */}
           <div className="space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
@@ -580,10 +654,10 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+          <button onClick={onClose} className="w-full sm:w-auto px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
           <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
+            className="w-full sm:w-auto px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
             style={{ background: '#194276' }}>
             {saving
               ? <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</span>
@@ -616,28 +690,28 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
     <>
       <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-full sm:w-[520px] max-w-full bg-white dark:bg-gray-800 z-50 shadow-2xl flex flex-col">
-        <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <div className="flex-1 min-w-0 pr-3">
+        <div className="flex items-start justify-between gap-3 px-4 sm:px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-400 mb-0.5">{deliverable.project_name ?? '—'} · {deliverable.program_name ?? '—'}</p>
             <h2 className="font-bold text-gray-900 text-sm">{deliverable.subject_name ?? '—'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{deliverable.name}</p>
           </div>
-          <button onClick={onClose} className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
-        <div className="flex border-b border-gray-100 px-5">
+        <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
           {(['info', 'flow', 'comments'] as PanelTab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={clsx(
-              'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+              'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
             )}>
               {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : 'Comentarios'}
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {tab === 'info' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Estado</p><StatusBadge status={deliverable.global_status} type="global" /></div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Tipo</p>
                   <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium',
@@ -776,15 +850,15 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-slate-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
             <div>
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Upload size={16} style={{ color: '#194276' }} /> Carga Masiva</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Importa entregables desde un archivo Excel (.xlsx)</p>
+              <h2 className="font-semibold text-gray-900 dark:text-slate-50 flex items-center gap-2"><Upload size={16} className="text-blue-600 dark:text-blue-400" /> Carga Masiva</h2>
+              <p className="text-xs text-gray-500 dark:text-slate-300 mt-0.5">Importa entregables desde un archivo Excel (.xlsx)</p>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 dark:text-slate-300"><X size={18} /></button>
           </div>
 
           {/* Steps */}
@@ -795,13 +869,13 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
               const active = step === s;
               return (
                 <div key={s} className="flex items-center gap-0">
-                  <div className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold',
-                    done ? 'bg-emerald-500 text-white' : active ? 'text-white' : 'bg-gray-100 text-gray-400'
-                  )} style={active ? { background: '#194276' } : undefined}>
+                  <div className={clsx('w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900',
+                    done ? 'bg-emerald-500 text-white ring-emerald-200 dark:ring-emerald-800' : active ? 'bg-blue-700 text-white ring-blue-200 dark:ring-blue-700' : 'bg-gray-100 text-gray-400 ring-transparent dark:bg-slate-800 dark:text-slate-400'
+                  )}>
                     {done ? <CheckCircle2 size={12} /> : i + 1}
                   </div>
-                  <span className={clsx('text-xs ml-1.5', active ? 'font-medium text-gray-900' : 'text-gray-400')}>{labels[i]}</span>
-                  {i < 2 && <div className="w-8 h-px bg-gray-200 mx-2" />}
+                  <span className={clsx('text-xs ml-2', active ? 'font-semibold text-gray-900 dark:text-slate-100' : done ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-slate-500')}>{labels[i]}</span>
+                  {i < 2 && <div className="w-8 h-px bg-gray-200 dark:bg-slate-600 mx-2" />}
                 </div>
               );
             })}
@@ -810,46 +884,46 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             {step === 'upload' && (
               <>
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-start gap-3">
-                  <FileText size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3 shadow-sm dark:border-blue-500/40 dark:bg-blue-950/45">
+                  <FileText size={16} className="text-blue-600 dark:text-blue-300 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-blue-900">Descarga la plantilla Excel</p>
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Descarga la plantilla Excel</p>
                     <p className="text-xs text-blue-700 mt-0.5 mb-2">Complétala y súbela. Responsables por correo institucional.</p>
                     <button onClick={handleDlTemplate} disabled={dlTemplate}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2 disabled:opacity-60">
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 underline underline-offset-2 disabled:opacity-60 dark:text-blue-200 dark:hover:text-white">
                       <Download size={12} /> {dlTemplate ? 'Descargando...' : 'Descargar plantilla (.xlsx)'}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Proyecto de destino <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Proyecto de destino <span className="text-red-500">*</span></label>
                   <div className="flex gap-2 mb-2">
                     {(['existing', 'new'] as const).map(m => (
                       <button key={m} type="button" onClick={() => setProjectMode(m)}
-                        className={clsx('flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors',
-                          projectMode === m ? 'text-white border-[#194276]' : 'text-gray-500 border-gray-200 hover:bg-gray-50'
-                        )} style={projectMode === m ? { background: '#194276' } : undefined}>
+                        className={clsx('flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors',
+                          projectMode === m ? 'text-white border-blue-700 bg-blue-700 shadow-sm' : 'text-gray-500 border-gray-200 hover:bg-gray-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800'
+                        )}>
                         {m === 'existing' ? 'Proyecto existente' : 'Crear nuevo proyecto'}
                       </button>
                     ))}
                   </div>
                   {projectMode === 'existing'
                     ? <select value={projectId} onChange={e => setProjectId(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
                         <option value="">Selecciona un proyecto...</option>
                         {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                       </select>
                     : <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
                         placeholder="Nombre del nuevo proyecto"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500" />
                   }
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Archivo Excel <span className="text-red-500">*</span></label>
-                  <div className={clsx('border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors',
-                    file ? 'border-[#194276]/40 bg-blue-50/30' : 'border-gray-200 hover:border-[#194276]/30 hover:bg-gray-50'
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5">Archivo Excel <span className="text-red-500">*</span></label>
+                  <div className={clsx('border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+                    file ? 'border-blue-500 bg-blue-50/70 dark:border-blue-400 dark:bg-blue-950/35' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-blue-400 dark:hover:bg-blue-950/30'
                   )} onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={22} className={clsx('mx-auto mb-2', file ? 'text-[#194276]' : 'text-gray-300')} />
+                    <Upload size={26} className={clsx('mx-auto mb-2', file ? 'text-blue-600 dark:text-blue-300' : 'text-gray-400 dark:text-slate-300')} />
                     {file
                       ? <div><p className="text-sm font-semibold text-gray-800">{file.name}</p><p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024).toFixed(1)} KB</p></div>
                       : <><p className="text-sm text-gray-600">Haz clic para seleccionar</p><p className="text-xs text-gray-400 mt-1">Formato: .xlsx — Máx. 10 MB</p></>
@@ -983,25 +1057,7 @@ export default function EntregablesPage() {
   const loadData = useCallback(() => {
     setLoading(true);
     api.get<Deliverable[]>(ENDPOINTS.DELIVERABLES)
-      .then(d => {
-        setData(d);
-        // Start compact: only auto-expand groups that have overdue items
-        const keys = new Set<string>();
-        const groups = new Map<string, Deliverable[]>();
-        d.forEach(del => {
-          const p = del.program_name ?? '(Sin programa)';
-          const existing = groups.get(p) ?? [];
-          existing.push(del);
-          groups.set(p, existing);
-        });
-        groups.forEach((items, p) => {
-          if (items.some(isOverdue)) {
-            keys.add(p);
-            keys.add(p + '_table');
-          }
-        });
-        setExpandedGroups(keys);
-      })
+      .then(d => setData(d))
       .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, []);
@@ -1055,9 +1111,8 @@ export default function EntregablesPage() {
 
   function toggleGroup(key: string) {
     setExpandedGroups(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
+      if (prev.has(key)) return new Set();
+      return new Set([key]);
     });
   }
 
@@ -1095,32 +1150,32 @@ export default function EntregablesPage() {
 
       {/* ── Filter bar ────────────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex flex-wrap items-center gap-2.5">
-        <div className="relative min-w-[220px] flex-1">
+        <div className="relative min-w-full sm:min-w-[220px] flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar asignatura, módulo, proyecto..."
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+            className="pl-8 pr-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
         </div>
 
         <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[150px]">
+          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
           <option value="">Todos los proyectos</option>
           {projectNames.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[140px]">
+          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[140px]">
           <option value="">Todos los estados</option>
           {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
 
         <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 min-w-[150px]">
+          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
           <option value="">Todos los responsables</option>
           {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
 
-        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+        <label className="flex min-h-10 items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" checked={onlyOverdue} onChange={e => setOnlyOverdue(e.target.checked)}
             className="w-3.5 h-3.5 rounded border-gray-300 accent-red-500" />
           <span className="text-sm text-gray-600 flex items-center gap-1">
@@ -1131,7 +1186,7 @@ export default function EntregablesPage() {
         <button
           onClick={() => setShowCompleted(p => !p)}
           className={clsx(
-            'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+            'flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors',
             showCompleted
               ? 'bg-gray-100 border-gray-300 text-gray-700'
               : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
@@ -1146,22 +1201,16 @@ export default function EntregablesPage() {
           )}
         </button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
 
-          {/* Expand / collapse all groups */}
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
-            <button
-              onClick={() => setExpandedGroups(new Set(grouped.flatMap(g => [g.programName, g.programName + '_table'])))}
-              className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-50 transition-colors border-r border-gray-200"
-            >
-              Expandir todo
-            </button>
+          {/* Collapse groups */}
+          <div className="flex flex-1 sm:flex-none items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
             <button
               onClick={() => setExpandedGroups(new Set())}
-              className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
+              className="flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
             >
-              Colapsar
+              Contraer programas
             </button>
           </div>
 
@@ -1183,12 +1232,12 @@ export default function EntregablesPage() {
           {isManager && (
             <>
               <button onClick={() => setFormPanel({ mode: 'create' })}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-lg"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-white rounded-lg"
                 style={{ background: '#194276' }}>
                 <Plus size={14} /> Nueva tarea
               </button>
               <button onClick={() => setShowImport(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-lg transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium border rounded-lg transition-colors"
                 style={{ borderColor: '#194276', color: '#194276' }}>
                 <Upload size={14} /> Carga Masiva
               </button>
@@ -1196,7 +1245,7 @@ export default function EntregablesPage() {
           )}
 
           <button onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <Download size={14} /> Exportar
           </button>
         </div>

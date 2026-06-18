@@ -186,7 +186,7 @@ export default function PerfilPage() {
         <div className="space-y-6">
 
           {/* Avatar card */}
-          <div className={`${cardCls} p-6`}>
+          <div className={`${cardCls} p-4 sm:p-6`}>
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div
@@ -355,7 +355,7 @@ export default function PerfilPage() {
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Elige cómo se ve la plataforma</p>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {themeOptions.map(({ value, label, desc, Icon }) => {
                 const active = theme === value;
                 return (
@@ -399,12 +399,12 @@ export default function PerfilPage() {
               Mis Estadísticas
             </h2>
             {statsLoading ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
               </div>
             ) : stats ? (
               <>
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                   <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 text-center">
                     <CheckCheck size={18} className="text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
                     <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{stats.completed}</p>

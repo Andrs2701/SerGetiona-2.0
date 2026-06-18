@@ -128,12 +128,12 @@ export default function CommentThread({ deliverableId }: CommentThreadProps) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-6 pt-4 pb-2 border-b border-gray-100">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 sm:px-6 pt-4 pb-2 border-b border-gray-100">
         Comentarios
       </p>
 
       {/* Messages list */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
         {loading && (
           <div className="space-y-3">
             {[1, 2].map((i) => (
@@ -197,7 +197,7 @@ export default function CommentThread({ deliverableId }: CommentThreadProps) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-100 px-6 py-4">
+      <div className="border-t border-gray-100 px-4 sm:px-6 py-4">
         {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
         <div className="flex gap-2 items-end">
           <textarea
