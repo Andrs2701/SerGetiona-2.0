@@ -5,7 +5,7 @@ import {
   FolderKanban, BookOpen, Activity, XCircle, CheckCircle2,
   TrendingUp, AlertTriangle, BarChart3, Users, Clock, Package,
   MessageSquare, X, CalendarDays, Gauge, LayoutDashboard,
-  GitBranch, FileBarChart, ChevronRight, ChevronDown, ZoomIn, ZoomOut,
+  GitBranch, FileBarChart, ChevronRight, ChevronDown, Info,
 } from 'lucide-react';
 import DashboardOperativo from '@/components/DashboardOperativo';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
@@ -248,25 +248,44 @@ function TabResumen({
   const statusTotal = Object.values(byStatus).reduce((s, v) => s + v, 0) || 1;
 
   const kpiCards = [
-    { label: 'Proyectos Activos', value: d.active_projects,       icon: FolderKanban, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', ring: 'hover:ring-indigo-300', filter: 'active_projects' as PanelFilter, highlight: false },
-    { label: 'Programas',         value: d.total_programs,        icon: BookOpen,     color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', ring: 'hover:ring-emerald-300', filter: 'programs' as PanelFilter, highlight: false },
-    { label: 'Total Entregables', value: d.total_deliverables,    icon: Package,      color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', ring: 'hover:ring-amber-300', filter: 'total_deliverables' as PanelFilter, highlight: false },
-    { label: 'Vencidas',          value: d.overdue_activities,    icon: XCircle,      color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', ring: 'hover:ring-red-300', filter: 'overdue' as PanelFilter, highlight: (d.overdue_activities ?? 0) > 0 },
-    { label: 'Por Vencer',        value: d.approaching_activities,icon: AlertTriangle,color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', ring: 'hover:ring-orange-300', filter: 'approaching' as PanelFilter, highlight: false },
-    { label: 'Con Observaciones', value: d.with_observations,     icon: MessageSquare,color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20', ring: 'hover:ring-purple-300', filter: 'with_observations' as PanelFilter, highlight: false },
+    { label: 'Proyectos Activos', value: d.active_projects,       icon: FolderKanban, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', ring: 'hover:ring-indigo-300', filter: 'active_projects' as PanelFilter, highlight: false,
+      tooltip: 'Iniciativa de producción con fecha de inicio y fin (ej. "Actualización Curricular 2026"). Es la unidad temporal del trabajo: vive, se ejecuta y se cierra.' },
+    { label: 'Programas',         value: d.total_programs,        icon: BookOpen,     color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', ring: 'hover:ring-emerald-300', filter: 'programs' as PanelFilter, highlight: false,
+      tooltip: 'Producto académico permanente de la universidad (Especializaciones, Maestrías, Pregrados). No "termina": se mantiene y se actualiza. Un proyecto puede tocar varios programas a la vez.' },
+    { label: 'Total Entregables', value: d.total_deliverables,    icon: Package,      color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', ring: 'hover:ring-amber-300', filter: 'total_deliverables' as PanelFilter, highlight: false,
+      tooltip: 'Unidades de producción dentro de cada asignatura (semanas, módulos). Cada entregable pasa por los 6 roles del flujo: Experto → Pedagogía → Diseño → Audiovisual → Ingeniería → Calidad.' },
+    { label: 'Vencidas',          value: d.overdue_activities,    icon: XCircle,      color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', ring: 'hover:ring-red-300', filter: 'overdue' as PanelFilter, highlight: (d.overdue_activities ?? 0) > 0,
+      tooltip: 'Actividades cuya fecha de compromiso ya pasó sin haber sido completadas ni aprobadas por el siguiente rol del flujo.' },
+    { label: 'Por Vencer',        value: d.approaching_activities,icon: AlertTriangle,color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', ring: 'hover:ring-orange-300', filter: 'approaching' as PanelFilter, highlight: false,
+      tooltip: 'Actividades que vencen en los próximos 3 días. Útil para anticiparse antes de que entren al cuadro de Vencidas.' },
+    { label: 'Con Observaciones', value: d.with_observations,     icon: MessageSquare,color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20', ring: 'hover:ring-purple-300', filter: 'with_observations' as PanelFilter, highlight: false,
+      tooltip: 'Entregables devueltos por Calidad o por un rol revisor con cambios solicitados. Requieren ajustes antes de continuar el flujo.' },
   ];
 
   return (
     <div className="space-y-6">
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        {kpiCards.map(({ label, value, icon: Icon, color, bg, ring, highlight, filter }) => (
-          <button key={label} onClick={() => onFilter(filter)}
-            className={`rounded-xl border p-4 flex flex-col gap-2 text-left transition-all cursor-pointer ring-2 ring-transparent ${ring} hover:shadow-md active:scale-95 ${highlight ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-            <div className={`${bg} rounded-lg p-2 self-start`}><Icon className={`${color} w-4 h-4`} /></div>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{label}</p>
-          </button>
+        {kpiCards.map(({ label, value, icon: Icon, color, bg, ring, highlight, filter, tooltip }) => (
+          <div key={label} className="relative group/kpi">
+            <button onClick={() => onFilter(filter)}
+              className={`w-full rounded-xl border p-4 flex flex-col gap-2 text-left transition-all cursor-pointer ring-2 ring-transparent ${ring} hover:shadow-md active:scale-95 ${highlight ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+              <div className={`${bg} rounded-lg p-2 self-start`}><Icon className={`${color} w-4 h-4`} /></div>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-tight">{label}</p>
+            </button>
+            {/* Info icon + tooltip */}
+            <div className="absolute top-2 right-2 pointer-events-none">
+              <div className="pointer-events-auto group/info relative">
+                <Info size={12} className="text-gray-300 dark:text-gray-600 group-hover/kpi:text-gray-400 dark:group-hover/kpi:text-gray-500 hover:!text-indigo-500 cursor-help transition-colors" />
+                <div className="invisible opacity-0 group-hover/info:visible group-hover/info:opacity-100 transition-opacity absolute right-0 top-5 w-64 bg-gray-900 dark:bg-gray-700 text-white text-[11px] leading-relaxed rounded-lg p-3 shadow-2xl z-50 pointer-events-none">
+                  <p className="font-semibold mb-1 text-indigo-200">{label}</p>
+                  <p className="text-gray-200">{tooltip}</p>
+                  <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45" />
+                </div>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
