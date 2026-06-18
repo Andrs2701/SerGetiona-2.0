@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, BookOpen, AlertTriangle, TrendingDown, Users, ChevronRight } from 'lucide-react';
+import { Search, BookOpen, AlertTriangle, TrendingDown, Users, ChevronRight, ArrowLeft } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { AcademicProgram, Deliverable, DashboardStats, ProgramBreakdown, RoleActivity, Role } from '@/lib/types';
@@ -83,19 +83,19 @@ function ProgramCard({
     <button
       onClick={onClick}
       className={clsx(
-        'w-full text-left border-l-4 rounded-lg p-3 transition-all border border-gray-200 hover:shadow-sm',
+        'w-full text-left border-l-4 rounded-lg p-3 transition-all border border-gray-200 dark:border-gray-700 hover:shadow-sm',
         complianceBorder(pct, pb.overdue_count),
-        selected ? 'bg-[#194276]/5 border-r-[#194276]' : 'bg-white hover:bg-gray-50'
+        selected ? 'bg-[#194276]/5 border-r-[#194276] dark:bg-indigo-900/20' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/40'
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <p className="font-semibold text-gray-900 text-sm leading-snug">{pb.name}</p>
+        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-snug">{pb.name}</p>
         <ChevronRight
           size={14}
-          className={clsx('flex-shrink-0 mt-0.5 transition-colors', selected ? 'text-[#194276]' : 'text-gray-400')}
+          className={clsx('flex-shrink-0 mt-0.5 transition-colors', selected ? 'text-[#194276] dark:text-indigo-400' : 'text-gray-400')}
         />
       </div>
-      <p className="text-xs text-gray-500 mb-2 truncate">{pb.project_name}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 truncate">{pb.project_name}</p>
 
       {/* Progress bar */}
       <div className="mb-2">
@@ -134,8 +134,8 @@ function QuickCard({
   colorClass: string;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 flex-1 min-w-0">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 min-w-[140px]">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       <p className={clsx('text-2xl font-bold', colorClass)}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
@@ -163,7 +163,7 @@ function GanttRow({
   }
 
   return (
-    <tr className={clsx(index % 2 === 0 ? 'bg-white' : 'bg-gray-50/70')}>
+    <tr className={clsx(index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/70 dark:bg-gray-700/30')}>
       <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate whitespace-nowrap" title={deliverable.subject_name}>
         {deliverable.subject_name ?? '—'}
       </td>
@@ -299,18 +299,18 @@ function ProgramDetail({
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{pb.name}</h2>
-            <p className="text-sm text-gray-500">{pb.project_name}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight">{pb.name}</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{pb.project_name}</p>
           </div>
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-end shrink-0">
             <span className={clsx('text-3xl font-black', complianceText(pct))}>{pct}%</span>
-            <span className="text-xs text-gray-400">{pb.finished} / {pb.total} entregables</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap">{pb.finished} / {pb.total} entregables</span>
           </div>
         </div>
-        <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="mt-3 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
             className={clsx('h-2 rounded-full', complianceColor(pct))}
             style={{ width: `${pct}%` }}
@@ -319,7 +319,7 @@ function ProgramDetail({
       </div>
 
       {/* Quick indicators */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <QuickCard label="% Avance" value={`${pct}%`} colorClass={complianceText(pct)} />
         <QuickCard label="Vencidos" value={pb.overdue_count} colorClass="text-red-600" />
         <QuickCard label="Activos" value={pb.active_count} colorClass="text-blue-600" />
@@ -328,10 +328,10 @@ function ProgramDetail({
 
       {/* Bottlenecks */}
       {bottlenecks.length > 0 && (
-        <div className="bg-white border border-amber-200 rounded-xl p-4">
+        <div className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-900/40 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle size={15} className="text-amber-500" />
-            <h3 className="text-sm font-semibold text-amber-700">Cuellos de botella</h3>
+            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400">Cuellos de botella</h3>
           </div>
           <div className="space-y-2">
             {bottlenecks.map((b, i) => (
@@ -352,9 +352,9 @@ function ProgramDetail({
       )}
 
       {/* Gantt table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-800">Seguimiento por Entregable</h3>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Seguimiento por Entregable</h3>
           <p className="text-xs text-gray-400 mt-0.5">
             Círculos: verde=aprobado · azul=activo · rojo=vencido · gris=no iniciado
           </p>
@@ -462,24 +462,27 @@ export default function ProgramasPage() {
     );
   }, [breakdown, search, programs]);
 
+  // Mobile view state: when a program is selected on small screens, hide the list
+  const showListOnMobile = !selectedPb;
+
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Programas Académicos"
         subtitle="Vista ejecutiva de seguimiento por programa"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Programas Académicos' }]}
       />
 
-      <div className="flex gap-5 items-start mt-2" style={{ minHeight: '70vh' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 lg:gap-5 mt-2 items-start" style={{ minHeight: '70vh' }}>
         {/* ── Left: program list ── */}
-        <div className="w-72 flex-shrink-0 flex flex-col gap-3">
+        <div className={clsx('flex-col gap-3', showListOnMobile ? 'flex' : 'hidden lg:flex')}>
           {/* Header + counter */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-[#194276]" />
-              <span className="font-semibold text-gray-900 text-sm">Programas</span>
+              <BookOpen size={16} className="text-[#194276] dark:text-indigo-400" />
+              <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Programas</span>
             </div>
-            <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+            <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full px-2 py-0.5">
               {filtered.length}
             </span>
           </div>
@@ -491,7 +494,7 @@ export default function ProgramasPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar programa..."
-              className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30 focus:border-[#194276]"
+              className="pl-8 pr-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg w-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194276]/30 focus:border-[#194276]"
             />
           </div>
 
@@ -499,11 +502,11 @@ export default function ProgramasPage() {
           {loadingList ? (
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-24 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-24 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse" />
               ))}
             </div>
           ) : (
-            <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-260px)]">
+            <div className="space-y-2 overflow-y-auto lg:max-h-[calc(100vh-260px)] pr-1">
               {filtered.map((pb) => (
                 <ProgramCard
                   key={pb.id}
@@ -522,12 +525,21 @@ export default function ProgramasPage() {
         </div>
 
         {/* ── Right: detail ── */}
-        <div className="flex-1 min-w-0">
+        <div className={clsx('min-w-0', showListOnMobile ? 'hidden lg:block' : 'block')}>
+          {/* Mobile back button */}
+          {selectedPb && (
+            <button
+              onClick={() => setSelectedPb(null)}
+              className="lg:hidden mb-3 inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <ArrowLeft size={14} /> Volver a programas
+            </button>
+          )}
           {!selectedPb ? (
-            <div className="flex flex-col items-center justify-center h-80 text-center">
-              <BookOpen size={40} className="text-gray-200 mb-3" />
-              <p className="text-gray-400 text-sm font-medium">Selecciona un programa</p>
-              <p className="text-gray-300 text-xs mt-1">para ver el seguimiento detallado</p>
+            <div className="hidden lg:flex flex-col items-center justify-center h-80 text-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              <BookOpen size={40} className="text-gray-200 dark:text-gray-600 mb-3" />
+              <p className="text-gray-400 dark:text-gray-500 text-sm font-medium">Selecciona un programa</p>
+              <p className="text-gray-300 dark:text-gray-600 text-xs mt-1">para ver el seguimiento detallado</p>
             </div>
           ) : (
             <ProgramDetail pb={selectedPb} deliverables={deliverables} loading={loadingDetail} />

@@ -229,8 +229,10 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
 
   return (
     <div className={clsx(
-      'px-5 py-4 border-b border-gray-100 last:border-0 transition-colors',
-      overdue && !isFinished ? 'bg-red-50/30 hover:bg-red-50/50' : 'hover:bg-slate-50/60'
+      'px-5 py-4 border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors relative',
+      overdue && !isFinished
+        ? 'border-l-4 border-l-red-500 hover:bg-red-50/40 dark:hover:bg-red-900/10'
+        : 'hover:bg-slate-50/60 dark:hover:bg-gray-800/40'
     )}>
       {/* ── Header line ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -1298,7 +1300,10 @@ export default function EntregablesPage() {
                           const days = daysUntil(active?.commitment_date);
                           const overdue = days !== null && days < 0 && d.global_status !== 'finished';
                           return (
-                            <tr key={d.id} className={clsx('border-b border-gray-50 hover:bg-blue-50/20 transition-colors', overdue && 'bg-red-50/20')}>
+                            <tr key={d.id} className={clsx(
+                              'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
+                              overdue && 'border-l-4 border-l-red-500'
+                            )}>
                               <td className="px-3 py-2.5 max-w-[200px]">
                                 <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
                                 <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
