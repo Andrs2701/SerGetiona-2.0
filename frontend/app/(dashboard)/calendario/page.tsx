@@ -857,10 +857,10 @@ export default function CalendarioPage() {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Calendario</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Calendario</h1>
         <div className="flex items-center gap-3 flex-wrap">
           {/* Toggle mis actividades / todas */}
           {isAdminOrCoord && (

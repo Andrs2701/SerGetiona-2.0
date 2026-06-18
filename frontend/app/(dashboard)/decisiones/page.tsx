@@ -318,7 +318,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-6"><StatsSkeleton /></div>
         ) : filtered.length === 0 ? (
@@ -333,7 +333,8 @@ export default function DecisionesPage() {
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-left text-xs text-gray-500 uppercase tracking-wide">
                 <th className="px-5 py-3 w-28">Fecha</th>
@@ -420,6 +421,7 @@ export default function DecisionesPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -455,7 +457,7 @@ export default function DecisionesPage() {
           {formError && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Fecha *</label>
               <input
@@ -489,7 +491,7 @@ export default function DecisionesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Responsable</label>
               <select

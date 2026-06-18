@@ -23,7 +23,7 @@ export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState<Tab>('permissions');
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Configuración"
         subtitle="Administración dinámica de permisos, roles, estados y parámetros del sistema"

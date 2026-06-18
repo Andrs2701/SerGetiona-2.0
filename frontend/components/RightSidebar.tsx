@@ -130,15 +130,15 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
   const detailHref = isManager ? '/seguimiento' : '/mi-espacio';
 
   return (
-    <aside className="hidden xl:flex w-72 flex-none flex-col border-l border-gray-200 bg-white overflow-y-auto">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-        <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+    <aside className="hidden xl:flex w-72 flex-none flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
           <CalendarClock size={15} className="text-indigo-500" />
           {isManager ? 'Panorama del equipo' : 'Mi día'}
         </h3>
         <button
           onClick={onClose}
-          className="text-gray-300 hover:text-gray-500 transition-colors"
+          className="text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 transition-colors p-1.5 -m-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
           title="Ocultar panel"
         >
           <X size={15} />

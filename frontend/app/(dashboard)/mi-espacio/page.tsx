@@ -294,7 +294,7 @@ function DetailPanel({
   return (
     <div className="fixed inset-0 z-40 flex">
       <div className="flex-1 bg-black/20" onClick={onClose}/>
-      <div className="w-[420px] bg-white shadow-2xl flex flex-col h-full border-l border-gray-200">
+      <div className="w-full sm:w-[420px] max-w-full bg-white dark:bg-gray-800 shadow-2xl flex flex-col h-full border-l border-gray-200 dark:border-gray-700">
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 gap-3">
           <div className="min-w-0">
@@ -643,7 +643,7 @@ export default function MiEspacioPage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"/>
         <div className="h-10 bg-gray-100 rounded animate-pulse"/>
         <div className="space-y-1">{[...Array(6)].map((_,i) => <div key={i} className="h-10 bg-white border border-gray-100 rounded animate-pulse"/>)}</div>
@@ -657,7 +657,7 @@ export default function MiEspacioPage() {
         <DetailPanel act={selectedAct} onClose={() => setSelectedAct(null)} onStatusChange={handleStatusChange} isManager={isManager} onSaved={loadWorkspace}/>
       )}
 
-      <div className="p-6 space-y-5">
+      <div className="p-4 sm:p-6 space-y-5">
         {/* Heading */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mi Espacio de Trabajo</h1>

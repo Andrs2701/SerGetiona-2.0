@@ -36,7 +36,7 @@ export default function ReportesPage() {
 
   if (!loading && !data) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <PageHeader title="Reportes" />
         <div className="mt-6 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
           No fue posible cargar el reporte.

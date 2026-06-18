@@ -217,7 +217,7 @@ export default function CapacidadPage() {
 
   if (!isManager) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <p className="text-sm text-gray-500">
           La capacidad operativa es información gerencial. No tienes acceso a este módulo.
         </p>
