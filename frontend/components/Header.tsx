@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft, Sun, Moon } from 'lucide-react';
+import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft, Sun, Moon, Menu } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -40,6 +40,7 @@ interface HeaderProps {
   onToggleRightSidebar?: () => void;
   leftSidebarOpen?: boolean;
   onToggleLeftSidebar?: () => void;
+  onMobileMenuOpen?: () => void;
 }
 
 export default function Header({
@@ -48,6 +49,7 @@ export default function Header({
   onToggleRightSidebar,
   leftSidebarOpen,
   onToggleLeftSidebar,
+  onMobileMenuOpen,
 }: HeaderProps) {
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
@@ -117,8 +119,19 @@ export default function Header({
 
   return (
     <header className="h-14 bg-[var(--header-bg)] border-b border-[var(--header-border)] flex items-center justify-between px-3 sm:px-6 flex-shrink-0 transition-colors gap-2">
-      {/* Left: sidebar toggle + title */}
+      {/* Left: hamburger (mobile) + sidebar toggle (desktop) */}
       <div className="flex items-center gap-2 min-w-0">
+        {/* Hamburger para móvil */}
+        {onMobileMenuOpen && (
+          <button
+            onClick={onMobileMenuOpen}
+            className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Abrir menú"
+          >
+            <Menu size={20} />
+          </button>
+        )}
+        {/* Toggle panel izquierdo en escritorio */}
         {onToggleLeftSidebar && (
           <button
             onClick={onToggleLeftSidebar}

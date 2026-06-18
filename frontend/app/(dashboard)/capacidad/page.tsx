@@ -283,7 +283,8 @@ export default function CapacidadPage() {
                 Haz clic en un rol para ver a sus miembros
               </span>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
+              <div className="min-w-[640px]">
               <div className="grid grid-cols-[1fr_80px_140px_200px_100px] bg-gray-50 border-b border-gray-200 px-4 py-2.5">
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Rol / Persona</span>
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Pers.</span>
@@ -414,6 +415,7 @@ export default function CapacidadPage() {
                   No hay datos de capacidad por rol.
                 </p>
               )}
+              </div>{/* min-w */}
             </div>
           </section>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign, Lock } from 'lucide-react';
+import { MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign, Lock, ArrowLeft } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -110,6 +110,9 @@ export default function ColaboracionPage() {
 
   // Members management modal
   const [membersChannel, setMembersChannel] = useState<Channel | null>(null);
+
+  // Mobile master-detail: show channels list or messages view
+  const [mobileShowMessages, setMobileShowMessages] = useState(false);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -233,10 +236,13 @@ export default function ColaboracionPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="flex flex-col sm:flex-row h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700">
 
-      {/* ── Sidebar ── */}
-      <div className="w-64 flex-none border-r border-gray-100 flex flex-col">
+      {/* ── Sidebar (canales) — full on mobile unless showing messages ── */}
+      <div className={clsx(
+        'sm:w-64 sm:flex-none border-b sm:border-b-0 sm:border-r border-gray-100 dark:border-gray-700 flex flex-col flex-shrink-0',
+        mobileShowMessages ? 'hidden sm:flex' : 'flex w-full'
+      )}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <span className="text-sm font-semibold text-gray-700">Canales</span>
           {isManager && (
@@ -259,7 +265,7 @@ export default function ColaboracionPage() {
             channels.map((ch) => (
               <button
                 key={ch.id}
-                onClick={() => setActiveId(ch.id)}
+                onClick={() => { setActiveId(ch.id); setMobileShowMessages(true); }}
                 className={clsx(
                   'w-full flex items-center gap-2 px-4 py-2 text-sm text-left transition-colors',
                   activeId === ch.id
@@ -289,12 +295,23 @@ export default function ColaboracionPage() {
         </div>
       </div>
 
-      {/* ── Main ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ── Main (mensajes) — hidden on mobile unless mobileShowMessages ── */}
+      <div className={clsx(
+        'flex-1 flex flex-col overflow-hidden',
+        mobileShowMessages ? 'flex' : 'hidden sm:flex'
+      )}>
 
         {/* Header */}
         {activeChannel ? (
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2 px-4 sm:px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+            {/* Back button (mobile only) */}
+            <button
+              onClick={() => setMobileShowMessages(false)}
+              className="sm:hidden p-1 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Volver a canales"
+            >
+              <ArrowLeft size={18} />
+            </button>
             {activeChannel.is_private
               ? <Lock size={15} className="text-amber-500" />
               : <Hash size={15} className="text-gray-400" />}
