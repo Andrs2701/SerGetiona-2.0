@@ -141,8 +141,8 @@ function ProjectCardSkeleton() {
 // ── Table view ─────────────────────────────────────────────────────────────────
 function ProjectsTable({ projects, onRowClick }: { projects: Project[]; onRowClick: (id: number) => void }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <table className="w-full text-sm min-w-[640px]">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
             <th className="px-4 py-3">Nombre</th>
@@ -447,7 +447,7 @@ export default function ProyectosPage() {
               placeholder="Descripción del proyecto"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <select
@@ -474,7 +474,7 @@ export default function ProyectosPage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
               <input

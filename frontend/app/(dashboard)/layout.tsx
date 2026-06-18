@@ -8,7 +8,6 @@ import RightSidebar from '@/components/RightSidebar';
 import { AuthProvider, useAuthContext } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import type { UserPreferences } from '@/lib/types';
-import { Menu } from 'lucide-react';
 
 const RIGHT_SIDEBAR_KEY = 'sergestiona_right_sidebar';
 const LEFT_SIDEBAR_KEY = 'sergestiona_left_sidebar';
@@ -85,25 +84,15 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
         desktopOpen={leftOpen}
       />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Mobile header bar with hamburger */}
-        <div className="md:hidden h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 gap-3 flex-shrink-0">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Menu size={20} />
-          </button>
-          <span className="font-bold text-indigo-700 dark:text-indigo-400 tracking-tight">Sergestiona</span>
-          <span className="text-xs text-gray-400 dark:text-gray-500">2.0</span>
-        </div>
         <Header
           rightSidebarOpen={rightOpen}
           onToggleRightSidebar={toggleRightSidebar}
           leftSidebarOpen={leftOpen}
           onToggleLeftSidebar={toggleLeftSidebar}
+          onMobileMenuOpen={() => setMobileMenuOpen(true)}
         />
         <div className="flex-1 flex overflow-hidden min-h-0">
-          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 min-w-0">
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 min-w-0 transition-colors">
             {children}
           </main>
           <RightSidebar open={rightOpen} onClose={toggleRightSidebar} />

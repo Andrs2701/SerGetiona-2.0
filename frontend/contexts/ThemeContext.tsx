@@ -1,60 +1,47 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
-export type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 
-interface ThemeState {
+interface ThemeContextValue {
   theme: Theme;
-  effectiveTheme: 'light' | 'dark';
-  setTheme(t: Theme): void;
+  toggleTheme: () => void;
 }
 
-const THEME_KEY = 'sergestiona_theme';
-
-const ThemeContext = createContext<ThemeState | null>(null);
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'light', toggleTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light');
-  const [systemDark, setSystemDark] = useState(false);
+  const [theme, setTheme] = useState<Theme>('light');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(THEME_KEY) as Theme | null;
-    if (stored === 'dark' || stored === 'light' || stored === 'system') {
-      setThemeState(stored);
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    setSystemDark(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    const stored = localStorage.getItem('sg_theme') as Theme | null;
+    const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const initial = stored ?? preferred;
+    setTheme(initial);
+    document.documentElement.classList.toggle('dark', initial === 'dark');
+    setMounted(true);
   }, []);
 
-  const effectiveTheme: 'light' | 'dark' =
-    theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next: Theme = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('sg_theme', next);
+      document.documentElement.classList.toggle('dark', next === 'dark');
+      return next;
+    });
+  }, []);
 
-  useEffect(() => {
-    if (effectiveTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [effectiveTheme]);
-
-  function setTheme(t: Theme) {
-    setThemeState(t);
-    localStorage.setItem(THEME_KEY, t);
-  }
+  if (!mounted) return <>{children}</>;
 
   return (
-    <ThemeContext.Provider value={{ theme, effectiveTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
-export function useTheme(): ThemeState {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');
-  return ctx;
+export function useTheme() {
+  return useContext(ThemeContext);
 }

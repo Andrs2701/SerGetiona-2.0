@@ -8,14 +8,11 @@ import {
   BookOpen,
   FileText,
   Users,
-  BarChart3,
   Settings,
   CalendarDays,
   UserCircle,
-  Gauge,
   ClipboardList,
   MessagesSquare,
-  Activity,
   X,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -63,21 +60,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'coordinator'],
   },
   {
-    href: '/capacidad',
-    label: 'Capacidad',
-    icon: Gauge,
-    roles: ['admin', 'coordinator'],
-  },
-  {
     href: '/decisiones',
     label: 'Decisiones',
     icon: ClipboardList,
-    roles: ['admin', 'coordinator'],
-  },
-  {
-    href: '/seguimiento',
-    label: 'Seguimiento',
-    icon: Activity,
     roles: ['admin', 'coordinator'],
   },
   {
@@ -99,12 +84,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['admin'],
   },
   {
-    href: '/reportes',
-    label: 'Reportes',
-    icon: BarChart3,
-    roles: ['admin', 'coordinator'],
-  },
-  {
     href: '/configuracion',
     label: 'Configuración',
     icon: Settings,
@@ -115,6 +94,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  /** Visibilidad en escritorio; el usuario la controla desde el Header */
   desktopOpen?: boolean;
 }
 
@@ -139,23 +119,25 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
       .catch(() => {});
   }, [isOperative]);
 
-  const navItems = ALL_NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const navItems = ALL_NAV_ITEMS.filter((item) =>
+    item.roles.includes(role)
+  );
 
   const initials = user?.name
     ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
     : 'US';
 
   const sidebarInner = (
-    <aside className="w-64 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-      <div className="h-14 flex items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+    <aside className="w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col transition-colors">
+      <div className="h-14 flex items-center justify-between px-6 border-b border-[var(--sidebar-border)] flex-shrink-0">
         <div className="flex items-baseline gap-1">
           <span className="font-bold text-lg tracking-tight" style={{ color: '#194276' }}>Sergestiona</span>
-          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">2.0</span>
+          <span className="text-xs font-medium text-gray-400">2.0</span>
         </div>
         {onMobileClose && (
           <button
             onClick={onMobileClose}
-            className="md:hidden p-1 rounded text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="md:hidden p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
           >
             <X size={18} />
           </button>
@@ -175,7 +157,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active
                   ? "text-white shadow-sm"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
               )}
               style={active ? { background: '#194276' } : undefined}
             >
@@ -185,9 +167,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
                 <span
                   className={clsx(
                     "min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center leading-none",
-                    active
-                      ? "bg-red-400 text-white"
-                      : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                    active ? "bg-red-400 text-white" : "bg-red-100 text-red-600"
                   )}
                 >
                   {overdueCount > 99 ? "99+" : overdueCount}
@@ -198,23 +178,23 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+      <div className="p-4 border-t border-[var(--sidebar-border)] flex-shrink-0">
         <Link
           href="/perfil"
           onClick={onMobileClose}
-          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+          className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
         >
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-            style={{ background: '#194276' }}
-          >
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: '#194276' }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-[#194276] transition-colors">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate transition-colors"
+              onMouseEnter={e => (e.currentTarget.style.color = '#5b8fd6')}
+              onMouseLeave={e => (e.currentTarget.style.color = '')}
+            >
               {user?.name ?? 'Usuario'}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {user ? USER_ROLE_LABELS[user.role] : ''}
             </p>
           </div>
@@ -225,7 +205,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar (ocultable para todos los roles) */}
       <div className={clsx('min-h-screen flex-shrink-0', desktopOpen ? 'hidden md:flex' : 'hidden')}>
         {sidebarInner}
       </div>
@@ -233,7 +213,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
       {/* Mobile overlay */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={onMobileClose} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={onMobileClose}
+          />
           <div className="relative z-10 flex-shrink-0 h-full shadow-xl">
             {sidebarInner}
           </div>

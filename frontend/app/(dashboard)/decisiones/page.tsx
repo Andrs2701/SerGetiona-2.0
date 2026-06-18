@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Search, Edit2, Trash2, ClipboardList, Info, CheckCircle2, Clock, AlertCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ClipboardList, Info, CheckCircle2, Clock, AlertCircle, XCircle, Shield, Eye, Bell, UserCog, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -222,17 +222,60 @@ export default function DecisionesPage() {
         </button>
       </div>
 
-      {/* ── Explicación contextual ── */}
-      <div className="flex gap-3 bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-4">
-        <Info size={18} className="text-indigo-500 flex-none mt-0.5" />
-        <div className="text-sm text-indigo-800 space-y-1">
-          <p className="font-semibold">¿Para qué sirve este módulo?</p>
-          <p className="text-indigo-700 leading-relaxed">
-            Centraliza las decisiones estratégicas y operativas que afectan la producción de contenido:
-            cambios de metodología, prioridades de entrega, restricciones técnicas, redistribución de
-            carga o acuerdos con el cliente. Cada decisión queda trazada con fecha, responsable, nivel
-            de impacto y estado de implementación, creando un historial auditable para el equipo y la dirección.
-          </p>
+      {/* ── Gobernanza: Permisos + Flujo ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Matriz de permisos */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield size={15} className="text-indigo-500" />
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Permisos del módulo</h3>
+          </div>
+          <div className="space-y-2.5">
+            {[
+              { icon: Plus,     label: 'Crear y editar',  who: 'Administrador · Coordinador', color: 'text-indigo-600 dark:text-indigo-400' },
+              { icon: Eye,      label: 'Visualizar',      who: 'Admin · Coordinador · Stakeholders del proyecto', color: 'text-blue-600 dark:text-blue-400' },
+              { icon: UserCog,  label: 'Aprobar / cerrar', who: 'Administrador (impacto alto) · Coordinador (resto)', color: 'text-emerald-600 dark:text-emerald-400' },
+              { icon: Bell,     label: 'Notificaciones',  who: 'Responsable asignado · Equipo del proyecto', color: 'text-amber-600 dark:text-amber-400' },
+            ].map(({ icon: Icon, label, who, color }) => (
+              <div key={label} className="flex items-start gap-3 text-xs">
+                <Icon size={14} className={`${color} mt-0.5 shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-700 dark:text-gray-300">{label}</p>
+                  <p className="text-gray-500 dark:text-gray-400 leading-snug">{who}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Flujo de la decisión */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ChevronRight size={15} className="text-indigo-500" />
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Flujo de la decisión</h3>
+          </div>
+          <div className="flex items-center gap-1 mb-3 flex-wrap">
+            {[
+              { key: 'pending',     label: 'Pendiente',    color: 'bg-amber-400',   icon: Clock },
+              { key: 'in_progress', label: 'En progreso',  color: 'bg-blue-500',    icon: AlertCircle },
+              { key: 'implemented', label: 'Implementada', color: 'bg-emerald-500', icon: CheckCircle2 },
+            ].map(({ key, label, color, icon: Icon }, i, arr) => (
+              <div key={key} className="flex items-center gap-1 flex-1 min-w-0">
+                <div className={`${color} w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0`}>
+                  <Icon size={13} />
+                </div>
+                <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 truncate">{label}</span>
+                {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300 shrink-0" />}
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-700 pt-2.5 space-y-1">
+            <p><strong className="text-gray-700 dark:text-gray-300">Pendiente:</strong> registrada, aún sin acción.</p>
+            <p><strong className="text-gray-700 dark:text-gray-300">En progreso:</strong> el responsable está ejecutando el cambio acordado.</p>
+            <p><strong className="text-gray-700 dark:text-gray-300">Implementada:</strong> aplicada y verificada — historial auditable cerrado.</p>
+            <p className="text-gray-400 italic">Cancelada se reserva para decisiones revertidas o descartadas.</p>
+          </div>
         </div>
       </div>
 
@@ -275,7 +318,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-6"><StatsSkeleton /></div>
         ) : filtered.length === 0 ? (
@@ -290,7 +333,8 @@ export default function DecisionesPage() {
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-left text-xs text-gray-500 uppercase tracking-wide">
                 <th className="px-5 py-3 w-28">Fecha</th>
@@ -307,10 +351,15 @@ export default function DecisionesPage() {
                 const StatusIcon = STATUS_ICONS[rec.status];
                 return (
                   <tr key={rec.id} className="hover:bg-gray-50/60 transition-colors group">
-                    <td className="px-5 py-4 whitespace-nowrap text-gray-500 text-xs">
-                      {new Date(rec.decision_date + 'T12:00:00').toLocaleDateString('es-CO', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                      })}
+                    <td className="px-5 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400 text-xs">
+                      {(() => {
+                        const raw = rec.decision_date;
+                        if (!raw) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+                        const iso = raw.length >= 10 ? raw.slice(0, 10) : raw;
+                        const d = new Date(iso + 'T12:00:00');
+                        if (Number.isNaN(d.getTime())) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+                        return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+                      })()}
                     </td>
                     <td className="px-5 py-4 max-w-xs">
                       <p className="text-gray-900 font-medium leading-snug line-clamp-2" title={rec.description}>
@@ -372,6 +421,7 @@ export default function DecisionesPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -407,7 +457,7 @@ export default function DecisionesPage() {
           {formError && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Fecha *</label>
               <input
@@ -441,7 +491,7 @@ export default function DecisionesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Responsable</label>
               <select

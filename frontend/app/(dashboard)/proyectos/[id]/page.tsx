@@ -238,7 +238,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="h-8 bg-gray-200 rounded w-64 mb-4 animate-pulse" />
         <TableSkeleton rows={6} cols={9} />
       </div>
@@ -247,7 +247,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   if (loadError || !project) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <PageHeader title="Proyecto no disponible" />
         <div className="mt-6 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
           No fue posible cargar el proyecto o no tienes permiso para consultarlo.
@@ -547,7 +547,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {/* Info tab */}
               {sidePanelTab === 'info' && (
                 <div className="p-5 space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5">Entregable</p>
                       <p className="font-medium text-gray-900 text-sm">{selectedActivity.deliverable.name}</p>

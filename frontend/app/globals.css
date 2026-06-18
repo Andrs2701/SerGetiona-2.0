@@ -2,22 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light mode variables ─────────────────────────────────────────── */
 :root {
   --background: #f9fafb;
   --foreground: #111827;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --muted: #6b7280;
+  --muted-bg: #f3f4f6;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --header-bg: #ffffff;
+  --header-border: #e5e7eb;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
 }
 
-.dark {
-  --background: #111827;
-  --foreground: #f9fafb;
+/* ── Dark mode variables ──────────────────────────────────────────── */
+html.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --muted: #94a3b8;
+  --muted-bg: #1e293b;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --header-bg: #1e293b;
+  --header-border: #334155;
+  --input-bg: #1e293b;
+  --input-border: #475569;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
+/* ── Base ─────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
   padding: 0;
@@ -28,4 +45,123 @@ html,
 body {
   max-width: 100vw;
   height: 100%;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ── Scrollbar dark mode ──────────────────────────────────────────── */
+html.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Dark mode global overrides
+   Estos overrides aplican modo oscuro automáticamente sin necesidad de
+   añadir `dark:` a cada componente. Se basan en clases utilitarias muy
+   comunes que aparecen repetidamente en las páginas existentes.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Fondos blancos / claros (cards, modales, inputs) */
+html.dark .bg-white { background-color: #1e293b !important; }
+html.dark .bg-gray-50 { background-color: #0f172a !important; }
+html.dark .bg-gray-100 { background-color: #1e293b !important; }
+
+/* Bordes claros */
+html.dark .border-gray-100,
+html.dark .border-gray-200 { border-color: #334155 !important; }
+html.dark .border-gray-300 { border-color: #475569 !important; }
+
+/* Divisores */
+html.dark .divide-gray-50 > * + *,
+html.dark .divide-gray-100 > * + *,
+html.dark .divide-gray-200 > * + * {
+  border-color: #334155 !important;
+}
+
+/* Texto */
+html.dark .text-gray-900 { color: #f1f5f9 !important; }
+html.dark .text-gray-800 { color: #e2e8f0 !important; }
+html.dark .text-gray-700 { color: #cbd5e1 !important; }
+html.dark .text-gray-600 { color: #94a3b8 !important; }
+html.dark .text-gray-500 { color: #94a3b8 !important; }
+html.dark .text-gray-400 { color: #64748b !important; }
+
+/* Hover gris claro → hover oscuro */
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+
+/* Pastel KPI cards: subir contraste con tinted backgrounds */
+html.dark .bg-amber-50    { background-color: rgba(245, 158, 11, 0.12) !important; }
+html.dark .bg-blue-50     { background-color: rgba(59, 130, 246, 0.12) !important; }
+html.dark .bg-indigo-50   { background-color: rgba(99, 102, 241, 0.12) !important; }
+html.dark .bg-emerald-50  { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-green-50    { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-red-50      { background-color: rgba(239, 68, 68, 0.12) !important; }
+html.dark .bg-rose-50     { background-color: rgba(244, 63, 94, 0.12) !important; }
+html.dark .bg-orange-50   { background-color: rgba(249, 115, 22, 0.12) !important; }
+html.dark .bg-purple-50   { background-color: rgba(168, 85, 247, 0.12) !important; }
+html.dark .bg-violet-50   { background-color: rgba(139, 92, 246, 0.12) !important; }
+html.dark .bg-pink-50     { background-color: rgba(236, 72, 153, 0.12) !important; }
+html.dark .bg-yellow-50   { background-color: rgba(234, 179, 8, 0.12) !important; }
+html.dark .bg-sky-50      { background-color: rgba(14, 165, 233, 0.12) !important; }
+html.dark .bg-slate-50    { background-color: #0f172a !important; }
+
+/* Borders coloreados claros → versiones más oscuras */
+html.dark .border-amber-100,   html.dark .border-amber-200   { border-color: rgba(245, 158, 11, 0.35) !important; }
+html.dark .border-blue-100,    html.dark .border-blue-200    { border-color: rgba(59, 130, 246, 0.35) !important; }
+html.dark .border-indigo-100,  html.dark .border-indigo-200  { border-color: rgba(99, 102, 241, 0.35) !important; }
+html.dark .border-emerald-100, html.dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.35) !important; }
+html.dark .border-red-100,     html.dark .border-red-200     { border-color: rgba(239, 68, 68, 0.35) !important; }
+html.dark .border-purple-100,  html.dark .border-purple-200  { border-color: rgba(168, 85, 247, 0.35) !important; }
+html.dark .border-orange-100,  html.dark .border-orange-200  { border-color: rgba(249, 115, 22, 0.35) !important; }
+
+/* Texto coloreado fuerte: subir saturación en oscuro */
+html.dark .text-indigo-700, html.dark .text-indigo-800  { color: #a5b4fc !important; }
+html.dark .text-blue-700,   html.dark .text-blue-800    { color: #93c5fd !important; }
+html.dark .text-emerald-700,html.dark .text-emerald-800 { color: #6ee7b7 !important; }
+html.dark .text-amber-700,  html.dark .text-amber-800   { color: #fcd34d !important; }
+html.dark .text-red-700,    html.dark .text-red-800     { color: #fca5a5 !important; }
+html.dark .text-purple-700, html.dark .text-purple-800  { color: #c4b5fd !important; }
+
+/* Inputs y selects */
+html.dark input[type="text"],
+html.dark input[type="search"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="number"],
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark textarea,
+html.dark select {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Shadow softer en oscuro */
+html.dark .shadow-sm,
+html.dark .shadow,
+html.dark .shadow-md,
+html.dark .shadow-lg {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }

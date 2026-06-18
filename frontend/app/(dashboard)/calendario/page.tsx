@@ -240,7 +240,7 @@ function SidePanel({
   const weekCompliance = weekScheduled > 0 ? Math.round((weekDone / weekScheduled) * 100) : 0;
 
   return (
-    <div className="w-72 flex-shrink-0 flex flex-col gap-4">
+    <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4">
       {/* Próximos vencimientos */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
@@ -857,10 +857,10 @@ export default function CalendarioPage() {
   ];
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">Calendario</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Calendario</h1>
         <div className="flex items-center gap-3 flex-wrap">
           {/* Toggle mis actividades / todas */}
           {isAdminOrCoord && (
@@ -908,7 +908,7 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Main calendar area ~70% */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-4">

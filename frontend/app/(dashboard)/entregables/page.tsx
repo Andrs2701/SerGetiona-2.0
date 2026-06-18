@@ -229,8 +229,10 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
 
   return (
     <div className={clsx(
-      'px-5 py-4 border-b border-gray-100 last:border-0 transition-colors',
-      overdue && !isFinished ? 'bg-red-50/30 hover:bg-red-50/50' : 'hover:bg-slate-50/60'
+      'px-5 py-4 border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors relative',
+      overdue && !isFinished
+        ? 'border-l-4 border-l-red-500 hover:bg-red-50/40 dark:hover:bg-red-900/10'
+        : 'hover:bg-slate-50/60 dark:hover:bg-gray-800/40'
     )}>
       {/* ── Header line ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -315,8 +317,8 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
         </div>
       </div>
 
-      {/* ── Role grid: 2 rows × 3 cols ─────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+      {/* ── Role grid: 2 cols mobile · 3 cols sm · 6 cols lg ─────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:grid-cols-6">
         {ROLES.map(role => (
           <RoleCell key={role} role={role} activity={byRole[role]} />
         ))}
@@ -470,7 +472,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[540px] bg-white z-50 shadow-2xl flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[540px] max-w-full bg-white dark:bg-gray-800 z-50 shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -500,7 +502,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                 </select>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Programa</label>
                 <input list="programs-list" value={form.program_name}
@@ -529,7 +531,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                 placeholder="Ej: Semana 1 – Introducción"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
                 <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as 'creation' | 'update' }))}
@@ -562,7 +564,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                       </span>
                       <p className={clsx('text-xs font-semibold', colors.label)}>{ROLE_LABELS[act.role]}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <select value={act.responsible_id} onChange={e => setAct(act.role, 'responsible_id', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20">
                         <option value="">Sin asignar</option>
@@ -613,7 +615,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[520px] bg-white z-50 shadow-2xl flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[520px] max-w-full bg-white dark:bg-gray-800 z-50 shadow-2xl flex flex-col">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
           <div className="flex-1 min-w-0 pr-3">
             <p className="text-xs text-gray-400 mb-0.5">{deliverable.project_name ?? '—'} · {deliverable.program_name ?? '—'}</p>
@@ -1084,7 +1086,7 @@ export default function EntregablesPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Entregables"
         subtitle="Seguimiento por módulo con responsables, estados y fechas de compromiso por rol"
@@ -1298,7 +1300,10 @@ export default function EntregablesPage() {
                           const days = daysUntil(active?.commitment_date);
                           const overdue = days !== null && days < 0 && d.global_status !== 'finished';
                           return (
-                            <tr key={d.id} className={clsx('border-b border-gray-50 hover:bg-blue-50/20 transition-colors', overdue && 'bg-red-50/20')}>
+                            <tr key={d.id} className={clsx(
+                              'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
+                              overdue && 'border-l-4 border-l-red-500'
+                            )}>
                               <td className="px-3 py-2.5 max-w-[200px]">
                                 <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
                                 <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
