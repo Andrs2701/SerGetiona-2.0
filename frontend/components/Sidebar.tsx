@@ -29,7 +29,7 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   roles: UserRole[];
-  badgeKey?: 'overdue';
+  badgeKey?: 'overdue' | 'collab';
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -70,6 +70,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Colaboración',
     icon: MessagesSquare,
     roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+    badgeKey: 'collab',
   },
   {
     href: '/calendario',
@@ -102,6 +103,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
   const pathname = usePathname();
   const { user } = useAuthContext();
   const [overdueCount, setOverdueCount] = useState<number>(0);
+  const [collabUnread, setCollabUnread] = useState<number>(0);
+  const [collabMentions, setCollabMentions] = useState(false);
 
   const role = (user?.role ?? 'admin') as UserRole;
   const isOperative = OPERATIVE_ROLES.includes(role);
@@ -118,6 +121,29 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
       })
       .catch(() => {});
   }, [isOperative]);
+
+  useEffect(() => {
+    if (!user) return;
+    function fetchCollab() {
+      api.get<unknown>('/channels')
+        .then((res) => {
+          const raw = res as Record<string, unknown>;
+          const chs = (Array.isArray(raw) ? raw : (raw.channels as unknown[]) ?? []) as Array<Record<string, unknown>>;
+          let total = 0;
+          let mentions = false;
+          for (const ch of chs) {
+            total += (typeof ch.unread_count === 'number' ? ch.unread_count : 0);
+            if (typeof ch.mention_count === 'number' && ch.mention_count > 0) mentions = true;
+          }
+          setCollabUnread(total);
+          setCollabMentions(mentions);
+        })
+        .catch(() => {});
+    }
+    fetchCollab();
+    const iv = setInterval(fetchCollab, 30_000);
+    return () => clearInterval(iv);
+  }, [user]);
 
   const navItems = ALL_NAV_ITEMS.filter((item) =>
     item.roles.includes(role)
@@ -147,7 +173,26 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon, badgeKey }) => {
           const active = pathname === href || (href !== "/" && pathname.startsWith(href));
-          const showBadge = badgeKey === 'overdue' && overdueCount > 0 && isOperative;
+
+          let badgeCount = 0;
+          let badgeActiveCls = '';
+          let badgeInactiveCls = '';
+
+          if (badgeKey === 'overdue' && overdueCount > 0 && isOperative) {
+            badgeCount = overdueCount;
+            badgeActiveCls = 'bg-red-400 text-white';
+            badgeInactiveCls = 'bg-red-100 text-red-600';
+          } else if (badgeKey === 'collab' && collabUnread > 0) {
+            badgeCount = collabUnread;
+            if (collabMentions) {
+              badgeActiveCls = 'bg-amber-400 text-white';
+              badgeInactiveCls = 'bg-amber-100 text-amber-700';
+            } else {
+              badgeActiveCls = 'bg-indigo-400 text-white';
+              badgeInactiveCls = 'bg-indigo-100 text-indigo-600';
+            }
+          }
+
           return (
             <Link
               key={href}
@@ -163,14 +208,14 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
             >
               <Icon size={18} />
               <span className="flex-1 truncate">{label}</span>
-              {showBadge && (
+              {badgeCount > 0 && (
                 <span
                   className={clsx(
                     "min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center leading-none",
-                    active ? "bg-red-400 text-white" : "bg-red-100 text-red-600"
+                    active ? badgeActiveCls : badgeInactiveCls
                   )}
                 >
-                  {overdueCount > 99 ? "99+" : overdueCount}
+                  {badgeCount > 99 ? "99+" : badgeCount}
                 </span>
               )}
             </Link>
