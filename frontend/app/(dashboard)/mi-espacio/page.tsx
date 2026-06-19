@@ -394,14 +394,14 @@ function ActivityRow({
   const daysLeft = act.commitment_date ? daysDiff(act.commitment_date) : null;
 
   const rowBg = selected
-    ? 'bg-indigo-50'
+    ? 'bg-indigo-50 dark:bg-indigo-900/20'
     : highlighted
-    ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400'
+    ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400 dark:bg-indigo-900/25 dark:ring-indigo-500'
     : act.date_status === 'overdue'
-    ? 'bg-red-50/40 hover:bg-red-50/70'
+    ? 'bg-red-50/40 hover:bg-red-50/60 dark:bg-red-900/20 dark:hover:bg-red-900/30'
     : act.date_status === 'approaching'
-    ? 'bg-amber-50/40 hover:bg-amber-50/70'
-    : 'hover:bg-gray-50/70';
+    ? 'bg-amber-50/40 hover:bg-amber-50/60 dark:bg-amber-900/15 dark:hover:bg-amber-900/25'
+    : 'hover:bg-gray-50/70 dark:hover:bg-white/[0.04]';
 
   return (
     <tr

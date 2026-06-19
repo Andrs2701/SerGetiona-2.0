@@ -146,6 +146,10 @@ html.dark .text-blue-700,   html.dark .text-blue-800    { color: #93c5fd !import
 html.dark .text-emerald-700,html.dark .text-emerald-800 { color: #6ee7b7 !important; }
 html.dark .text-amber-700,  html.dark .text-amber-800   { color: #fcd34d !important; }
 html.dark .text-red-700,    html.dark .text-red-800     { color: #fca5a5 !important; }
+html.dark .text-red-500,    html.dark .text-red-600     { color: #fca5a5 !important; }
+html.dark .bg-red-100       { background-color: rgba(239, 68, 68, 0.18) !important; }
+html.dark .bg-amber-100     { background-color: rgba(245, 158, 11, 0.15) !important; }
+html.dark .text-amber-600   { color: #fcd34d !important; }
 html.dark .text-purple-700, html.dark .text-purple-800  { color: #c4b5fd !important; }
 
 /* Inputs y selects */
