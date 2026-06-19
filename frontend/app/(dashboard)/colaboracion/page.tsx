@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign, Lock,
   ArrowLeft, CornerDownRight, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp,
@@ -180,7 +181,8 @@ function MessageActions({
 
 // ── main component ────────────────────────────────────────────────────────────
 
-export default function ColaboracionPage() {
+function ColaboracionInner() {
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const isManager = user?.role === 'admin' || user?.role === 'coordinator';
 
@@ -249,16 +251,23 @@ export default function ColaboracionPage() {
       .catch(() => setChannelMembers([]));
   }, [activeId]);
 
+  const deepLinkChannelId = searchParams.get('channel');
+
   const loadChannels = useCallback(async () => {
     setLoadingChannels(true);
     try {
       const res = await api.get<{ channels: Channel[] }>('/channels');
       setChannels(res.channels ?? []);
-      if (res.channels?.length && !activeId) setActiveId(res.channels[0].id);
+      if (res.channels?.length && !activeId) {
+        const target = deepLinkChannelId ? Number(deepLinkChannelId) : null;
+        const match = target && res.channels.find(c => c.id === target);
+        setActiveId(match ? match.id : res.channels[0].id);
+        if (match) setMobileShowMessages(true);
+      }
     } finally {
       setLoadingChannels(false);
     }
-  }, [activeId]);
+  }, [activeId, deepLinkChannelId]);
 
   const loadMessages = useCallback(async (channelId: number) => {
     setLoadingMsgs(true);
@@ -816,5 +825,13 @@ export default function ColaboracionPage() {
         onChanged={loadChannels}
       />
     </div>
+  );
+}
+
+export default function ColaboracionPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <ColaboracionInner />
+    </Suspense>
   );
 }

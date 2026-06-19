@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Bell, ChevronDown, User, KeyRound, LogOut, CheckCheck, PanelRight, PanelLeft, Sun, Moon, Menu } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { clsx } from 'clsx';
@@ -22,16 +23,39 @@ function timeAgo(dateStr: string): string {
 }
 
 function notifIcon(type: string) {
-  if (type === 'task_assigned')       return '📋';
-  if (type === 'status_changed')      return '🔄';
-  if (type === 'date_changed')        return '📅';
+  if (type === 'task_assigned')        return '📋';
+  if (type === 'status_changed')       return '🔄';
+  if (type === 'date_changed')         return '📅';
   if (type === 'adjustments_requested') return '↩️';
-  if (type === 'activity_modified')   return '✏️';
-  if (type === 'next_in_chain')       return '▶️';
+  if (type === 'activity_modified')    return '✏️';
+  if (type === 'next_in_chain')        return '▶️';
   if (type === 'deadline_approaching') return '⏰';
-  if (type === 'overdue')             return '🔴';
-  if (type === 'comment_added')       return '💬';
+  if (type === 'overdue')              return '🔴';
+  if (type === 'overdue_reminder')     return '🔴';
+  if (type === 'comment_added')        return '💬';
+  if (type === 'mention')              return '💬';
+  if (type === 'channel_added')        return '🔔';
+  if (type === 'deliverable_approved') return '✅';
+  if (type === 'deliverable_rejected') return '❌';
+  if (type === 'deliverable_observation') return '📝';
+  if (type === 'executive_summary')    return '📊';
   return '🔔';
+}
+
+function getNotifRoute(n: Notification): string | null {
+  const d = n.data ?? {};
+  const actId = d.activity_id ?? d.role_activity_id;
+  const channelId = d.channel_id;
+  const deliverableId = d.deliverable_id;
+
+  if (n.type === 'mention' && channelId) return `/colaboracion?channel=${channelId}`;
+  if (n.type === 'channel_added' && channelId) return `/colaboracion?channel=${channelId}`;
+  if (n.type === 'comment_added' && deliverableId) return `/entregables?filter=status_in_review`;
+  if (n.type === 'deliverable_approved' || n.type === 'deliverable_rejected' || n.type === 'deliverable_observation') return '/entregables';
+  if (actId) return `/mi-espacio?highlight=${actId}`;
+  if (['task_assigned', 'status_changed', 'date_changed', 'adjustments_requested', 'activity_modified',
+       'next_in_chain', 'deadline_approaching', 'overdue', 'overdue_reminder'].includes(n.type)) return '/mi-espacio';
+  return null;
 }
 
 interface HeaderProps {
@@ -51,6 +75,7 @@ export default function Header({
   onToggleLeftSidebar,
   onMobileMenuOpen,
 }: HeaderProps) {
+  const router = useRouter();
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -209,25 +234,31 @@ export default function Header({
                 {notifications.length === 0 && (
                   <p className="text-center text-sm text-gray-400 py-8">Sin notificaciones</p>
                 )}
-                {notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    onClick={() => !n.read_at && markRead(n.id)}
-                    className={clsx(
-                      'px-4 py-3 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors',
-                      !n.read_at && 'bg-blue-50 dark:bg-blue-900/20'
-                    )}
-                  >
-                    <span className="text-lg flex-shrink-0">{notifIcon(n.type)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className={clsx('text-sm', !n.read_at ? 'font-semibold text-gray-900 dark:text-gray-100' : 'font-medium text-gray-700 dark:text-gray-300')}>
-                        {n.title}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                {notifications.map((n) => {
+                  const route = getNotifRoute(n);
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        if (!n.read_at) markRead(n.id);
+                        if (route) { setNotifOpen(false); router.push(route); }
+                      }}
+                      className={clsx(
+                        'px-4 py-3 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors',
+                        !n.read_at && 'bg-blue-50 dark:bg-blue-900/20'
+                      )}
+                    >
+                      <span className="text-lg flex-shrink-0">{notifIcon(n.type)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={clsx('text-sm', !n.read_at ? 'font-semibold text-gray-900 dark:text-gray-100' : 'font-medium text-gray-700 dark:text-gray-300')}>
+                          {n.title}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="border-t border-gray-100 dark:border-gray-700 px-4 py-2">
