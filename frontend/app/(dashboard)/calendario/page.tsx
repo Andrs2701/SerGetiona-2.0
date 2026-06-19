@@ -417,10 +417,10 @@ function MonthView({
               onClick={() => date && onSelectDay(isSelected ? null : key)}
               className={clsx(
                 'min-h-[90px] border-b border-r border-gray-100 p-1.5 transition-colors',
-                date ? 'cursor-pointer hover:bg-gray-50' : 'bg-gray-50/50',
+                date ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.04]' : 'bg-gray-50/50 dark:bg-white/[0.02]',
                 isToday && 'bg-indigo-50',
                 isSelected && 'ring-2 ring-inset ring-indigo-400',
-                dayEvts.length > 0 && !isToday && !isSelected && 'bg-amber-50/30'
+                dayEvts.length > 0 && !isToday && !isSelected && 'bg-amber-50/30 dark:bg-amber-900/10'
               )}
             >
               {date && (
@@ -432,7 +432,7 @@ function MonthView({
                     {date.getDate()}
                   </div>
                   {dayEvts.map((ev) => (
-                    <div key={ev.id} className="text-[10px] bg-amber-100 text-amber-700 rounded px-1 mb-0.5 truncate">
+                    <div key={ev.id} className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium rounded px-1 mb-0.5 truncate">
                       {ev.name}
                     </div>
                   ))}
@@ -542,13 +542,13 @@ function WeekView({
             <div
               key={key}
               className={clsx(
-                'border-r border-gray-100 last:border-r-0 p-2 min-h-[400px] cursor-pointer hover:bg-gray-50/50 transition-colors',
-                isToday && 'bg-indigo-50/30'
+                'border-r border-gray-100 last:border-r-0 p-2 min-h-[400px] cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/[0.04] transition-colors',
+                isToday && 'bg-indigo-50/30 dark:bg-indigo-900/15'
               )}
               onClick={() => onSelectDay(key)}
             >
               {dayEvts.map((ev) => (
-                <div key={ev.id} className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 mb-1 truncate">
+                <div key={ev.id} className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium rounded px-1.5 py-0.5 mb-1 truncate">
                   {ev.name}
                 </div>
               ))}

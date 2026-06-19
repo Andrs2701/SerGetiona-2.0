@@ -148,7 +148,11 @@ html.dark .text-amber-700,  html.dark .text-amber-800   { color: #fcd34d !import
 html.dark .text-red-700,    html.dark .text-red-800     { color: #fca5a5 !important; }
 html.dark .text-red-500,    html.dark .text-red-600     { color: #fca5a5 !important; }
 html.dark .bg-red-100       { background-color: rgba(239, 68, 68, 0.18) !important; }
-html.dark .bg-amber-100     { background-color: rgba(245, 158, 11, 0.15) !important; }
+html.dark .bg-amber-100     { background-color: rgba(245, 158, 11, 0.18) !important; }
+html.dark .bg-emerald-100   { background-color: rgba(16, 185, 129, 0.18) !important; }
+html.dark .bg-blue-100      { background-color: rgba(59, 130, 246, 0.18) !important; }
+html.dark .bg-purple-100    { background-color: rgba(168, 85, 247, 0.18) !important; }
+html.dark .text-amber-500   { color: #fcd34d !important; }
 html.dark .text-amber-600   { color: #fcd34d !important; }
 html.dark .text-purple-700, html.dark .text-purple-800  { color: #c4b5fd !important; }
 
