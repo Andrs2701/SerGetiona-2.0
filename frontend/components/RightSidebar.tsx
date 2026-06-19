@@ -197,7 +197,7 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
                 {critical.map((i) => (
                   <Link
                     key={i.id}
-                    href={detailHref}
+                    href={isManager ? detailHref : `/mi-espacio?highlight=${i.id}`}
                     className="block bg-red-50/60 border border-red-100 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors"
                   >
                     <p className="text-xs font-medium text-gray-800 truncate">{i.title}</p>
@@ -229,7 +229,7 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
                 {upcoming.map((i) => (
                   <Link
                     key={i.id}
-                    href={detailHref}
+                    href={isManager ? detailHref : `/mi-espacio?highlight=${i.id}`}
                     className="block border border-gray-100 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
                   >
                     <p className="text-xs font-medium text-gray-800 truncate">{i.title}</p>

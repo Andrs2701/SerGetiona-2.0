@@ -12,6 +12,7 @@ import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { useSearchParams } from 'next/navigation';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -382,16 +383,20 @@ function ActivityRow({
   act,
   onSelect,
   selected,
+  highlighted,
 }: {
   act: WorkspaceActivity;
   onSelect: (a: WorkspaceActivity) => void;
   selected: boolean;
+  highlighted?: boolean;
 }) {
   const autoStatus = computeAutoStatus(act);
   const daysLeft = act.commitment_date ? daysDiff(act.commitment_date) : null;
 
   const rowBg = selected
     ? 'bg-indigo-50'
+    : highlighted
+    ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-400'
     : act.date_status === 'overdue'
     ? 'bg-red-50/40 hover:bg-red-50/70'
     : act.date_status === 'approaching'
@@ -400,6 +405,7 @@ function ActivityRow({
 
   return (
     <tr
+      id={`activity-row-${act.id}`}
       onClick={() => onSelect(act)}
       className={clsx('border-b border-gray-100 cursor-pointer transition-colors text-sm', rowBg)}
     >
@@ -464,14 +470,17 @@ function ProgramGroup({
   onSelect,
   selectedId,
   defaultOpen = true,
+  highlightId,
 }: {
   programName: string;
   activities: WorkspaceActivity[];
   onSelect: (a: WorkspaceActivity) => void;
   selectedId: number | null;
   defaultOpen?: boolean;
+  highlightId?: number | null;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const containsHighlight = highlightId ? activities.some(a => a.id === highlightId) : false;
+  const [open, setOpen] = useState(defaultOpen || containsHighlight);
 
   const overdue   = activities.filter(a => a.date_status === 'overdue' && a.status !== 'approved').length;
   const approved  = activities.filter(a => a.status === 'approved').length;
@@ -512,7 +521,7 @@ function ProgramGroup({
       </tr>
       {/* Activity rows */}
       {open && activities.map(act => (
-        <ActivityRow key={act.id} act={act} onSelect={onSelect} selected={selectedId === act.id}/>
+        <ActivityRow key={act.id} act={act} onSelect={onSelect} selected={selectedId === act.id} highlighted={highlightId === act.id}/>
       ))}
     </tbody>
   );
@@ -529,6 +538,8 @@ export default function MiEspacioPage() {
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<WorkspaceActivity[]>([]);
   const [selectedAct, setSelectedAct] = useState<WorkspaceActivity | null>(null);
+  const searchParams = useSearchParams();
+  const [highlightId, setHighlightId] = useState<number | null>(null);
 
   // Filters
   const [search, setSearch]               = useState('');
@@ -556,6 +567,26 @@ export default function MiEspacioPage() {
     const iv = setInterval(loadWorkspace, 60_000);
     return () => clearInterval(iv);
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    const id = searchParams.get('highlight');
+    if (id) {
+      const numId = parseInt(id, 10);
+      if (!isNaN(numId)) setHighlightId(numId);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!highlightId || activities.length === 0) return;
+    const act = activities.find(a => a.id === highlightId);
+    if (act) {
+      setSelectedAct(act);
+      setTimeout(() => {
+        const el = document.getElementById(`activity-row-${highlightId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 350);
+    }
+  }, [highlightId, activities]);
 
   // Optimistic local update + schedule a server sync
   const handleStatusChange = useCallback((id: number, status: string) => {
@@ -772,6 +803,7 @@ export default function MiEspacioPage() {
                     onSelect={setSelectedAct}
                     selectedId={selectedAct?.id ?? null}
                     defaultOpen={!!hasFilters}
+                    highlightId={highlightId}
                   />
                 ))}
               </table>

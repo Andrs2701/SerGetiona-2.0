@@ -139,6 +139,7 @@ function useCountdown(targetDate: string | undefined) {
 // ─── Countdown Banner ────────────────────────────────────────────────────────
 
 function CountdownBanner({ activities }: { activities: WorkspaceActivity[] }) {
+  const router = useRouter();
   const next = [...activities]
     .filter((a) => a.status !== 'approved' && a.commitment_date)
     .filter((a) => {
@@ -155,7 +156,10 @@ function CountdownBanner({ activities }: { activities: WorkspaceActivity[] }) {
   const urgent = d <= 2;
 
   return (
-    <div className={`rounded-xl border px-5 py-4 flex items-center gap-4 ${urgent ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'}`}>
+    <div
+      onClick={() => router.push(`/mi-espacio?highlight=${next.id}`)}
+      className={`cursor-pointer rounded-xl border px-5 py-4 flex items-center gap-4 hover:shadow-md hover:scale-[1.005] transition-all ${urgent ? 'bg-amber-50 border-amber-200 hover:border-amber-300' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-300'}`}
+    >
       <div className={`rounded-lg p-2.5 flex-shrink-0 ${urgent ? 'bg-amber-100' : 'bg-indigo-100'}`}>
         <Timer className={`w-5 h-5 ${urgent ? 'text-amber-600' : 'text-indigo-600'}`} />
       </div>
@@ -430,7 +434,7 @@ export default function DashboardOperativo() {
               <ActivityCard
                 key={act.id}
                 act={act}
-                onClick={() => router.push('/mi-espacio')}
+                onClick={() => router.push(`/mi-espacio?highlight=${act.id}`)}
               />
             ))}
           </div>
