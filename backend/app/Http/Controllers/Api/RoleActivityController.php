@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\ResourceType;
 use App\Models\RoleActivity;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -301,6 +302,13 @@ class RoleActivityController extends Controller
 
         switch ($action) {
             case 'deliver':
+                $hasResourceTypes = ResourceType::where('role', $activity->role)->where('is_active', true)->exists();
+                if ($hasResourceTypes && $activity->productionLogs()->count() === 0) {
+                    return response()->json([
+                        'message' => 'Debes registrar al menos un recurso producido antes de marcar como entregado.',
+                        'requires_production' => true,
+                    ], 422);
+                }
                 $activity->status               = 'delivered';
                 $activity->actual_delivery_date = $today;
                 break;

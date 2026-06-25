@@ -5,11 +5,11 @@ import {
   Search, X, ChevronDown, ChevronUp, ChevronRight,
   Clock, XCircle, CheckCircle2, AlertTriangle,
   CalendarDays, Link2, MessageSquare, GitCommitHorizontal,
-  Send, Plus, Trash2, ExternalLink, Filter,
+  Send, Plus, Trash2, ExternalLink, Filter, Package,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink } from '@/lib/types';
+import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -72,7 +72,7 @@ const ROLE_STATES: Record<string, string[]> = {
 
 // ─── Detail Panel tabs ────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'enlace' | 'comentarios' | 'timeline';
+type PanelTab = 'info' | 'produccion' | 'enlace' | 'comentarios' | 'timeline';
 
 // Timeline
 const TIMELINE_COLORS: Record<string, string> = {
@@ -233,6 +233,137 @@ function CommentsPanel({ deliverableId }: { deliverableId: number }) {
   );
 }
 
+// ─── Production Logs Panel ────────────────────────────────────────────────────
+
+function ProductionLogsPanel({ activityId, role }: { activityId: number; role: string }) {
+  const [logs, setLogs] = useState<ProductionLog[]>([]);
+  const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ resource_type_id: 0, quantity: 1, description: '', produced_at: new Date().toISOString().split('T')[0] });
+
+  useEffect(() => {
+    Promise.all([
+      api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId)).then(r => setLogs(r.data ?? r as unknown as ProductionLog[])),
+      api.get<{ data: ResourceType[] }>(`${ENDPOINTS.RESOURCE_TYPES}?role=${role}`).then(r => {
+        const types = r.data ?? r as unknown as ResourceType[];
+        setResourceTypes(types);
+        if (types.length > 0) setForm(f => ({ ...f, resource_type_id: types[0].id }));
+      }),
+    ]).catch(() => {}).finally(() => setLoading(false));
+  }, [activityId, role]);
+
+  async function handleAdd() {
+    if (!form.resource_type_id || form.quantity < 1) return;
+    setSaving(true);
+    try {
+      const log = await api.post<ProductionLog>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId), form);
+      const full = { ...log as ProductionLog, resource_type: resourceTypes.find(rt => rt.id === form.resource_type_id) };
+      setLogs(p => [full, ...p]);
+      setForm({ resource_type_id: resourceTypes[0]?.id ?? 0, quantity: 1, description: '', produced_at: new Date().toISOString().split('T')[0] });
+      setAdding(false);
+    } catch { /* ignore */ }
+    setSaving(false);
+  }
+
+  async function handleDelete(id: number) {
+    try {
+      await api.delete(`/production-logs/${id}`);
+      setLogs(p => p.filter(l => l.id !== id));
+    } catch (e) {
+      alert(e instanceof Error && e.message.includes('409') ? 'No se puede eliminar: la actividad ya fue entregada.' : 'Error al eliminar.');
+    }
+  }
+
+  if (loading) return <div className="h-16 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/>;
+
+  const totalByType = logs.reduce<Record<string, number>>((acc, l) => {
+    const name = l.resource_type?.name ?? 'Otro';
+    acc[name] = (acc[name] ?? 0) + l.quantity;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-3">
+      {resourceTypes.length === 0 && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">Este rol no tiene tipos de recurso configurados.</p>
+      )}
+
+      {Object.keys(totalByType).length > 0 && (
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1.5">
+          <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide">Resumen de producción</p>
+          {Object.entries(totalByType).map(([name, qty]) => (
+            <div key={name} className="flex justify-between text-xs">
+              <span className="text-indigo-600 dark:text-indigo-400">{name}</span>
+              <span className="font-bold text-indigo-800 dark:text-indigo-200">{qty}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {logs.map((l) => (
+        <div key={l.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-3 py-2">
+          <Package size={13} className="text-indigo-400 flex-shrink-0"/>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{l.resource_type?.name ?? 'Recurso'} <span className="text-indigo-600 dark:text-indigo-400 font-bold">x{l.quantity}</span></p>
+            {l.description && <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{l.description}</p>}
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">{l.produced_at ? formatDate(l.produced_at) : ''}</p>
+          </div>
+          <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-400 dark:hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
+        </div>
+      ))}
+
+      {!logs.length && resourceTypes.length > 0 && !adding && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">Sin registros de producción aún.</p>
+      )}
+
+      {adding && resourceTypes.length > 0 && (
+        <div className="space-y-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Tipo de recurso</label>
+            <select value={form.resource_type_id} onChange={e => setForm(f => ({ ...f, resource_type_id: Number(e.target.value) }))}
+              className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+              {resourceTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Cantidad</label>
+              <input type="number" min={1} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Math.max(1, Number(e.target.value)) }))}
+                className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Fecha</label>
+              <input type="date" value={form.produced_at} onChange={e => setForm(f => ({ ...f, produced_at: e.target.value }))}
+                className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Observaciones (opcional)</label>
+            <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Descripción breve..."
+              className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleAdd} disabled={saving || !form.resource_type_id}
+              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              <Send size={11}/> Registrar
+            </button>
+            <button onClick={() => setAdding(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {!adding && resourceTypes.length > 0 && (
+        <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+          <Plus size={12}/> Registrar producción
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Detail side panel ────────────────────────────────────────────────────────
 
 function DetailPanel({
@@ -273,20 +404,27 @@ function DetailPanel({
     setSaveError(null);
     try {
       await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes });
-      onStatusChange(act.id, status);   // optimistic update
+      onStatusChange(act.id, status);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      onSaved();                         // re-fetch from server so all users see fresh data
-    } catch {
+      onSaved();
+    } catch (e) {
       setStatus(act.status);
-      setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
-      setTimeout(() => setSaveError(null), 4000);
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.includes('requires_production') || msg.includes('registrar al menos un recurso')) {
+        setSaveError('Debes registrar la producción antes de marcar como entregado.');
+        setTab('produccion');
+      } else {
+        setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
+      }
+      setTimeout(() => setSaveError(null), 5000);
     }
     setSaving(false);
   }
 
   const TABS: { id: PanelTab; label: string; icon: React.ElementType }[] = [
     { id: 'info',        label: 'Información',     icon: GitCommitHorizontal },
+    { id: 'produccion',  label: 'Producción',       icon: Package },
     { id: 'enlace',      label: 'Enlace',           icon: Link2 },
     { id: 'comentarios', label: 'Comentarios',      icon: MessageSquare },
     { id: 'timeline',    label: 'Línea de tiempo',  icon: Clock },
@@ -368,6 +506,7 @@ function DetailPanel({
               </button>
             </div>
           )}
+          {tab === 'produccion'  && <><p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Registra los recursos producidos en esta actividad. Es obligatorio antes de marcar como entregado.</p><ProductionLogsPanel activityId={act.id} role={act.role}/></>}
           {tab === 'enlace'      && <><p className="text-xs text-gray-500 mb-3">Agrega enlaces de entrega (Drive, SharePoint, repositorio, etc.)</p><EvidenceLinksPanel activityId={act.id}/></>}
           {tab === 'comentarios' && act.deliverable && <CommentsPanel deliverableId={act.deliverable.id}/>}
           {tab === 'timeline'    && <><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Historial de cambios</p><TimelineView activityId={act.id}/></>}

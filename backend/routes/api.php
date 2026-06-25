@@ -23,6 +23,8 @@ use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\SystemConfigurationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\EvidenceLinkController;
+use App\Http\Controllers\Api\ProductionLogController;
+use App\Http\Controllers\Api\ResourceTypeController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -87,6 +89,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('deliverables/{deliverable}/comments', [CommentController::class, 'index']);
     Route::post('deliverables/{deliverable}/comments', [CommentController::class, 'store']);
 
+    // Tipos de recurso por rol — lectura abierta, gestión solo admin
+    Route::get('resource-types', [ResourceTypeController::class, 'index']);
+
+    // Registros de producción por actividad
+    Route::get('activities/{activity}/production', [ProductionLogController::class, 'byActivity']);
+    Route::post('activities/{activity}/production', [ProductionLogController::class, 'store']);
+    Route::delete('production-logs/{productionLog}', [ProductionLogController::class, 'destroy']);
+
     // Niveles de complejidad — lectura abierta (formularios), gestión solo admin
     Route::get('complexity-levels', [ComplexityLevelController::class, 'index']);
     Route::middleware('role:admin')->group(function () {
@@ -118,6 +128,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('config/visibility-rules', [SystemConfigurationController::class, 'getVisibilityRules']);
         Route::put('config/visibility-rules', [SystemConfigurationController::class, 'updateVisibilityRules']);
+
+        // Tipos de recurso — CRUD admin
+        Route::post('resource-types', [ResourceTypeController::class, 'store']);
+        Route::put('resource-types/{resourceType}', [ResourceTypeController::class, 'update']);
+        Route::delete('resource-types/{resourceType}', [ResourceTypeController::class, 'destroy']);
     });
 
     // Usuarios: lectura para gestión de asignaciones; escritura solo admin.
@@ -153,6 +168,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/export/deliverables', [ExportController::class, 'deliverables']);
         Route::get('/export/projects', [ExportController::class, 'projects']);
+        Route::get('/export/production', [ProductionLogController::class, 'export']);
+
+        // Indicadores de producción
+        Route::get('reports/production', [ProductionLogController::class, 'summary']);
     });
 
     // Flujo secuencial de entregable

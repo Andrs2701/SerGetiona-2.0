@@ -521,6 +521,40 @@ export interface VisibilityRule {
   scope: 'all' | 'assigned_only';
 }
 
+// ── Tipos de recurso y producción ──────────────────────────────────────────
+
+export interface ResourceType {
+  id: number;
+  role: Role;
+  name: string;
+  slug: string;
+  description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface ProductionLog {
+  id: number;
+  role_activity_id: number;
+  resource_type_id: number;
+  quantity: number;
+  description?: string | null;
+  produced_by: number;
+  logged_by: number;
+  produced_at: string;
+  resource_type?: ResourceType;
+  producer?: { id: number; name: string };
+  created_at?: string;
+}
+
+export interface ProductionSummary {
+  totals: { total_records: number; total_quantity: number; unique_producers: number };
+  by_type: Array<{ resource_type: string; role: string; total: number }>;
+  by_role: Array<{ role: string; records: number; total: number }>;
+  by_user: Array<{ user_id: number; user_name: string; user_role: string; total: number; records: number }>;
+  by_project: Array<{ project_id: number; project_name: string; total: number; records: number }>;
+}
+
 export const HEALTH_LEVEL_LABELS: Record<HealthLevel, string> = {
   green: 'Saludable',
   yellow: 'Con alertas',

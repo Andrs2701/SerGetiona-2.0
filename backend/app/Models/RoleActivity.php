@@ -67,4 +67,9 @@ class RoleActivity extends Model
     {
         return $this->hasMany(EvidenceLink::class);
     }
+
+    public function productionLogs()
+    {
+        return $this->hasMany(ProductionLog::class);
+    }
 }

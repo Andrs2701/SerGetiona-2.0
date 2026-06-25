@@ -8,8 +8,9 @@ import SystemRolesConfig from '@/components/SystemRolesConfig';
 import SystemStatusesConfig from '@/components/SystemStatusesConfig';
 import ComplexityLevelsConfig from '@/components/ComplexityLevelsConfig';
 import SystemParametersConfig from '@/components/SystemParametersConfig';
+import ResourceTypesConfig from '@/components/ResourceTypesConfig';
 
-type Tab = 'permissions' | 'roles' | 'statuses' | 'complexity' | 'parameters';
+type Tab = 'permissions' | 'roles' | 'statuses' | 'complexity' | 'parameters' | 'resource_types';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'permissions', label: 'Matriz de Permisos' },
@@ -17,6 +18,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'statuses', label: 'Estados' },
   { key: 'complexity', label: 'Complejidad' },
   { key: 'parameters', label: 'Parámetros' },
+  { key: 'resource_types', label: 'Tipos de Recurso' },
 ];
 
 export default function ConfiguracionPage() {
@@ -53,6 +55,7 @@ export default function ConfiguracionPage() {
       {activeTab === 'statuses' && <SystemStatusesConfig />}
       {activeTab === 'complexity' && <ComplexityLevelsConfig />}
       {activeTab === 'parameters' && <SystemParametersConfig />}
+      {activeTab === 'resource_types' && <ResourceTypesConfig />}
     </div>
   );
 }

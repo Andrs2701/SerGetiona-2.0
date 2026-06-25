@@ -11,10 +11,11 @@ import DashboardOperativo from '@/components/DashboardOperativo';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
 import HealthBadge from '@/components/HealthBadge';
 import CapacityBar from '@/components/CapacityBar';
-import { api, ENDPOINTS } from '@/lib/api';
+import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type {
   DashboardStats, ProgramBreakdown, ActivityByRoleDetail,
   HealthReport, CapacitySummary, CapacityUser, Role, RoleActivity,
+  ProductionSummary,
 } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -83,12 +84,13 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
-type DashTab = 'resumen' | 'seguimiento' | 'capacidad' | 'reportes';
+type DashTab = 'resumen' | 'seguimiento' | 'capacidad' | 'produccion' | 'reportes';
 
 const TABS: { id: DashTab; label: string; icon: React.ElementType }[] = [
   { id: 'resumen',     label: 'Resumen',     icon: LayoutDashboard },
   { id: 'seguimiento', label: 'Seguimiento', icon: GitBranch },
   { id: 'capacidad',   label: 'Capacidad',   icon: Gauge },
+  { id: 'produccion',  label: 'Producción',  icon: Package },
   { id: 'reportes',    label: 'Reportes',    icon: FileBarChart },
 ];
 
@@ -1735,6 +1737,169 @@ function DistribucionPorProyecto({ projects }: { projects: CapacityProjectAgg[] 
 
 // ─── TAB: REPORTES (responsive) ───────────────────────────────────────────────
 
+// ─── Tab Producción ──────────────────────────────────────────────────────────
+
+function TabProduccion() {
+  const [data, setData] = useState<ProductionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [projectFilter, setProjectFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (projectFilter) params.set('project_id', projectFilter);
+    if (roleFilter) params.set('role', roleFilter);
+    const qs = params.toString();
+    api.get<ProductionSummary>(`${ENDPOINTS.PRODUCTION_SUMMARY}${qs ? `?${qs}` : ''}`)
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [projectFilter, roleFilter]);
+
+  if (loading) return <Card><div className="h-32 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/></Card>;
+  if (!data) return <Card><p className="text-sm text-gray-400 text-center py-8">Sin datos de producción.</p></Card>;
+
+  const maxByType = Math.max(...(data.by_type?.map(t => Number(t.total)) ?? [0]), 1);
+  const maxByUser = Math.max(...(data.by_user?.map(u => Number(u.total)) ?? [0]), 1);
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setLoading(true); }}
+          className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+          <option value="">Todos los roles</option>
+          {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <button
+          onClick={() => downloadCsv(`${ENDPOINTS.EXPORT_PRODUCTION}${roleFilter ? `?role=${roleFilter}` : ''}`, `produccion_${new Date().toISOString().split('T')[0]}.csv`)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+        >
+          <FileBarChart size={14}/> Exportar CSV
+        </button>
+      </div>
+
+      {/* Totals */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {[
+          { label: 'Registros totales', value: data.totals?.total_records ?? 0, color: 'text-indigo-600 dark:text-indigo-400' },
+          { label: 'Recursos producidos', value: data.totals?.total_quantity ?? 0, color: 'text-emerald-600 dark:text-emerald-400' },
+          { label: 'Productores únicos', value: data.totals?.unique_producers ?? 0, color: 'text-blue-600 dark:text-blue-400' },
+        ].map(({ label, value, color }) => (
+          <Card key={label} className="py-4 text-center">
+            <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* By type */}
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <Package size={16} className="text-indigo-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Tipo de Recurso</h3>
+          </div>
+          <div className="space-y-2.5">
+            {(data.by_type ?? []).map(t => (
+              <div key={`${t.role}-${t.resource_type}`}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium">{t.resource_type}</span>
+                  <span className="text-gray-500 dark:text-gray-500">{ROLE_LABELS[t.role as keyof typeof ROLE_LABELS] ?? t.role} · {t.total}</span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                  <div className="h-3 rounded-full bg-indigo-400" style={{ width: `${(Number(t.total) / maxByType) * 100}%` }}/>
+                </div>
+              </div>
+            ))}
+            {(data.by_type ?? []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">Sin datos</p>}
+          </div>
+        </Card>
+
+        {/* By role */}
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={16} className="text-blue-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Rol</h3>
+          </div>
+          <div className="space-y-2.5">
+            {(data.by_role ?? []).map(r => {
+              const total = Number(r.total);
+              const maxRole = Math.max(...(data.by_role?.map(x => Number(x.total)) ?? [0]), 1);
+              return (
+                <div key={r.role}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">{ROLE_LABELS[r.role as keyof typeof ROLE_LABELS] ?? r.role}</span>
+                    <span className="text-gray-500 dark:text-gray-500">{r.records} registros · {total} recursos</span>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                    <div className="h-3 rounded-full bg-blue-400" style={{ width: `${(total / maxRole) * 100}%` }}/>
+                  </div>
+                </div>
+              );
+            })}
+            {(data.by_role ?? []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">Sin datos</p>}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* By user */}
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={16} className="text-emerald-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Responsable</h3>
+          </div>
+          <div className="space-y-2">
+            {(data.by_user ?? []).slice(0, 10).map((u, i) => (
+              <div key={u.user_id} className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 w-4 shrink-0 font-semibold">#{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-xs mb-0.5">
+                    <span className="text-gray-700 dark:text-gray-300 font-medium truncate">{u.user_name}</span>
+                    <span className="text-gray-400 dark:text-gray-500 shrink-0 ml-2">{ROLE_LABELS[u.user_role as keyof typeof ROLE_LABELS] ?? u.user_role}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-emerald-400" style={{ width: `${(Number(u.total) / maxByUser) * 100}%` }}/>
+                  </div>
+                </div>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{u.total}</span>
+              </div>
+            ))}
+            {(data.by_user ?? []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">Sin datos</p>}
+          </div>
+        </Card>
+
+        {/* By project */}
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <FolderKanban size={16} className="text-amber-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Proyecto</h3>
+          </div>
+          <div className="space-y-2">
+            {(data.by_project ?? []).map((p, i) => {
+              const maxProj = Math.max(...(data.by_project?.map(x => Number(x.total)) ?? [0]), 1);
+              return (
+                <div key={p.project_id} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400 w-4 shrink-0 font-semibold">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate mb-0.5">{p.project_name}</p>
+                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div className="h-2 rounded-full bg-amber-400" style={{ width: `${(Number(p.total) / maxProj) * 100}%` }}/>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-amber-600 dark:text-amber-400 shrink-0">{p.total}</span>
+                </div>
+              );
+            })}
+            {(data.by_project ?? []).length === 0 && <p className="text-xs text-gray-400 text-center py-4">Sin datos</p>}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function TabReportes({
   stats, health,
 }: {
@@ -1974,6 +2139,7 @@ function DashboardAdmin() {
         )}
         {activeTab === 'seguimiento' && <TabSeguimiento projects={projects} />}
         {activeTab === 'capacidad'   && <TabCapacidad capacity={capacity} workload={workload} programs={stats.programs_breakdown ?? []} />}
+        {activeTab === 'produccion'  && <TabProduccion />}
         {activeTab === 'reportes'    && <TabReportes stats={stats} health={health} />}
       </div>
 

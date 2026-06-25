@@ -147,6 +147,12 @@ export const ENDPOINTS = {
   ACTIVITY_TIMELINE: (id: number) => `/activities/${id}/timeline`,
   DELIVERABLE_FLOW: (id: number) => `/deliverables/${id}/flow`,
 
+  // Resource types & production
+  RESOURCE_TYPES: '/resource-types',
+  ACTIVITY_PRODUCTION: (id: number) => `/activities/${id}/production`,
+  PRODUCTION_SUMMARY: '/reports/production',
+  EXPORT_PRODUCTION: '/export/production',
+
   // Auth extended
   AUTH_ME: '/auth/me',
   AUTH_LOGOUT: '/auth/logout',
