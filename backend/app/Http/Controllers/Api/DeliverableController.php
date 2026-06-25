@@ -241,32 +241,67 @@ class DeliverableController extends Controller
     {
         $deliverable->loadMissing('subject.academicProgram.project');
         abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
-        $deliverable->load('roleActivities.responsible');
 
-        $roleLabels = [
-            'expert' => 'Experto', 'pedagogy' => 'Pedagogía', 'design' => 'Diseño',
-            'audiovisual' => 'Audiovisual', 'engineering' => 'Ingeniería', 'qa' => 'Calidad',
-        ];
+        $deliverable->load([
+            'roleActivities.responsible',
+            'roleActivities.evidenceLinks.user',
+            'roleActivities.productionLogs.resourceType',
+            'roleActivities.productionLogs.producer',
+        ]);
 
-        $completedStatuses = ['approved', 'delivered', 'not_applicable'];
-        $activities  = $deliverable->roleActivities->keyBy('role');
-        $steps       = [];
-        $activeFound = false;
+        $roleOrder  = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+        $activities = $deliverable->roleActivities->keyBy('role');
+        $roles      = [];
 
-        foreach ($roleLabels as $role => $label) {
-            $act       = $activities[$role] ?? null;
-            $status    = $act?->status ?? 'not_started';
-            $completed = in_array($status, $completedStatuses);
-            $step      = ['role' => $role, 'label' => $label, 'status' => $status, 'responsible' => $act?->responsible?->name, 'completed' => $completed];
-
-            if (!$completed && !$activeFound) {
-                $step['active'] = true;
-                $activeFound    = true;
+        foreach ($roleOrder as $role) {
+            $act = $activities[$role] ?? null;
+            if (!$act) {
+                continue;
             }
-            $steps[] = $step;
+
+            // Group production logs by resource type
+            $productionByType = [];
+            foreach ($act->productionLogs as $log) {
+                $typeName = $log->resourceType?->name ?? 'Sin tipo';
+                if (!isset($productionByType[$typeName])) {
+                    $productionByType[$typeName] = ['resource_type' => $typeName, 'total' => 0, 'logs' => []];
+                }
+                $productionByType[$typeName]['total'] += $log->quantity;
+                $productionByType[$typeName]['logs'][] = [
+                    'quantity'    => $log->quantity,
+                    'produced_at' => $log->produced_at?->toDateString(),
+                    'producer'    => $log->producer?->name,
+                ];
+            }
+
+            $roles[] = [
+                'role'                 => $act->role,
+                'activity_id'          => $act->id,
+                'status'               => $act->status,
+                'notes'                => $act->notes,
+                'commitment_date'      => $act->commitment_date?->toDateString(),
+                'actual_delivery_date' => $act->actual_delivery_date?->toDateString(),
+                'responsible'          => $act->responsible ? ['id' => $act->responsible->id, 'name' => $act->responsible->name] : null,
+                'production'           => array_values($productionByType),
+                'links'                => $act->evidenceLinks->map(fn($link) => [
+                    'id'         => $link->id,
+                    'type'       => $link->type,
+                    'title'      => $link->title,
+                    'url'        => $link->url,
+                    'user'       => $link->user ? ['name' => $link->user->name] : null,
+                    'created_at' => $link->created_at?->toIso8601String(),
+                ])->values()->all(),
+            ];
         }
 
-        return response()->json(['steps' => $steps]);
+        return response()->json([
+            'deliverable' => [
+                'id'   => $deliverable->id,
+                'name' => $deliverable->name,
+                'type' => $deliverable->type,
+            ],
+            'roles' => $roles,
+        ]);
     }
 
     // ─── POST /deliverables/{id}/apply-template ───────────────────────────────
