@@ -114,65 +114,65 @@ function TimelineView({ activityId }: { activityId: number }) {
   );
 }
 
-// Evidence links
-function EvidenceLinksPanel({ activityId }: { activityId: number }) {
+// Evidence links — controlled pending state, submits via parent handleSave
+function EvidenceLinksPanel({
+  activityId,
+  pendingUrl, setPendingUrl,
+  pendingTitle, setPendingTitle,
+  onLinksLoaded,
+  refreshKey,
+}: {
+  activityId: number;
+  pendingUrl: string; setPendingUrl: (u: string) => void;
+  pendingTitle: string; setPendingTitle: (t: string) => void;
+  onLinksLoaded: (count: number) => void;
+  refreshKey: number;
+}) {
   const [links, setLinks] = useState<EvidenceLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [url, setUrl] = useState('');
-  const [title, setTitle] = useState('');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     api.get<EvidenceLink[]>(ENDPOINTS.ACTIVITY_EVIDENCE(activityId))
-      .then(setLinks).catch(() => setLinks([]))
+      .then(data => {
+        const arr = Array.isArray(data) ? data : [];
+        setLinks(arr);
+        onLinksLoaded(arr.length);
+      })
+      .catch(() => { setLinks([]); onLinksLoaded(0); })
       .finally(() => setLoading(false));
-  }, [activityId]);
+  }, [activityId, refreshKey]);
 
-  async function handleAdd() {
-    if (!url.trim() || !title.trim()) return;
-    setSaving(true);
-    try {
-      const l = await api.post<EvidenceLink>(ENDPOINTS.ACTIVITY_EVIDENCE(activityId), { type: 'url', title: title.trim(), url: url.trim() });
-      setLinks(p => [...p, l as EvidenceLink]);
-      setUrl(''); setTitle(''); setAdding(false);
-    } catch { /* ignore */ }
-    setSaving(false);
+  async function handleDelete(id: number) {
+    await api.delete(`/evidence/${id}`);
+    setLinks(p => {
+      const updated = p.filter(x => x.id !== id);
+      onLinksLoaded(updated.length);
+      return updated;
+    });
   }
 
-  if (loading) return <div className="h-10 bg-gray-50 rounded animate-pulse"/>;
+  if (loading) return <div className="h-10 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/>;
 
   return (
     <div className="space-y-2">
-      {!links.length && !adding && <p className="text-xs text-gray-400">Sin enlaces adjuntos</p>}
-      {links.map((l) => (
-        <div key={l.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+      {links.map(l => (
+        <div key={l.id} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-3 py-2">
           <Link2 size={13} className="text-indigo-400 flex-shrink-0"/>
-          <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 text-xs text-indigo-600 hover:underline truncate">{l.title || l.url}</a>
+          <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline truncate">{l.title || l.url}</a>
           <ExternalLink size={11} className="text-gray-300 flex-shrink-0"/>
-          <button onClick={async () => { await api.delete(`/evidence/${l.id}`); setLinks(p => p.filter(x => x.id !== l.id)); }} className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
+          <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
         </div>
       ))}
-      {adding && (
-        <div className="space-y-2 bg-gray-50 rounded-lg p-3">
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título del enlace"
-            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 placeholder:text-gray-400"/>
-          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..."
-            className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 placeholder:text-gray-400"/>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={saving || !url.trim() || !title.trim()}
-              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-              <Send size={11}/> Guardar
-            </button>
-            <button onClick={() => { setAdding(false); setUrl(''); setTitle(''); }} className="text-xs text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
-          </div>
-        </div>
-      )}
-      {!adding && (
-        <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors">
-          <Plus size={12}/> Agregar enlace
-        </button>
-      )}
+      <div className="space-y-1.5 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
+        <input value={pendingTitle} onChange={e => setPendingTitle(e.target.value)}
+          placeholder="Título (ej: Entrega Drive Semana 1)"
+          className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
+        <input value={pendingUrl} onChange={e => setPendingUrl(e.target.value)}
+          placeholder="https://drive.google.com/..."
+          className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500">Se guardará junto con los demás cambios</p>
+      </div>
     </div>
   );
 }
@@ -236,50 +236,47 @@ function CommentsPanel({ deliverableId }: { deliverableId: number }) {
 }
 
 // ─── Quick Production Grid ────────────────────────────────────────────────────
+// quantities/date live in parent (DetailPanel); no Registrar button here
 
-function QuickProductionGrid({ activityId, role }: { activityId: number; role: string }) {
+function QuickProductionGrid({
+  activityId, role,
+  quantities, onQuantityChange,
+  date, onDateChange,
+  onLogsLoaded, refreshKey,
+}: {
+  activityId: number; role: string;
+  quantities: Record<number, number>;
+  onQuantityChange: (id: number, qty: number) => void;
+  date: string; onDateChange: (d: string) => void;
+  onLogsLoaded: (count: number) => void;
+  refreshKey: number;
+}) {
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
   const [logs, setLogs] = useState<ProductionLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.get<{ data: ResourceType[] }>(`${ENDPOINTS.RESOURCE_TYPES}?role=${role}`)
         .then(r => setResourceTypes(((r.data ?? r) as ResourceType[]).filter(rt => rt.is_active))),
       api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId))
-        .then(r => setLogs((r.data ?? r) as ProductionLog[])),
+        .then(r => {
+          const data = (r.data ?? r) as ProductionLog[];
+          setLogs(data);
+          onLogsLoaded(data.length);
+        }),
     ]).catch(() => {}).finally(() => setLoading(false));
-  }, [activityId, role]);
-
-  async function handleSubmit() {
-    const toPost = resourceTypes.filter(rt => (quantities[rt.id] ?? 0) > 0);
-    if (!toPost.length) return;
-    setSaving(true);
-    try {
-      await Promise.all(toPost.map(rt =>
-        api.post(ENDPOINTS.ACTIVITY_PRODUCTION(activityId), {
-          resource_type_id: rt.id,
-          quantity: quantities[rt.id],
-          produced_at: date,
-        })
-      ));
-      const updated = await api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId));
-      setLogs((updated.data ?? updated) as ProductionLog[]);
-      setQuantities({});
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch { /* ignore */ }
-    setSaving(false);
-  }
+  }, [activityId, role, refreshKey]);
 
   async function handleDelete(id: number) {
     try {
       await api.delete(`/production-logs/${id}`);
-      setLogs(p => p.filter(l => l.id !== id));
+      setLogs(p => {
+        const updated = p.filter(l => l.id !== id);
+        onLogsLoaded(updated.length);
+        return updated;
+      });
     } catch (e) {
       alert(e instanceof Error && e.message.includes('409') ? 'No se puede eliminar: la actividad ya fue entregada.' : 'Error al eliminar.');
     }
@@ -288,20 +285,11 @@ function QuickProductionGrid({ activityId, role }: { activityId: number; role: s
   if (loading) return <div className="h-16 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/>;
   if (!resourceTypes.length) return <p className="text-xs text-gray-400 dark:text-gray-500 py-1">Este rol no tiene tipos de recurso configurados.</p>;
 
-  const totalByType = logs.reduce<Record<string, number>>((acc, l) => {
-    const name = l.resource_type?.name ?? 'Otro';
-    acc[name] = (acc[name] ?? 0) + l.quantity;
-    return acc;
-  }, {});
-
-  const hasQty = resourceTypes.some(rt => (quantities[rt.id] ?? 0) > 0);
-
   return (
     <div className="space-y-3">
-      {/* Registered summary */}
-      {Object.keys(totalByType).length > 0 && (
+      {logs.length > 0 && (
         <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1">
-          <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1.5">Registrado</p>
+          <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1">Ya registrado</p>
           {logs.map(l => (
             <div key={l.id} className="flex items-center justify-between text-xs">
               <span className="text-indigo-600 dark:text-indigo-400">{l.resource_type?.name} <span className="font-bold text-indigo-800 dark:text-indigo-200">x{l.quantity}</span></span>
@@ -314,36 +302,42 @@ function QuickProductionGrid({ activityId, role }: { activityId: number; role: s
         </div>
       )}
 
-      {/* Grid of type → quantity inputs */}
       <div className="grid grid-cols-2 gap-2">
         {resourceTypes.map(rt => (
           <div key={rt.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-2.5 py-2">
             <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={rt.name}>{rt.name}</span>
-            <input
-              type="number" min={0}
+            <input type="number" min={0}
               value={quantities[rt.id] ?? ''}
               placeholder="0"
-              onChange={e => setQuantities(q => ({ ...q, [rt.id]: Math.max(0, Number(e.target.value)) }))}
+              onChange={e => onQuantityChange(rt.id, Math.max(0, Number(e.target.value)))}
               className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
           </div>
         ))}
       </div>
 
-      {/* Date + submit row */}
-      <div className="flex items-end gap-2">
-        <div>
-          <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-0.5">Fecha</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
-        </div>
-        <button onClick={handleSubmit} disabled={saving || !hasQty}
-          className={clsx('flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors',
-            saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
-            (saving || !hasQty) && 'opacity-50 cursor-not-allowed')}>
-          {saving ? 'Registrando...' : saved ? '✓ Registrado' : <><Send size={11}/> Registrar</>}
-        </button>
+      <div>
+        <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-0.5">Fecha de producción</label>
+        <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
+          className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
       </div>
+    </div>
+  );
+}
+
+// ─── Step header (numbered section title) ─────────────────────────────────────
+
+function StepHeader({ step, label, done }: { step: number; label: string; done?: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className={clsx(
+        'w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors',
+        done
+          ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+          : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+      )}>{step}</span>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex-1">{label}</p>
+      {done && <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0"/>}
     </div>
   );
 }
@@ -370,12 +364,30 @@ function DetailPanel({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Sync local state when a different activity is selected
+  // Lifted production state — submitted by handleSave, not by QuickProductionGrid
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [prodDate, setProdDate] = useState(new Date().toISOString().split('T')[0]);
+  const [existingLogsCount, setExistingLogsCount] = useState(0);
+  // Lifted evidence link state — submitted by handleSave, not by EvidenceLinksPanel
+  const [pendingUrl, setPendingUrl] = useState('');
+  const [pendingTitle, setPendingTitle] = useState('');
+  const [existingLinksCount, setExistingLinksCount] = useState(0);
+  // Increment to re-fetch child components after save
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Reset all when switching activity
   useEffect(() => {
     setStatus(act.status);
     setNotes(act.notes ?? '');
     setSaved(false);
     setSaveError(null);
+    setQuantities({});
+    setProdDate(new Date().toISOString().split('T')[0]);
+    setPendingUrl('');
+    setPendingTitle('');
+    setExistingLogsCount(0);
+    setExistingLinksCount(0);
+    setRefreshKey(k => k + 1);
   }, [act.id]);
 
   const allStates = ROLE_STATES[act.role] ?? Object.keys(ROLE_STATUS_LABELS);
@@ -383,24 +395,66 @@ function DetailPanel({
     ? allStates
     : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
 
+  const isProdRole = PRODUCTION_ROLES.has(act.role);
+  const toPost = Object.entries(quantities)
+    .filter(([, qty]) => qty > 0)
+    .map(([rtId, qty]) => ({ resource_type_id: Number(rtId), quantity: qty }));
+  const hasProduction = existingLogsCount > 0 || toPost.length > 0;
+  const hasPendingLink = pendingUrl.trim() !== '' && pendingTitle.trim() !== '';
+  const hasLink = existingLinksCount > 0 || hasPendingLink;
+  const prodStep = isProdRole ? 2 : undefined;
+  const linkStep = isProdRole ? 3 : 2;
+
   async function handleSave() {
     setSaving(true);
     setSaveError(null);
+
+    // Validate before attempting delivery
+    if (status === 'delivered' && isProdRole) {
+      if (!hasProduction) {
+        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado.`);
+        setSaving(false);
+        return;
+      }
+      if (!hasLink) {
+        setSaveError(`Completa la sección ${linkStep} – Enlace antes de marcar como Entregado.`);
+        setSaving(false);
+        return;
+      }
+    }
+
     try {
+      // 1. POST production quantities in parallel
+      if (toPost.length > 0) {
+        await Promise.all(toPost.map(item =>
+          api.post(ENDPOINTS.ACTIVITY_PRODUCTION(act.id), { ...item, produced_at: prodDate })
+        ));
+        setQuantities({});
+      }
+      // 2. POST pending evidence link
+      if (hasPendingLink) {
+        await api.post(ENDPOINTS.ACTIVITY_EVIDENCE(act.id), {
+          type: 'url', title: pendingTitle.trim(), url: pendingUrl.trim(),
+        });
+        setPendingUrl('');
+        setPendingTitle('');
+      }
+      // 3. PUT status + notes
       await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes });
       onStatusChange(act.id, status);
       setSaved(true);
+      setRefreshKey(k => k + 1);
       setTimeout(() => setSaved(false), 2500);
       onSaved();
     } catch (e) {
       setStatus(act.status);
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('requires_production') || msg.includes('registrar al menos un recurso')) {
-        setSaveError('Debes registrar la producción antes de marcar como entregado. Completa la sección de Producción más abajo.');
+        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado.`);
       } else {
         setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
       }
-      setTimeout(() => setSaveError(null), 5000);
+      setTimeout(() => setSaveError(null), 6000);
     }
     setSaving(false);
   }
@@ -438,12 +492,14 @@ function DetailPanel({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto">
           {tab === 'principal' && (
-            <div className="space-y-5">
-              {/* ── Información ── */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+
+              {/* ── Paso 1: Información ── */}
+              <div className="px-5 py-4 space-y-3">
+                <StepHeader step={1} label="Información"/>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs mt-3">
                   {[
                     ['Programa', act.program?.name ?? '—'],
                     ['Asignatura', act.subject?.name ?? '—'],
@@ -455,14 +511,14 @@ function DetailPanel({
                     ...(act.actual_delivery_date ? [['Entregado el', formatDate(act.actual_delivery_date)]] : []),
                   ].map(([label, value]) => (
                     <div key={label}>
-                      <p className="text-gray-400 mb-0.5">{label}</p>
+                      <p className="text-gray-400 dark:text-gray-500 mb-0.5">{label}</p>
                       <p className="font-medium text-gray-800 dark:text-gray-200">{value}</p>
                     </div>
                   ))}
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Estado</p>
+                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Estado</p>
                   <select value={status} onChange={e => setStatus(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
                     {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
@@ -470,50 +526,81 @@ function DetailPanel({
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Observaciones</p>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
                     placeholder="Notas u observaciones..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:bg-gray-700"/>
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
                 </div>
+              </div>
 
+              {/* ── Paso 2: Producción (solo roles productivos) ── */}
+              {isProdRole && (
+                <div className="px-5 py-4 space-y-3">
+                  <StepHeader step={2} label="Producción" done={hasProduction}/>
+                  <div className="mt-1">
+                    <QuickProductionGrid
+                      activityId={act.id}
+                      role={act.role}
+                      quantities={quantities}
+                      onQuantityChange={(id, qty) => setQuantities(q => ({ ...q, [id]: qty }))}
+                      date={prodDate}
+                      onDateChange={setProdDate}
+                      onLogsLoaded={setExistingLogsCount}
+                      refreshKey={refreshKey}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Paso 2 o 3: Enlace de entrega ── */}
+              <div className="px-5 py-4 space-y-3">
+                <StepHeader step={linkStep} label="Enlace de entrega" done={hasLink}/>
+                <div className="mt-1">
+                  <EvidenceLinksPanel
+                    activityId={act.id}
+                    pendingUrl={pendingUrl}
+                    setPendingUrl={setPendingUrl}
+                    pendingTitle={pendingTitle}
+                    setPendingTitle={setPendingTitle}
+                    onLinksLoaded={setExistingLinksCount}
+                    refreshKey={refreshKey}
+                  />
+                </div>
+              </div>
+
+              {/* ── Guardar ── */}
+              <div className="px-5 py-4 space-y-3">
                 {saveError && (
                   <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
                     {saveError}
                   </p>
                 )}
                 <button onClick={handleSave} disabled={saving}
-                  className={clsx('w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors',
+                  className={clsx('w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors',
                     saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
                     saving && 'opacity-60')}>
                   {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
                 </button>
+                {status === 'delivered' && isProdRole && (!hasProduction || !hasLink) && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">
+                    Para marcar como Entregado completa la producción y el enlace.
+                  </p>
+                )}
               </div>
 
-              {/* ── Producción (solo roles productivos) ── */}
-              {PRODUCTION_ROLES.has(act.role) && (
-                <>
-                  <div className="border-t border-gray-100 dark:border-gray-700"/>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <Package size={12}/>Producción
-                    </p>
-                    <QuickProductionGrid activityId={act.id} role={act.role}/>
-                  </div>
-                </>
-              )}
-
-              {/* ── Enlace de entrega ── */}
-              <div className="border-t border-gray-100 dark:border-gray-700"/>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <Link2 size={12}/>Enlace de entrega
-                </p>
-                <EvidenceLinksPanel activityId={act.id}/>
-              </div>
             </div>
           )}
-          {tab === 'comentarios' && act.deliverable && <CommentsPanel deliverableId={act.deliverable.id}/>}
-          {tab === 'timeline'    && <><p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Historial de cambios</p><TimelineView activityId={act.id}/></>}
+          {tab === 'comentarios' && (
+            <div className="p-5">
+              {act.deliverable && <CommentsPanel deliverableId={act.deliverable.id}/>}
+            </div>
+          )}
+          {tab === 'timeline' && (
+            <div className="p-5">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Historial de cambios</p>
+              <TimelineView activityId={act.id}/>
+            </div>
+          )}
         </div>
       </div>
     </div>
