@@ -799,17 +799,22 @@ export default function MiEspacioPage() {
   }, [loadWorkspace]);
 
   useEffect(() => {
-    const id = searchParams.get('highlight');
-    if (id) {
-      const numId = parseInt(id, 10);
+    // ?open=ID also supported: both ?highlight= and ?open= set highlightId and open the panel
+    const highlight = searchParams.get('highlight');
+    const open = searchParams.get('open');
+    const rawId = open ?? highlight;
+    if (rawId) {
+      const numId = parseInt(rawId, 10);
       if (!isNaN(numId)) setHighlightId(numId);
     }
   }, [searchParams]);
 
   useEffect(() => {
     if (!highlightId || activities.length === 0) return;
+    // Search ALL activities so completed/filtered-out ones are still found
     const act = activities.find(a => a.id === highlightId);
     if (act) {
+      // Auto-open the detail panel for the linked activity
       setSelectedAct(act);
       setTimeout(() => {
         const el = document.getElementById(`activity-row-${highlightId}`);
