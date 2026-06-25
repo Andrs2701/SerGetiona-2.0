@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog } from '@/lib/types';
+import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -72,7 +72,7 @@ const ROLE_STATES: Record<string, string[]> = {
 
 // ─── Detail Panel tabs ────────────────────────────────────────────────────────
 
-type PanelTab = 'principal' | 'comentarios' | 'timeline';
+type PanelTab = 'principal' | 'evidencias' | 'comentarios' | 'timeline';
 
 const PRODUCTION_ROLES = new Set(['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa']);
 
@@ -173,6 +173,107 @@ function EvidenceLinksPanel({
           className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
         <p className="text-[10px] text-gray-400 dark:text-gray-500">Se guardará junto con los demás cambios</p>
       </div>
+    </div>
+  );
+}
+
+// Evidencias tab — full flow per role
+function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
+  const [flow, setFlow] = useState<DeliverableFlow | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get<DeliverableFlow>(ENDPOINTS.DELIVERABLE_FLOW(deliverableId))
+      .then(setFlow)
+      .catch(() => setFlow(null))
+      .finally(() => setLoading(false));
+  }, [deliverableId]);
+
+  if (loading) return <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700/40 rounded-lg animate-pulse"/>)}</div>;
+  if (!flow) return <p className="text-sm text-gray-400 py-4 text-center">No hay información disponible</p>;
+
+  const ROLE_LABELS_LOCAL: Record<string, string> = {
+    expert: 'Experto', pedagogy: 'Pedagogía', design: 'Diseño',
+    audiovisual: 'Audiovisual', engineering: 'Ingeniería', qa: 'QA',
+  };
+  const STATUS_COLORS: Record<string, string> = {
+    delivered: 'bg-teal-100 text-teal-700', approved: 'bg-emerald-100 text-emerald-700',
+    not_started: 'bg-gray-100 text-gray-500', in_progress: 'bg-blue-100 text-blue-700',
+    in_development: 'bg-blue-100 text-blue-700', draft: 'bg-blue-100 text-blue-700',
+    adjustments_requested: 'bg-orange-100 text-orange-700',
+    with_findings: 'bg-orange-100 text-orange-700',
+  };
+
+  return (
+    <div className="space-y-4">
+      {flow.roles.map(r => {
+        const hasContent = r.production.length > 0 || r.links.length > 0 || r.notes;
+        if (!hasContent && r.status === 'not_started') return null;
+        const statusColor = STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-500';
+        return (
+          <div key={r.role} className="border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden">
+            {/* Role header */}
+            <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-700/40">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {ROLE_LABELS_LOCAL[r.role] ?? r.role}
+                </span>
+                {r.responsible && <span className="text-[10px] text-gray-400">— {r.responsible.name}</span>}
+              </div>
+              <span className={clsx('text-[10px] font-medium px-2 py-0.5 rounded-full', statusColor)}>
+                {ROLE_STATUS_LABELS[r.status] ?? r.status}
+              </span>
+            </div>
+
+            {/* Content */}
+            <div className="px-3 py-2.5 space-y-2.5">
+              {/* Production resources */}
+              {r.production.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Recursos producidos</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {r.production.map(p => (
+                      <span key={p.resource_type} className="inline-flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                        {p.resource_type} <span className="font-bold">({p.total})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Evidence links */}
+              {r.links.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Evidencias</p>
+                  {r.links.map(l => (
+                    <div key={l.id} className="flex items-center gap-2 text-xs py-1">
+                      <Link2 size={11} className="text-indigo-400 flex-shrink-0"/>
+                      {l.url ? (
+                        <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 text-indigo-600 dark:text-indigo-400 hover:underline truncate">{l.title}</a>
+                      ) : (
+                        <span className="flex-1 text-gray-700 dark:text-gray-300 truncate">{l.title}</span>
+                      )}
+                      {l.user && <span className="text-[10px] text-gray-400 flex-shrink-0">{l.user.name}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Notes */}
+              {r.notes && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">Observaciones</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{r.notes}</p>
+                </div>
+              )}
+
+              {!r.production.length && !r.links.length && !r.notes && (
+                <p className="text-xs text-gray-400 py-1">Sin registros para este rol</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -461,6 +562,7 @@ function DetailPanel({
 
   const TABS: { id: PanelTab; label: string; icon: React.ElementType }[] = [
     { id: 'principal',   label: 'Actividad',        icon: GitCommitHorizontal },
+    { id: 'evidencias',  label: 'Evidencias',       icon: Package },
     { id: 'comentarios', label: 'Comentarios',      icon: MessageSquare },
     { id: 'timeline',    label: 'Línea de tiempo',  icon: Clock },
   ];
@@ -588,6 +690,14 @@ function DetailPanel({
                 )}
               </div>
 
+            </div>
+          )}
+          {tab === 'evidencias' && act.deliverable && (
+            <div className="p-5">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                Información registrada por cada rol durante el flujo de producción de este entregable.
+              </p>
+              <EvidenciasTab deliverableId={act.deliverable.id}/>
             </div>
           )}
           {tab === 'comentarios' && (

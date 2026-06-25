@@ -555,6 +555,23 @@ export interface ProductionSummary {
   by_project: Array<{ project_id: number; project_name: string; total: number; records: number }>;
 }
 
+export interface DeliverableFlowRole {
+  role: string;
+  activity_id: number;
+  status: string;
+  notes?: string;
+  commitment_date?: string;
+  actual_delivery_date?: string;
+  responsible?: { id: number; name: string };
+  production: { resource_type: string; total: number; logs: { quantity: number; produced_at?: string; producer?: string }[] }[];
+  links: { id: number; type: string; title: string; url?: string; user?: { name: string }; created_at: string }[];
+}
+
+export interface DeliverableFlow {
+  deliverable: { id: number; name: string };
+  roles: DeliverableFlowRole[];
+}
+
 export const HEALTH_LEVEL_LABELS: Record<HealthLevel, string> = {
   green: 'Saludable',
   yellow: 'Con alertas',
