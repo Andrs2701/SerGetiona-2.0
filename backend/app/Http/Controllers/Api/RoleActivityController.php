@@ -137,6 +137,32 @@ class RoleActivityController extends Controller
         };
     }
 
+    /**
+     * Build the enriched data payload for status_changed notifications.
+     * Requires 'deliverable.subject.academicProgram' to be loaded on $activity.
+     */
+    private function buildStatusNotificationData(RoleActivity $activity): array
+    {
+        $deliverable = $activity->deliverable;
+        $subject     = $deliverable?->subject;
+        $program     = $subject?->academicProgram;
+
+        return [
+            'entity_type'      => 'RoleActivity',
+            'entity_id'        => $activity->id,
+            'activity_id'      => $activity->id,
+            'role_activity_id' => $activity->id,
+            'deliverable_id'   => $activity->deliverable_id,
+            'deliverable_name' => $deliverable?->name,
+            'role'             => $activity->role,
+            'status'           => $activity->status,
+            'new_status'       => $activity->status,
+            'commitment_date'  => $activity->commitment_date?->toDateString(),
+            'subject'          => $subject?->name,
+            'program'          => $program?->name,
+        ];
+    }
+
     public function update(Request $request, RoleActivity $activity)
     {
         if ($denied = $this->authorizeActivity($request, $activity)) {
@@ -195,6 +221,7 @@ class RoleActivityController extends Controller
             ]);
         }
 
+        $activity->loadMissing('deliverable.subject.academicProgram');
         $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
 
         // Notification: task assigned (new responsible)
@@ -209,12 +236,13 @@ class RoleActivityController extends Controller
         if (isset($dirty['status'])) {
             $newLabel = self::translateStatus($activity->status);
             $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
+            $statusData = $this->buildStatusNotificationData($activity);
             NotificationService::notifyMany(
                 $managers,
                 'status_changed',
                 'Estado de actividad cambiado',
                 "La actividad '{$activity->role}' de '{$deliverableName}' cambió a '{$newLabel}'.",
-                ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'new_status' => $activity->status]
+                $statusData
             );
 
             // Notify the responsible if change was made by a manager
@@ -226,7 +254,7 @@ class RoleActivityController extends Controller
                         'status_changed',
                         'Estado de tu actividad actualizado',
                         "El estado de tu actividad '{$activity->role}' en '{$deliverableName}' fue cambiado a '{$newLabel}'.",
-                        ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'new_status' => $activity->status]
+                        $statusData
                     );
                 }
             }
@@ -359,15 +387,17 @@ class RoleActivityController extends Controller
         ]);
 
         // Notify admins + coordinators
+        $activity->loadMissing('deliverable.subject.academicProgram');
         $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
         $newLabel = self::translateStatus($activity->status);
         $delName  = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+        $statusData = $this->buildStatusNotificationData($activity);
         NotificationService::notifyMany(
             $managers,
             'status_changed',
             'Estado de actividad cambiado',
             "La actividad '{$activity->role}' de '{$delName}' cambió a '{$newLabel}'.",
-            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'new_status' => $activity->status]
+            $statusData
         );
 
         // Notify the activity owner (if different from who triggered the action)
@@ -379,7 +409,7 @@ class RoleActivityController extends Controller
                     'status_changed',
                     'Estado de tu actividad actualizado',
                     "El estado de tu actividad '{$activity->role}' en '{$delName}' fue cambiado a '{$newLabel}'.",
-                    ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                    $statusData
                 );
             }
         }
