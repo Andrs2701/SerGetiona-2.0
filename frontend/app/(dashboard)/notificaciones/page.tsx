@@ -11,6 +11,7 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Notification } from '@/lib/types';
 import { ROLE_STATUS_LABELS } from '@/lib/types';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -90,7 +91,8 @@ function NotifMetaRow({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function getNotifRoute(n: Notification): string | null {
+function getNotifRoute(n: Notification, userRole?: string): string | null {
+  const isManager = userRole === 'admin' || userRole === 'coordinator';
   const d = n.data ?? {};
   const actId = d.activity_id ?? d.role_activity_id;
   const channelId = d.channel_id;
@@ -101,6 +103,11 @@ function getNotifRoute(n: Notification): string | null {
   if (n.type === 'comment_added' && deliverableId) return `/entregables?filter=status_in_review`;
 
   if (n.type === 'deliverable_approved' || n.type === 'deliverable_rejected' || n.type === 'deliverable_observation') {
+    return '/entregables';
+  }
+
+  if (isManager) {
+    if (deliverableId) return `/entregables?deliverable=${deliverableId}`;
     return '/entregables';
   }
 
@@ -137,6 +144,7 @@ function matchesFilter(n: Notification, f: FilterType): boolean {
 
 export default function NotificacionesPage() {
   const router = useRouter();
+  const { user } = useAuthContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
@@ -169,7 +177,7 @@ export default function NotificacionesPage() {
 
   function handleClick(n: Notification) {
     if (!n.read_at) markRead(n.id);
-    const route = getNotifRoute(n);
+    const route = getNotifRoute(n, user?.role);
     if (route) router.push(route);
   }
 
@@ -286,7 +294,7 @@ export default function NotificacionesPage() {
           <div className="space-y-1">
             {group.items.map(n => {
               const cfg = getNotifConfig(n.type);
-              const route = getNotifRoute(n);
+              const route = getNotifRoute(n, user?.role);
               return (
                 <button
                   key={n.id}

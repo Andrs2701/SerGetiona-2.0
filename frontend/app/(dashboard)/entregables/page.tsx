@@ -5,11 +5,11 @@ import {
   Search, Eye, MessageCircle, FileText, CheckCircle2, Send, RotateCcw,
   X, Download, ChevronDown, AlertCircle, Clock, Filter,
   Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
-  BookOpen, FolderOpen, LayoutList, Table2,
+  BookOpen, FolderOpen, LayoutList, Table2, ExternalLink,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Deliverable, RoleActivity, Comment, Role, User } from '@/lib/types';
+import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow } from '@/lib/types';
 import {
   GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
 } from '@/lib/types';
@@ -671,12 +671,14 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
 // ─── Side Panel ───────────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'flow' | 'comments';
+type PanelTab = 'info' | 'flow' | 'evidencias' | 'comments';
 
 function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [flow, setFlow] = useState<DeliverableFlow | null>(null);
+  const [loadingFlow, setLoadingFlow] = useState(false);
 
   useEffect(() => { setTab(defaultTab); }, [defaultTab, deliverable.id]);
   useEffect(() => {
@@ -684,6 +686,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
     setLoadingComments(true);
     api.get<Comment[]>(ENDPOINTS.DELIVERABLE_COMMENTS(deliverable.id))
       .then(setComments).catch(() => setComments([])).finally(() => setLoadingComments(false));
+  }, [tab, deliverable.id]);
+  useEffect(() => {
+    if (tab !== 'evidencias') return;
+    setLoadingFlow(true);
+    api.get<DeliverableFlow>(ENDPOINTS.DELIVERABLE_FLOW(deliverable.id))
+      .then(setFlow).catch(() => setFlow(null)).finally(() => setLoadingFlow(false));
   }, [tab, deliverable.id]);
 
   return (
@@ -699,12 +707,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
           <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
         <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
-          {(['info', 'flow', 'comments'] as PanelTab[]).map(t => (
+          {(['info', 'flow', 'evidencias', 'comments'] as PanelTab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={clsx(
               'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
             )}>
-              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : 'Comentarios'}
+              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : t === 'evidencias' ? 'Evidencias' : 'Comentarios'}
             </button>
           ))}
         </div>
@@ -779,6 +787,91 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                         <p className="text-sm text-gray-700">{c.content}</p>
                       </div>
                     ))}
+                  </div>
+          )}
+          {tab === 'evidencias' && (
+            loadingFlow
+              ? <div className="text-center py-10 text-gray-400 text-sm">Cargando evidencias…</div>
+              : !flow
+                ? <div className="text-center py-10 text-gray-400 text-sm">Sin datos de producción</div>
+                : <div className="space-y-5">
+                    {/* Recursos entregados por rol */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recursos entregados por rol</p>
+                      <div className="space-y-2">
+                        {flow.roles.map(r => {
+                          const totalProd = r.production.reduce((s, p) => s + p.total, 0);
+                          if (r.status === 'not_applicable') return null;
+                          return (
+                            <div key={r.role} className={clsx(
+                              'rounded-lg border p-3',
+                              ROLE_CELL_COLORS[r.role as Role]?.bg ?? 'bg-gray-50',
+                              ROLE_CELL_COLORS[r.role as Role]?.border ?? 'border-gray-100',
+                            )}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[r.role as Role] ?? 'bg-gray-400')}>
+                                    {ROLE_ABBR[r.role as Role] ?? r.role.toUpperCase()}
+                                  </span>
+                                  <span className={clsx('text-xs font-semibold', ROLE_CELL_COLORS[r.role as Role]?.label ?? 'text-gray-700')}>
+                                    {ROLE_LABELS[r.role as Role] ?? r.role}
+                                  </span>
+                                </div>
+                                <ActivityStatusBadge status={r.status} />
+                              </div>
+                              {r.production.length === 0 ? (
+                                <p className="text-[10px] text-gray-400 italic">Sin producción registrada</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-1.5 mt-1">
+                                  {r.production.map(p => (
+                                    <span key={p.resource_type} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/70 rounded text-[10px] font-medium text-gray-700 border border-white/50">
+                                      <span className="font-bold">{p.total}</span> {p.resource_type}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {r.responsible && (
+                                <p className="text-[10px] text-gray-500 mt-1.5 flex items-center gap-1">
+                                  <UserIcon size={9} /> {r.responsible.name}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Enlaces de evidencia */}
+                    {flow.roles.some(r => r.links.length > 0) && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Evidencias y enlaces</p>
+                        <div className="space-y-1.5">
+                          {flow.roles.flatMap(r => r.links.map(lk => ({ ...lk, role: r.role }))).map(lk => (
+                            <div key={lk.id} className="flex items-start gap-2.5 bg-gray-50 rounded-lg px-3 py-2">
+                              <ExternalLink size={12} className="text-indigo-400 mt-0.5 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[lk.role as Role] ?? 'bg-gray-400')}>
+                                    {ROLE_ABBR[lk.role as Role] ?? lk.role.toUpperCase()}
+                                  </span>
+                                  {lk.url ? (
+                                    <a href={lk.url} target="_blank" rel="noopener noreferrer"
+                                      className="text-xs font-medium text-indigo-600 hover:underline truncate max-w-[220px]">
+                                      {lk.title}
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs font-medium text-gray-700 truncate">{lk.title}</span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  {lk.user?.name ?? '—'} · {new Date(lk.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
           )}
         </div>
@@ -1032,6 +1125,7 @@ export default function EntregablesPage() {
   const [showImport, setShowImport]   = useState(false);
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
   const [users, setUsers]       = useState<User[]>([]);
+  const autoOpenedRef = useRef(false);
 
   useEffect(() => {
     api.get<Array<{ id: number; name: string }>>(ENDPOINTS.PROJECTS)
@@ -1047,6 +1141,18 @@ export default function EntregablesPage() {
     else if (filter.startsWith('status_')) setFilterStatus(filter.replace('status_', ''));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (autoOpenedRef.current || data.length === 0) return;
+    const deliverableIdStr = searchParams.get('deliverable');
+    if (!deliverableIdStr) return;
+    const target = data.find(d => d.id === Number(deliverableIdStr));
+    if (target) {
+      setPanel({ deliverable: target, tab: 'info' });
+      autoOpenedRef.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
