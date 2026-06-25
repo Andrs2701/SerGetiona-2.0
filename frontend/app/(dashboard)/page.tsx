@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FolderKanban, BookOpen, Activity, XCircle, CheckCircle2,
   TrendingUp, AlertTriangle, BarChart3, Users, Clock, Package,
@@ -1276,12 +1276,21 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
         <div key={i} className="absolute top-0 bottom-0 border-r border-gray-100 dark:border-gray-700/50" style={{ left: i * timeline.cellPx, width: timeline.cellPx }} />
       ))}
       {timeline.todayX >= 0 && timeline.todayX <= timeline.totalPx && (
-        <div className="absolute top-0 bottom-0 z-20 border-l-2 border-dotted border-gray-900 dark:border-gray-100" style={{ left: timeline.todayX }}>
-          <span className="absolute -top-5 -translate-x-1/2 rounded bg-gray-900 px-1.5 py-0.5 text-[9px] font-bold text-white dark:bg-gray-100 dark:text-gray-900">Hoy</span>
-        </div>
+        <div className="absolute top-0 bottom-0 z-20 border-l-2 border-dotted border-red-500/70 dark:border-red-400/70 pointer-events-none" style={{ left: timeline.todayX }} />
       )}
     </>
   );
+
+  const ganttScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loading && programs.length > 0 && ganttScrollRef.current) {
+      const container = ganttScrollRef.current;
+      const scrollTarget = timeline.todayX - container.clientWidth / 2 + 170;
+      requestAnimationFrame(() => {
+        container.scrollLeft = Math.max(0, scrollTarget);
+      });
+    }
+  }, [loading, programs.length, timeline.todayX]);
 
   return (
     <div className="space-y-4">
@@ -1304,6 +1313,16 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
           <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
             <button onClick={expandAll} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 sm:flex-none">Expandir todo</button>
             <button onClick={collapseAll} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 sm:flex-none">Colapsar todo</button>
+            <button
+              onClick={() => {
+                if (ganttScrollRef.current) {
+                  ganttScrollRef.current.scrollTo({ left: Math.max(0, timeline.todayX - ganttScrollRef.current.clientWidth / 2 + 170), behavior: 'smooth' });
+                }
+              }}
+              className="flex-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 sm:flex-none"
+            >
+              Ir a hoy
+            </button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -1317,7 +1336,7 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
       </Card>
 
       <Card className="relative overflow-hidden p-0">
-        <div className="max-h-[640px] overflow-auto" onMouseLeave={() => setTooltip(null)}>
+        <div ref={ganttScrollRef} className="max-h-[640px] overflow-auto" onMouseLeave={() => setTooltip(null)}>
           <div style={{ minWidth: 340 + timeline.totalPx }}>
             <div className="sticky top-0 z-30 flex border-b border-gray-200 bg-gray-50 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <div className="sticky left-0 z-40 w-[340px] shrink-0 border-r border-gray-200 bg-gray-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-900">
@@ -1331,13 +1350,18 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
                     </div>
                   ))}
                 </div>
-                <div className="flex h-8">
+                <div className="relative flex h-8">
                   {timeline.weekStarts.map((week, i) => (
                     <div key={i} className="shrink-0 border-r border-gray-200 px-1 py-1 text-center text-[10px] text-gray-500 dark:border-gray-700" style={{ width: timeline.cellPx }}>
                       <span className="font-semibold">Sem {i + 1}</span>
                       <span className="block">{week.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}</span>
                     </div>
                   ))}
+                  {timeline.todayX >= 0 && timeline.todayX <= timeline.totalPx && (
+                    <div className="absolute top-0 bottom-0 z-20 pointer-events-none" style={{ left: timeline.todayX }}>
+                      <span className="absolute -top-[22px] -translate-x-1/2 rounded bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">Hoy</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
