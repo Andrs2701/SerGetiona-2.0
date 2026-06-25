@@ -72,7 +72,9 @@ const ROLE_STATES: Record<string, string[]> = {
 
 // ─── Detail Panel tabs ────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'produccion' | 'enlace' | 'comentarios' | 'timeline';
+type PanelTab = 'principal' | 'comentarios' | 'timeline';
+
+const PRODUCTION_ROLES = new Set(['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa']);
 
 // Timeline
 const TIMELINE_COLORS: Record<string, string> = {
@@ -233,36 +235,43 @@ function CommentsPanel({ deliverableId }: { deliverableId: number }) {
   );
 }
 
-// ─── Production Logs Panel ────────────────────────────────────────────────────
+// ─── Quick Production Grid ────────────────────────────────────────────────────
 
-function ProductionLogsPanel({ activityId, role }: { activityId: number; role: string }) {
-  const [logs, setLogs] = useState<ProductionLog[]>([]);
+function QuickProductionGrid({ activityId, role }: { activityId: number; role: string }) {
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
+  const [logs, setLogs] = useState<ProductionLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ resource_type_id: 0, quantity: 1, description: '', produced_at: new Date().toISOString().split('T')[0] });
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId)).then(r => setLogs(r.data ?? r as unknown as ProductionLog[])),
-      api.get<{ data: ResourceType[] }>(`${ENDPOINTS.RESOURCE_TYPES}?role=${role}`).then(r => {
-        const types = r.data ?? r as unknown as ResourceType[];
-        setResourceTypes(types);
-        if (types.length > 0) setForm(f => ({ ...f, resource_type_id: types[0].id }));
-      }),
+      api.get<{ data: ResourceType[] }>(`${ENDPOINTS.RESOURCE_TYPES}?role=${role}`)
+        .then(r => setResourceTypes(((r.data ?? r) as ResourceType[]).filter(rt => rt.is_active))),
+      api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId))
+        .then(r => setLogs((r.data ?? r) as ProductionLog[])),
     ]).catch(() => {}).finally(() => setLoading(false));
   }, [activityId, role]);
 
-  async function handleAdd() {
-    if (!form.resource_type_id || form.quantity < 1) return;
+  async function handleSubmit() {
+    const toPost = resourceTypes.filter(rt => (quantities[rt.id] ?? 0) > 0);
+    if (!toPost.length) return;
     setSaving(true);
     try {
-      const log = await api.post<ProductionLog>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId), form);
-      const full = { ...log as ProductionLog, resource_type: resourceTypes.find(rt => rt.id === form.resource_type_id) };
-      setLogs(p => [full, ...p]);
-      setForm({ resource_type_id: resourceTypes[0]?.id ?? 0, quantity: 1, description: '', produced_at: new Date().toISOString().split('T')[0] });
-      setAdding(false);
+      await Promise.all(toPost.map(rt =>
+        api.post(ENDPOINTS.ACTIVITY_PRODUCTION(activityId), {
+          resource_type_id: rt.id,
+          quantity: quantities[rt.id],
+          produced_at: date,
+        })
+      ));
+      const updated = await api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId));
+      setLogs((updated.data ?? updated) as ProductionLog[]);
+      setQuantities({});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch { /* ignore */ }
     setSaving(false);
   }
@@ -277,6 +286,7 @@ function ProductionLogsPanel({ activityId, role }: { activityId: number; role: s
   }
 
   if (loading) return <div className="h-16 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/>;
+  if (!resourceTypes.length) return <p className="text-xs text-gray-400 dark:text-gray-500 py-1">Este rol no tiene tipos de recurso configurados.</p>;
 
   const totalByType = logs.reduce<Record<string, number>>((acc, l) => {
     const name = l.resource_type?.name ?? 'Otro';
@@ -284,82 +294,56 @@ function ProductionLogsPanel({ activityId, role }: { activityId: number; role: s
     return acc;
   }, {});
 
+  const hasQty = resourceTypes.some(rt => (quantities[rt.id] ?? 0) > 0);
+
   return (
     <div className="space-y-3">
-      {resourceTypes.length === 0 && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">Este rol no tiene tipos de recurso configurados.</p>
-      )}
-
+      {/* Registered summary */}
       {Object.keys(totalByType).length > 0 && (
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1.5">
-          <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide">Resumen de producción</p>
-          {Object.entries(totalByType).map(([name, qty]) => (
-            <div key={name} className="flex justify-between text-xs">
-              <span className="text-indigo-600 dark:text-indigo-400">{name}</span>
-              <span className="font-bold text-indigo-800 dark:text-indigo-200">{qty}</span>
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1">
+          <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1.5">Registrado</p>
+          {logs.map(l => (
+            <div key={l.id} className="flex items-center justify-between text-xs">
+              <span className="text-indigo-600 dark:text-indigo-400">{l.resource_type?.name} <span className="font-bold text-indigo-800 dark:text-indigo-200">x{l.quantity}</span></span>
+              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <span>{l.produced_at ? formatDate(l.produced_at.split('T')[0]) : ''}</span>
+                <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={10}/></button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {logs.map((l) => (
-        <div key={l.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-3 py-2">
-          <Package size={13} className="text-indigo-400 flex-shrink-0"/>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{l.resource_type?.name ?? 'Recurso'} <span className="text-indigo-600 dark:text-indigo-400 font-bold">x{l.quantity}</span></p>
-            {l.description && <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{l.description}</p>}
-            <p className="text-[10px] text-gray-400 dark:text-gray-500">{l.produced_at ? formatDate(l.produced_at) : ''}</p>
+      {/* Grid of type → quantity inputs */}
+      <div className="grid grid-cols-2 gap-2">
+        {resourceTypes.map(rt => (
+          <div key={rt.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-2.5 py-2">
+            <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={rt.name}>{rt.name}</span>
+            <input
+              type="number" min={0}
+              value={quantities[rt.id] ?? ''}
+              placeholder="0"
+              onChange={e => setQuantities(q => ({ ...q, [rt.id]: Math.max(0, Number(e.target.value)) }))}
+              className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            />
           </div>
-          <button onClick={() => handleDelete(l.id)} className="text-gray-300 hover:text-red-400 dark:hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
+        ))}
+      </div>
+
+      {/* Date + submit row */}
+      <div className="flex items-end gap-2">
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-0.5">Fecha</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
         </div>
-      ))}
-
-      {!logs.length && resourceTypes.length > 0 && !adding && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">Sin registros de producción aún.</p>
-      )}
-
-      {adding && resourceTypes.length > 0 && (
-        <div className="space-y-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Tipo de recurso</label>
-            <select value={form.resource_type_id} onChange={e => setForm(f => ({ ...f, resource_type_id: Number(e.target.value) }))}
-              className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-              {resourceTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Cantidad</label>
-              <input type="number" min={1} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Math.max(1, Number(e.target.value)) }))}
-                className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
-            </div>
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Fecha</label>
-              <input type="date" value={form.produced_at} onChange={e => setForm(f => ({ ...f, produced_at: e.target.value }))}
-                className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Observaciones (opcional)</label>
-            <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Descripción breve..."
-              className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={saving || !form.resource_type_id}
-              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-              <Send size={11}/> Registrar
-            </button>
-            <button onClick={() => setAdding(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2">Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      {!adding && resourceTypes.length > 0 && (
-        <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
-          <Plus size={12}/> Registrar producción
+        <button onClick={handleSubmit} disabled={saving || !hasQty}
+          className={clsx('flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors',
+            saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
+            (saving || !hasQty) && 'opacity-50 cursor-not-allowed')}>
+          {saving ? 'Registrando...' : saved ? '✓ Registrado' : <><Send size={11}/> Registrar</>}
         </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -379,7 +363,7 @@ function DetailPanel({
   isManager: boolean;
   onSaved: () => void;
 }) {
-  const [tab, setTab] = useState<PanelTab>('info');
+  const [tab, setTab] = useState<PanelTab>('principal');
   const [status, setStatus] = useState(act.status);
   const [notes, setNotes] = useState(act.notes ?? '');
   const [saving, setSaving] = useState(false);
@@ -412,8 +396,7 @@ function DetailPanel({
       setStatus(act.status);
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('requires_production') || msg.includes('registrar al menos un recurso')) {
-        setSaveError('Debes registrar la producción antes de marcar como entregado.');
-        setTab('produccion');
+        setSaveError('Debes registrar la producción antes de marcar como entregado. Completa la sección de Producción más abajo.');
       } else {
         setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
       }
@@ -423,9 +406,7 @@ function DetailPanel({
   }
 
   const TABS: { id: PanelTab; label: string; icon: React.ElementType }[] = [
-    { id: 'info',        label: 'Información',     icon: GitCommitHorizontal },
-    { id: 'produccion',  label: 'Producción',       icon: Package },
-    { id: 'enlace',      label: 'Enlace',           icon: Link2 },
+    { id: 'principal',   label: 'Actividad',        icon: GitCommitHorizontal },
     { id: 'comentarios', label: 'Comentarios',      icon: MessageSquare },
     { id: 'timeline',    label: 'Línea de tiempo',  icon: Clock },
   ];
@@ -458,58 +439,81 @@ function DetailPanel({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
-          {tab === 'info' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                {[
-                  ['Programa', act.program?.name ?? '—'],
-                  ['Asignatura', act.subject?.name ?? '—'],
-                  ['Semana / Módulo', act.deliverable?.name ?? '—'],
-                  ...(act.deliverable?.type ? [['Tipo', DELIVERABLE_TYPE_LABELS[act.deliverable.type]]] : []),
-                  ...(act.deliverable?.semestre ? [['Semestre', act.deliverable.semestre]] : []),
-                  ...(act.deliverable?.ciclo    ? [['Ciclo',    act.deliverable.ciclo]]    : []),
-                  ['Fecha límite', act.commitment_date ? formatDate(act.commitment_date) : '—'],
-                  ...(act.actual_delivery_date ? [['Entregado el', formatDate(act.actual_delivery_date)]] : []),
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-gray-400 mb-0.5">{label}</p>
-                    <p className="font-medium text-gray-800">{value}</p>
+          {tab === 'principal' && (
+            <div className="space-y-5">
+              {/* ── Información ── */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                  {[
+                    ['Programa', act.program?.name ?? '—'],
+                    ['Asignatura', act.subject?.name ?? '—'],
+                    ['Semana / Módulo', act.deliverable?.name ?? '—'],
+                    ...(act.deliverable?.type ? [['Tipo', DELIVERABLE_TYPE_LABELS[act.deliverable.type]]] : []),
+                    ...(act.deliverable?.semestre ? [['Semestre', act.deliverable.semestre]] : []),
+                    ...(act.deliverable?.ciclo    ? [['Ciclo',    act.deliverable.ciclo]]    : []),
+                    ['Fecha límite', act.commitment_date ? formatDate(act.commitment_date) : '—'],
+                    ...(act.actual_delivery_date ? [['Entregado el', formatDate(act.actual_delivery_date)]] : []),
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <p className="text-gray-400 mb-0.5">{label}</p>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Estado</p>
+                  <select value={status} onChange={e => setStatus(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
+                    {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Observaciones</p>
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                    placeholder="Notas u observaciones..."
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:bg-gray-700"/>
+                </div>
+
+                {saveError && (
+                  <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                    {saveError}
+                  </p>
+                )}
+                <button onClick={handleSave} disabled={saving}
+                  className={clsx('w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors',
+                    saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
+                    saving && 'opacity-60')}>
+                  {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
+                </button>
+              </div>
+
+              {/* ── Producción (solo roles productivos) ── */}
+              {PRODUCTION_ROLES.has(act.role) && (
+                <>
+                  <div className="border-t border-gray-100 dark:border-gray-700"/>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <Package size={12}/>Producción
+                    </p>
+                    <QuickProductionGrid activityId={act.id} role={act.role}/>
                   </div>
-                ))}
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Estado</p>
-                <select value={status} onChange={e => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 bg-white">
-                  {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Observaciones</p>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                  placeholder="Notas u observaciones..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 placeholder:text-gray-400"/>
-              </div>
-
-              {saveError && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  {saveError}
-                </p>
+                </>
               )}
-              <button onClick={handleSave} disabled={saving}
-                className={clsx('w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors',
-                  saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
-                  saving && 'opacity-60')}>
-                {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
-              </button>
+
+              {/* ── Enlace de entrega ── */}
+              <div className="border-t border-gray-100 dark:border-gray-700"/>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <Link2 size={12}/>Enlace de entrega
+                </p>
+                <EvidenceLinksPanel activityId={act.id}/>
+              </div>
             </div>
           )}
-          {tab === 'produccion'  && <><p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Registra los recursos producidos en esta actividad. Es obligatorio antes de marcar como entregado.</p><ProductionLogsPanel activityId={act.id} role={act.role}/></>}
-          {tab === 'enlace'      && <><p className="text-xs text-gray-500 mb-3">Agrega enlaces de entrega (Drive, SharePoint, repositorio, etc.)</p><EvidenceLinksPanel activityId={act.id}/></>}
           {tab === 'comentarios' && act.deliverable && <CommentsPanel deliverableId={act.deliverable.id}/>}
-          {tab === 'timeline'    && <><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Historial de cambios</p><TimelineView activityId={act.id}/></>}
+          {tab === 'timeline'    && <><p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Historial de cambios</p><TimelineView activityId={act.id}/></>}
         </div>
       </div>
     </div>
