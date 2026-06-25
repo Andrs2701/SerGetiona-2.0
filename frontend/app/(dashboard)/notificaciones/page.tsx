@@ -10,6 +10,7 @@ import {
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Notification } from '@/lib/types';
+import { ROLE_STATUS_LABELS } from '@/lib/types';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -67,6 +68,28 @@ function getNotifConfig(type: string): NotifTypeConfig {
   return NOTIF_TYPES[type] ?? DEFAULT_TYPE;
 }
 
+function formatCommitmentDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return 'Vence: ' + d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function NotifMetaRow({ data }: { data: Record<string, unknown> }) {
+  const parts: string[] = [];
+  if (typeof data.program === 'string' && data.program) parts.push(data.program);
+  if (typeof data.subject === 'string' && data.subject) parts.push(data.subject);
+  if (typeof data.commitment_date === 'string' && data.commitment_date) parts.push(formatCommitmentDate(data.commitment_date));
+  if (typeof data.status === 'string' && data.status) {
+    const label = ROLE_STATUS_LABELS[data.status] ?? data.status;
+    parts.push(label);
+  }
+  if (!parts.length) return null;
+  return (
+    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 leading-snug">
+      {parts.join(' · ')}
+    </p>
+  );
+}
+
 function getNotifRoute(n: Notification): string | null {
   const d = n.data ?? {};
   const actId = d.activity_id ?? d.role_activity_id;
@@ -81,7 +104,7 @@ function getNotifRoute(n: Notification): string | null {
     return '/entregables';
   }
 
-  if (actId) return `/mi-espacio?highlight=${actId}`;
+  if (actId) return `/mi-espacio?highlight=${actId}&open=${actId}`;
 
   if (['task_assigned', 'status_changed', 'date_changed', 'adjustments_requested', 'activity_modified',
        'next_in_chain', 'deadline_approaching', 'overdue', 'overdue_reminder'].includes(n.type)) {
@@ -294,6 +317,9 @@ export default function NotificacionesPage() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
+                    {n.data && Object.keys(n.data).length > 0 && (
+                      <NotifMetaRow data={n.data as Record<string, unknown>} />
+                    )}
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className={clsx('text-[10px] font-medium px-1.5 py-0.5 rounded-full', cfg.bgColor, cfg.color)}>
                         {cfg.label}
