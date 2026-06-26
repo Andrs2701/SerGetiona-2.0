@@ -157,23 +157,28 @@ class RoleActivityController extends Controller
      */
     private function buildStatusNotificationData(RoleActivity $activity): array
     {
+        $activity->loadMissing('deliverable.subject.academicProgram.project', 'responsible');
         $deliverable = $activity->deliverable;
         $subject     = $deliverable?->subject;
         $program     = $subject?->academicProgram;
+        $project     = $program?->project;
 
         return [
-            'entity_type'      => 'RoleActivity',
-            'entity_id'        => $activity->id,
-            'activity_id'      => $activity->id,
-            'role_activity_id' => $activity->id,
-            'deliverable_id'   => $activity->deliverable_id,
-            'deliverable_name' => $deliverable?->name,
-            'role'             => $activity->role,
-            'status'           => $activity->status,
-            'new_status'       => $activity->status,
-            'commitment_date'  => $activity->commitment_date?->toDateString(),
-            'subject'          => $subject?->name,
-            'program'          => $program?->name,
+            'entity_type'          => 'RoleActivity',
+            'entity_id'            => $activity->id,
+            'activity_id'          => $activity->id,
+            'role_activity_id'     => $activity->id,
+            'deliverable_id'       => $activity->deliverable_id,
+            'deliverable_name'     => $deliverable?->name,
+            'role'                 => $activity->role,
+            'status'               => $activity->status,
+            'new_status'           => $activity->status,
+            'commitment_date'      => $activity->commitment_date?->toDateString(),
+            'actual_delivery_date' => $activity->actual_delivery_date?->toDateString(),
+            'subject'              => $subject?->name,
+            'program'              => $program?->name,
+            'project'              => $project?->name,
+            'responsible_name'     => $activity->responsible?->name,
         ];
     }
 
@@ -196,7 +201,8 @@ class RoleActivityController extends Controller
                 'adjusting', 'designing', 'production', 'editing', 'implementing',
                 'validating', 'pending', 'in_testing', 'with_findings',
             ])],
-            'notes'                => 'nullable|string',
+            'notes'                      => 'nullable|string',
+            'production_not_applicable'  => 'sometimes|boolean',
         ]);
 
         if (!$isManager) {
@@ -248,16 +254,20 @@ class RoleActivityController extends Controller
 
         // Notification: status changed — notify coordinators/admin AND responsible AND next in chain
         if (isset($dirty['status'])) {
-            $newLabel = self::translateStatus($activity->status);
-            $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
-            $statusData = $this->buildStatusNotificationData($activity);
-            NotificationService::notifyMany(
-                $managers,
-                'status_changed',
-                'Estado de actividad cambiado',
-                "La actividad '{$activity->role}' de '{$deliverableName}' cambió a '{$newLabel}'.",
-                $statusData
-            );
+            $newLabel    = self::translateStatus($activity->status);
+            $roleLabel   = NotificationService::translateRole($activity->role);
+            $managers    = User::whereIn('role', ['admin', 'coordinator'])->get();
+            $statusData  = $this->buildStatusNotificationData($activity);
+
+            $isDelivery = $activity->status === 'delivered';
+            $notifTitle  = $isDelivery
+                ? "{$roleLabel} entregó: {$deliverableName}"
+                : 'Estado de actividad cambiado';
+            $notifBody   = $isDelivery
+                ? "Responsable: {$statusData['responsible_name']} | Programa: {$statusData['program']} | Asignatura: {$statusData['subject']}"
+                : "La actividad '{$roleLabel}' de '{$deliverableName}' cambió a '{$newLabel}'.";
+
+            NotificationService::notifyMany($managers, 'status_changed', $notifTitle, $notifBody, $statusData);
 
             // Notify the responsible if change was made by a manager
             if ($isManager && $activity->responsible_id) {
@@ -267,7 +277,7 @@ class RoleActivityController extends Controller
                         $responsible,
                         'status_changed',
                         'Estado de tu actividad actualizado',
-                        "El estado de tu actividad '{$activity->role}' en '{$deliverableName}' fue cambiado a '{$newLabel}'.",
+                        "El estado de tu actividad '{$roleLabel}' en '{$deliverableName}' fue cambiado a '{$newLabel}'.",
                         $statusData
                     );
                 }
@@ -516,6 +526,14 @@ class RoleActivityController extends Controller
                     'type'  => 'note',
                     'icon'  => 'message',
                     'label' => 'Observación actualizada',
+                    'user'  => $log->user?->name,
+                    'date'  => $log->created_at?->toIso8601String(),
+                ];
+            } elseif ($log->field_changed === 'evidence_link' && $log->new_value) {
+                $events[] = [
+                    'type'  => 'delivered',
+                    'icon'  => 'link',
+                    'label' => "Evidencia agregada: {$log->new_value}",
                     'user'  => $log->user?->name,
                     'date'  => $log->created_at?->toIso8601String(),
                 ];

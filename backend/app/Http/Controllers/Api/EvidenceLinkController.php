@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Deliverable;
 use App\Models\EvidenceLink;
 use App\Models\RoleActivity;
 use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class EvidenceLinkController extends Controller
 {
@@ -77,6 +79,16 @@ class EvidenceLinkController extends Controller
 
         $link->load('user');
 
+        AuditLog::create([
+            'user_id'       => Auth::id(),
+            'action'        => 'updated',
+            'entity_type'   => 'RoleActivity',
+            'entity_id'     => $activity->id,
+            'field_changed' => 'evidence_link',
+            'new_value'     => $link->title ?: $link->url,
+            'created_at'    => now(),
+        ]);
+
         return response()->json([
             'id'         => $link->id,
             'type'       => $link->type,
@@ -127,6 +139,16 @@ class EvidenceLinkController extends Controller
         if (!$canDelete) {
             return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
         }
+
+        AuditLog::create([
+            'user_id'       => $user->id,
+            'action'        => 'updated',
+            'entity_type'   => 'RoleActivity',
+            'entity_id'     => $link->role_activity_id,
+            'field_changed' => 'evidence_link_removed',
+            'old_value'     => $link->title ?: $link->url,
+            'created_at'    => now(),
+        ]);
 
         $link->delete();
 

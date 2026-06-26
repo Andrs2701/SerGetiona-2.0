@@ -385,6 +385,7 @@ function QuickProductionGrid({
   quantities, onQuantityChange,
   date, onDateChange,
   onLogsLoaded, refreshKey,
+  productionNA, onProductionNAChange,
 }: {
   activityId: number; role: string;
   quantities: Record<number, number>;
@@ -392,6 +393,8 @@ function QuickProductionGrid({
   date: string; onDateChange: (d: string) => void;
   onLogsLoaded: (count: number) => void;
   refreshKey: number;
+  productionNA: boolean;
+  onProductionNAChange: (v: boolean) => void;
 }) {
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
   const [logs, setLogs] = useState<ProductionLog[]>([]);
@@ -429,6 +432,20 @@ function QuickProductionGrid({
 
   return (
     <div className="space-y-3">
+      {/* N/A toggle */}
+      <button
+        type="button"
+        onClick={() => onProductionNAChange(!productionNA)}
+        className={clsx(
+          'w-full text-xs py-1.5 rounded-lg border font-medium transition-colors',
+          productionNA
+            ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'
+            : 'bg-white dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-600 hover:border-gray-400 hover:text-gray-600'
+        )}>
+        {productionNA ? '✓ Producción: No aplica (N/A)' : 'Marcar como No aplica (N/A)'}
+      </button>
+
+      <div className={clsx('space-y-3', productionNA && 'opacity-40 pointer-events-none')}>
       {logs.length > 0 && (
         <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1">
           <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1">Ya registrado</p>
@@ -463,6 +480,7 @@ function QuickProductionGrid({
         <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
           className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
       </div>
+      </div>{/* end opacity wrapper */}
     </div>
   );
 }
@@ -510,6 +528,7 @@ function DetailPanel({
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [prodDate, setProdDate] = useState(new Date().toISOString().split('T')[0]);
   const [existingLogsCount, setExistingLogsCount] = useState(0);
+  const [productionNA, setProductionNA] = useState(act.production_not_applicable ?? false);
   // Lifted evidence link state — submitted by handleSave, not by EvidenceLinksPanel
   const [pendingUrl, setPendingUrl] = useState('');
   const [pendingTitle, setPendingTitle] = useState('');
@@ -525,6 +544,7 @@ function DetailPanel({
     setSaveError(null);
     setQuantities({});
     setProdDate(new Date().toISOString().split('T')[0]);
+    setProductionNA(act.production_not_applicable ?? false);
     setPendingUrl('');
     setPendingTitle('');
     setExistingLogsCount(0);
@@ -551,15 +571,15 @@ function DetailPanel({
     setSaving(true);
     setSaveError(null);
 
-    // Validate before attempting delivery
-    if (status === 'delivered' && isProdRole) {
+    // Validate before attempting delivery — N/A bypasses both production and link checks
+    if (status === 'delivered' && isProdRole && !productionNA) {
       if (!hasProduction) {
-        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado.`);
+        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado, o marca como No aplica.`);
         setSaving(false);
         return;
       }
       if (!hasLink) {
-        setSaveError(`Completa la sección ${linkStep} – Enlace antes de marcar como Entregado.`);
+        setSaveError(`Completa la sección ${linkStep} – Enlace antes de marcar como Entregado, o marca producción como No aplica.`);
         setSaving(false);
         return;
       }
@@ -581,8 +601,8 @@ function DetailPanel({
         setPendingUrl('');
         setPendingTitle('');
       }
-      // 3. PUT status + notes
-      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes });
+      // 3. PUT status + notes + production_not_applicable
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes, production_not_applicable: productionNA });
       onStatusChange(act.id, status);
       setSaved(true);
       setRefreshKey(k => k + 1);
@@ -604,7 +624,6 @@ function DetailPanel({
   const TABS: { id: PanelTab; label: string; icon: React.ElementType }[] = [
     { id: 'principal',   label: 'Actividad',        icon: GitCommitHorizontal },
     { id: 'evidencias',  label: 'Evidencias',       icon: Package },
-    { id: 'comentarios', label: 'Comentarios',      icon: MessageSquare },
     { id: 'timeline',    label: 'Línea de tiempo',  icon: Clock },
   ];
 
@@ -679,7 +698,7 @@ function DetailPanel({
               {/* ── Paso 2: Producción (solo roles productivos) ── */}
               {isProdRole && (
                 <div className="px-5 py-4 space-y-3">
-                  <StepHeader step={2} label="Producción" done={hasProduction}/>
+                  <StepHeader step={2} label="Producción" done={hasProduction || productionNA}/>
                   <div className="mt-1">
                     <QuickProductionGrid
                       activityId={act.id}
@@ -690,6 +709,8 @@ function DetailPanel({
                       onDateChange={setProdDate}
                       onLogsLoaded={setExistingLogsCount}
                       refreshKey={refreshKey}
+                      productionNA={productionNA}
+                      onProductionNAChange={setProductionNA}
                     />
                   </div>
                 </div>
@@ -724,9 +745,9 @@ function DetailPanel({
                     saving && 'opacity-60')}>
                   {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
                 </button>
-                {status === 'delivered' && isProdRole && (!hasProduction || !hasLink) && (
+                {status === 'delivered' && isProdRole && !productionNA && (!hasProduction || !hasLink) && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">
-                    Para marcar como Entregado completa la producción y el enlace.
+                    Para marcar como Entregado: registra producción y enlace, o marca producción como N/A.
                   </p>
                 )}
               </div>
@@ -1032,9 +1053,11 @@ export default function MiEspacioPage() {
       return true;
     })
     .sort((a, b) => {
+      const ds = (DATE_STATUS_SORT[a.date_status] ?? 9) - (DATE_STATUS_SORT[b.date_status] ?? 9);
+      if (ds !== 0) return ds;
       if ((a.program?.name ?? '') !== (b.program?.name ?? '')) return (a.program?.name ?? '').localeCompare(b.program?.name ?? '');
       if ((a.subject?.name ?? '') !== (b.subject?.name ?? '')) return (a.subject?.name ?? '').localeCompare(b.subject?.name ?? '');
-      return (DATE_STATUS_SORT[a.date_status] ?? 9) - (DATE_STATUS_SORT[b.date_status] ?? 9);
+      return (a.commitment_date ?? '').localeCompare(b.commitment_date ?? '');
     }),
   [activities, search, filterProgram, filterSubject, filterStatus, showCompleted]);
 

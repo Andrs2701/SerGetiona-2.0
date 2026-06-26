@@ -62,9 +62,18 @@ function daysUntil(dateStr?: string): number | null {
   return Math.ceil((new Date(dateStr).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000);
 }
 
-function formatDate(dateStr?: string): string {
+function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' });
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
+function formatDateShort(dateStr?: string | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 }
 
 function calcProgressExcNA(activities: RoleActivity[]): { pct: number; done: number; total: number } {
@@ -671,22 +680,14 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
 // ─── Side Panel ───────────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'flow' | 'evidencias' | 'comments';
+type PanelTab = 'info' | 'flow' | 'evidencias';
 
 function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
   const [flow, setFlow] = useState<DeliverableFlow | null>(null);
   const [loadingFlow, setLoadingFlow] = useState(false);
 
   useEffect(() => { setTab(defaultTab); }, [defaultTab, deliverable.id]);
-  useEffect(() => {
-    if (tab !== 'comments') return;
-    setLoadingComments(true);
-    api.get<Comment[]>(ENDPOINTS.DELIVERABLE_COMMENTS(deliverable.id))
-      .then(setComments).catch(() => setComments([])).finally(() => setLoadingComments(false));
-  }, [tab, deliverable.id]);
   useEffect(() => {
     if (tab !== 'evidencias') return;
     setLoadingFlow(true);
@@ -707,12 +708,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
           <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
         <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
-          {(['info', 'flow', 'evidencias', 'comments'] as PanelTab[]).map(t => (
+          {(['info', 'flow', 'evidencias'] as PanelTab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={clsx(
               'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
             )}>
-              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : t === 'evidencias' ? 'Evidencias' : 'Comentarios'}
+              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : 'Evidencias'}
             </button>
           ))}
         </div>
@@ -730,7 +731,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                   <ProgressExcNA activities={deliverable.role_activities ?? []} compact />
                 </div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Inicio</p>
-                  <span className="text-sm text-gray-700">{deliverable.start_date ? formatDate(deliverable.start_date) : '—'}</span>
+                  <span className="text-sm text-gray-700">{formatDate(deliverable.start_date)}</span>
                 </div>
               </div>
               {deliverable.notes && (
@@ -738,56 +739,127 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                   <p className="text-sm text-gray-700">{deliverable.notes}</p>
                 </div>
               )}
+              {/* Fechas por Rol */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fechas por Rol</p>
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-400">
+                        <th className="text-left px-3 py-2 font-medium">Rol</th>
+                        <th className="text-left px-3 py-2 font-medium">Programada</th>
+                        <th className="text-left px-3 py-2 font-medium">Real</th>
+                        <th className="text-left px-3 py-2 font-medium">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {ROLES.map(role => {
+                        const act = (deliverable.role_activities ?? []).find(a => a.role === role);
+                        const isNA = act?.status === 'not_applicable';
+                        const cfg = ACTIVITY_STATUS_CFG[act?.status ?? 'not_started'];
+                        return (
+                          <tr key={role} className={clsx('transition-colors', isNA ? 'opacity-50' : '')}>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[role])}>{ROLE_ABBR[role]}</span>
+                                <span className="text-gray-700 font-medium">{ROLE_LABELS[role]}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-gray-600">
+                              {isNA ? <span className="text-gray-400 italic">No aplica</span> : formatDateShort(act?.commitment_date)}
+                            </td>
+                            <td className="px-3 py-2 text-gray-600">
+                              {isNA ? '—' : formatDateShort(act?.actual_delivery_date)}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={clsx('font-medium', cfg?.text ?? 'text-gray-500')}>
+                                {cfg?.label ?? '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
           {tab === 'flow' && (
             <div className="space-y-2">
               {ROLES.map(role => {
                 const act = (deliverable.role_activities ?? []).find(a => a.role === role);
-                const days = daysUntil(act?.commitment_date);
+                const isNA = act?.status === 'not_applicable';
+                const daysLeft = daysUntil(act?.commitment_date);
+                const isDelivered = act?.status === 'delivered' || act?.status === 'approved';
+                const isOverdue = !isDelivered && daysLeft !== null && daysLeft < 0;
+                const isApproaching = !isDelivered && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+
+                // Days difference between commitment and actual delivery
+                let deliveryDiffLabel: string | null = null;
+                if (isDelivered && act?.actual_delivery_date && act?.commitment_date) {
+                  const diff = Math.round(
+                    (new Date(act.actual_delivery_date + 'T00:00:00').getTime() - new Date(act.commitment_date + 'T00:00:00').getTime()) / 86400000
+                  );
+                  deliveryDiffLabel = diff <= 0
+                    ? `Entregado ${diff === 0 ? 'a tiempo' : `${Math.abs(diff)}d antes`}`
+                    : `Entregado ${diff}d tarde`;
+                }
+
+                // Visual delivery indicator badge
+                const deliveryBadge = (() => {
+                  if (isNA) return null;
+                  if (isDelivered && deliveryDiffLabel) {
+                    const onTime = act?.actual_delivery_date && act?.commitment_date && act.actual_delivery_date <= act.commitment_date;
+                    return (
+                      <span className={clsx('text-[10px] font-medium px-1.5 py-0.5 rounded',
+                        onTime ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      )}>{deliveryDiffLabel}</span>
+                    );
+                  }
+                  if (isOverdue) return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-700">Vencido</span>;
+                  if (isApproaching) return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Próximo a vencer</span>;
+                  return null;
+                })();
+
                 return (
                   <div key={role} className={clsx('rounded-lg border p-3',
+                    isNA ? 'border-gray-100 bg-gray-50 opacity-50' :
+                    act?.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
+                    isOverdue ? 'border-red-100 bg-red-50' :
+                    isApproaching ? 'border-amber-100 bg-amber-50' :
                     !act || act.status === 'not_started' ? 'border-gray-100 bg-gray-50' :
-                    act.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
-                    act.status === 'not_applicable' ? 'border-gray-100 bg-gray-50 opacity-50' :
                     'border-blue-100 bg-blue-50'
                   )}>
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-1.5">
                         <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[role])}>{ROLE_ABBR[role]}</span>
                         <span className="text-xs font-semibold text-gray-700">{ROLE_LABELS[role]}</span>
                       </div>
-                      <ActivityStatusBadge status={act?.status ?? 'not_started'} />
+                      <div className="flex items-center gap-1.5">
+                        {deliveryBadge}
+                        <ActivityStatusBadge status={act?.status ?? 'not_started'} />
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
-                      <span>{act?.responsible?.name ?? '—'}</span>
-                      {act?.commitment_date && (
-                        <span className={clsx(days !== null && days < 0 ? 'text-red-500 font-semibold' : '')}>
-                          {formatDate(act.commitment_date)}{days !== null ? ` (${days > 0 ? `+${days}d` : `${Math.abs(days)}d atrás`})` : ''}
-                        </span>
+                    <div className="text-xs text-gray-500 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span>{act?.responsible?.name ?? '—'}</span>
+                        {!isNA && act?.commitment_date && (
+                          <span className={clsx(isOverdue ? 'text-red-500 font-semibold' : isApproaching ? 'text-amber-600 font-medium' : '')}>
+                            Prog: {formatDateShort(act.commitment_date)}
+                          </span>
+                        )}
+                      </div>
+                      {!isNA && act?.actual_delivery_date && (
+                        <div className="flex justify-end">
+                          <span className="text-gray-400">Real: {formatDateShort(act.actual_delivery_date)}</span>
+                        </div>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          )}
-          {tab === 'comments' && (
-            loadingComments
-              ? <div className="text-center py-10 text-gray-400 text-sm">Cargando…</div>
-              : comments.length === 0
-                ? <div className="text-center py-10 text-gray-400 text-sm">Sin comentarios</div>
-                : <div className="space-y-3">
-                    {comments.map(c => (
-                      <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-xs font-semibold text-gray-800">{c.user.name}</span>
-                          <span className="text-[10px] text-gray-400">{new Date(c.created_at).toLocaleDateString('es-CO')}</span>
-                        </div>
-                        <p className="text-sm text-gray-700">{c.content}</p>
-                      </div>
-                    ))}
-                  </div>
           )}
           {tab === 'evidencias' && (
             loadingFlow
@@ -829,6 +901,9 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                                     </span>
                                   ))}
                                 </div>
+                              )}
+                              {r.notes && (
+                                <p className="text-[10px] text-gray-500 mt-1.5 italic leading-relaxed">{r.notes}</p>
                               )}
                               {r.responsible && (
                                 <p className="text-[10px] text-gray-500 mt-1.5 flex items-center gap-1">

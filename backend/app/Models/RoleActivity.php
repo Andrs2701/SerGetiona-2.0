@@ -21,14 +21,16 @@ class RoleActivity extends Model
         'status',
         'notes',
         'checklist',
+        'production_not_applicable',
     ];
 
     protected $casts = [
-        'assigned_at' => 'datetime',
-        'commitment_date' => 'date',
-        'actual_start_date' => 'date',
-        'actual_delivery_date' => 'date',
-        'checklist' => 'array',
+        'assigned_at'               => 'datetime',
+        'commitment_date'           => 'date',
+        'actual_start_date'         => 'date',
+        'actual_delivery_date'      => 'date',
+        'checklist'                 => 'array',
+        'production_not_applicable' => 'boolean',
     ];
 
     public static function defaultChecklist(string $role): array

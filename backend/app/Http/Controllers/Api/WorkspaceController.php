@@ -152,14 +152,15 @@ class WorkspaceController extends Controller
             $project     = $program?->project;
 
             return [
-                'id'                   => $activity->id,
-                'role'                 => $activity->role,
-                'status'               => $activity->status,
-                'notes'                => $activity->notes,
-                'commitment_date'      => $activity->commitment_date?->toDateString(),
-                'actual_start_date'    => $activity->actual_start_date?->toDateString(),
-                'actual_delivery_date' => $activity->actual_delivery_date?->toDateString(),
-                'date_status'          => $dateStatus,
+                'id'                        => $activity->id,
+                'role'                      => $activity->role,
+                'status'                    => $activity->status,
+                'notes'                     => $activity->notes,
+                'commitment_date'           => $activity->commitment_date?->toDateString(),
+                'actual_start_date'         => $activity->actual_start_date?->toDateString(),
+                'actual_delivery_date'      => $activity->actual_delivery_date?->toDateString(),
+                'production_not_applicable' => (bool) $activity->production_not_applicable,
+                'date_status'               => $dateStatus,
                 'next_role'            => $nextInfo['next_role'],
                 'next_responsible'     => $nextInfo['next_responsible'],
                 'next_commitment_date' => $nextInfo['next_commitment_date'],

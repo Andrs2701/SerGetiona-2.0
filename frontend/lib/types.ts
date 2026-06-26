@@ -287,6 +287,7 @@ export interface WorkspaceActivity {
   commitment_date?: string;
   actual_start_date?: string;
   actual_delivery_date?: string;
+  production_not_applicable?: boolean;
   date_status: DateStatus;
   deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string } | null;
   subject: { id: number; name: string } | null;

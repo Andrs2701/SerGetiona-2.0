@@ -422,6 +422,15 @@ class DeliverableController extends Controller
                         'role'       => $role,
                         'role_label' => $roleLabel,
                     ];
+                } elseif ($log->field_changed === 'evidence_link' && $log->new_value) {
+                    $allEvents[] = [
+                        'type'       => 'delivered',
+                        'label'      => "Evidencia agregada: {$log->new_value} — {$roleLabel}",
+                        'user'       => $log->user?->name,
+                        'date'       => $log->created_at?->toIso8601String(),
+                        'role'       => $role,
+                        'role_label' => $roleLabel,
+                    ];
                 }
             }
 
