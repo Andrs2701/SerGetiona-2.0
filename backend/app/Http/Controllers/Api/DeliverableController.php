@@ -40,7 +40,22 @@ class DeliverableController extends Controller
         if ($request->filled('project_id'))  {
             $query->whereHas('subject.academicProgram', fn($q) => $q->where('project_id', $request->project_id));
         }
+        if ($request->filled('program_id')) {
+            $query->whereHas('subject', fn($q) => $q->where('academic_program_id', $request->program_id));
+        }
         if ($request->filled('global_status')) $query->byStatus($request->global_status);
+        if ($request->filled('role')) {
+            $query->whereHas('roleActivities', fn($q) => $q->where('role', $request->role));
+        }
+        if ($request->filled('responsible_id')) {
+            $query->whereHas('roleActivities', fn($q) => $q->where('responsible_id', $request->responsible_id));
+        }
+        if ($request->filled('year')) {
+            $query->whereHas('roleActivities', fn($q) => $q->whereYear('commitment_date', $request->year));
+        }
+        if ($request->filled('month')) {
+            $query->whereHas('roleActivities', fn($q) => $q->whereMonth('commitment_date', $request->month));
+        }
 
         return response()->json($query->get()->map(fn($d) => $this->formatRow($d)));
     }

@@ -5,7 +5,7 @@ import {
   FolderKanban, BookOpen, Activity, XCircle, CheckCircle2,
   TrendingUp, AlertTriangle, BarChart3, Users, Clock, Package,
   MessageSquare, X, CalendarDays, Gauge, LayoutDashboard,
-  GitBranch, FileBarChart, ChevronRight, ChevronDown, Info,
+  GitBranch, FileBarChart, ChevronRight, ChevronDown, Info, Filter,
 } from 'lucide-react';
 import DashboardOperativo from '@/components/DashboardOperativo';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
@@ -105,6 +105,16 @@ interface PanelRow {
   id: number; name: string; responsible?: string; program?: string;
   subject?: string; commitment_date?: string; days_diff?: number; status?: string; role?: string;
 }
+
+interface DashFilters {
+  programId: string;
+  responsibleId: string;
+  role: string;
+  year: string;
+  month: string;
+}
+const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '' };
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function formatDateStr(date: string) {
   return new Date(date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -233,12 +243,13 @@ interface WorkloadUser {
 }
 
 function TabResumen({
-  stats, health, capacity, onFilter,
+  stats, health, capacity, onFilter, filters,
 }: {
   stats: DashboardStats;
   health: HealthReport | null;
   capacity: { summary: CapacitySummary; users: CapacityUser[] } | null;
   onFilter: (f: PanelFilter) => void;
+  filters: DashFilters;
 }) {
   const router = useRouter();
   const d = stats;
@@ -264,8 +275,17 @@ function TabResumen({
       tooltip: 'Entregables devueltos por Calidad o por un rol revisor con cambios solicitados. Requieren ajustes antes de continuar el flujo.' },
   ];
 
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
   return (
     <div className="space-y-6">
+      {/* Active filters banner */}
+      {activeFilterCount > 0 && (
+        <div className="flex items-center gap-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300">
+          <Filter size={12} className="shrink-0" />
+          <span>Los KPIs del Resumen no se filtran en tiempo real — usan datos globales. Los filtros aplican sobre el Gantt de Seguimiento y la pestaña de Producción.</span>
+        </div>
+      )}
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {kpiCards.map(({ label, value, icon: Icon, color, bg, ring, highlight, filter, tooltip }) => (
@@ -1109,7 +1129,7 @@ function GanttTooltipCard({ tooltip }: { tooltip: GanttTooltip }) {
   );
 }
 
-function TabSeguimiento({ projects }: { projects: Project[] }) {
+function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: DashFilters }) {
   const [selectedProject, setSelectedProject] = useState<number | ''>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [onlyOverdue, setOnlyOverdue] = useState(false);
@@ -1131,6 +1151,11 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
       const params: Record<string, string> = { per_page: '200' };
       if (selectedProject) params.project_id = String(selectedProject);
       if (selectedStatus) params.status = selectedStatus;
+      if (filters.programId) params.program_id = filters.programId;
+      if (filters.responsibleId) params.responsible_id = filters.responsibleId;
+      if (filters.role) params.role = filters.role;
+      if (filters.year) params.year = filters.year;
+      if (filters.month) params.month = filters.month;
       const raw = await api.get<RawGanttDeliverable[] | { data?: RawGanttDeliverable[] }>(ENDPOINTS.DELIVERABLES + '?' + new URLSearchParams(params).toString());
       setDeliverables(Array.isArray(raw) ? raw : raw?.data ?? []);
     } catch {
@@ -1138,7 +1163,7 @@ function TabSeguimiento({ projects }: { projects: Project[] }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedProject, selectedStatus]);
+  }, [selectedProject, selectedStatus, filters]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, [loadData]);
@@ -1739,11 +1764,15 @@ function DistribucionPorProyecto({ projects }: { projects: CapacityProjectAgg[] 
 
 // ─── Tab Producción ──────────────────────────────────────────────────────────
 
-function TabProduccion() {
+function TabProduccion({ externalRole }: { externalRole?: string }) {
   const [data, setData] = useState<ProductionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [projectFilter, setProjectFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState(externalRole ?? '');
+
+  useEffect(() => {
+    setRoleFilter(externalRole ?? '');
+  }, [externalRole]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -2071,6 +2100,78 @@ function ResponsiveDonut({ data, total }: { data: { key: string; label: string; 
   );
 }
 
+// ─── FilterBar ───────────────────────────────────────────────────────────────
+
+const SELECT_CLS = 'text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 max-w-[160px]';
+
+function FilterBar({
+  filters, onChange, programs, users, activeCount,
+}: {
+  filters: DashFilters;
+  onChange: (partial: Partial<DashFilters>) => void;
+  programs: { id: number; name: string }[];
+  users: { id: number; name: string; role: string }[];
+  activeCount: number;
+}) {
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
+      <div className="flex flex-wrap gap-2.5 items-center">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">
+          <Filter size={13} />
+          <span>Filtros</span>
+          {activeCount > 0 && (
+            <span className="bg-indigo-600 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">{activeCount}</span>
+          )}
+        </div>
+
+        {/* Programa */}
+        <select value={filters.programId} onChange={e => onChange({ programId: e.target.value })} className={SELECT_CLS}>
+          <option value="">Todos los programas</option>
+          {programs.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+        </select>
+
+        {/* Responsable */}
+        <select value={filters.responsibleId} onChange={e => onChange({ responsibleId: e.target.value })} className={SELECT_CLS}>
+          <option value="">Todos los responsables</option>
+          {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+        </select>
+
+        {/* Rol */}
+        <select value={filters.role} onChange={e => onChange({ role: e.target.value })} className={SELECT_CLS}>
+          <option value="">Todos los roles</option>
+          {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+
+        {/* Año */}
+        <select value={filters.year} onChange={e => onChange({ year: e.target.value })} className={`${SELECT_CLS} max-w-[90px]`}>
+          <option value="">Año</option>
+          {[2024, 2025, 2026, 2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+        </select>
+
+        {/* Mes */}
+        <select value={filters.month} onChange={e => onChange({ month: e.target.value })} className={`${SELECT_CLS} max-w-[120px]`}>
+          <option value="">Mes</option>
+          {MONTHS_ES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
+        </select>
+
+        {activeCount > 0 && (
+          <button
+            onClick={() => onChange(EMPTY_FILTERS)}
+            className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 font-medium transition-colors ml-auto">
+            <X size={12} /> Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {activeCount > 0 && (
+        <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-2 pl-0.5">
+          {activeCount} filtro{activeCount > 1 ? 's' : ''} activo{activeCount > 1 ? 's' : ''} — el Gantt de Seguimiento y la pestaña de Producción reflejan esta selección.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── DashboardAdmin ───────────────────────────────────────────────────────────
 
 function DashboardAdmin() {
@@ -2082,6 +2183,7 @@ function DashboardAdmin() {
   const [workload, setWorkload] = useState<WorkloadUser[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [filters, setFilters]   = useState<DashFilters>(EMPTY_FILTERS);
 
   useEffect(() => {
     Promise.all([
@@ -2109,6 +2211,10 @@ function DashboardAdmin() {
     </div>
   );
 
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const filterPrograms = (stats.programs_breakdown ?? []).map(p => ({ id: p.id, name: p.name }));
+  const filterUsers = workload.map(u => ({ id: u.user_id, name: u.user_name, role: u.role }));
+
   return (
     <>
       <div className="p-4 sm:p-6 space-y-6">
@@ -2133,13 +2239,24 @@ function DashboardAdmin() {
           </div>
         </div>
 
+        {/* Filter bar — visible en Seguimiento y Producción */}
+        {(activeTab === 'seguimiento' || activeTab === 'produccion' || activeTab === 'resumen') && (
+          <FilterBar
+            filters={filters}
+            onChange={partial => setFilters(prev => ({ ...prev, ...partial }))}
+            programs={filterPrograms}
+            users={filterUsers}
+            activeCount={activeFilterCount}
+          />
+        )}
+
         {/* Tab content */}
         {activeTab === 'resumen' && (
-          <TabResumen stats={stats} health={health} capacity={capacity} onFilter={setPanelFilter} />
+          <TabResumen stats={stats} health={health} capacity={capacity} onFilter={setPanelFilter} filters={filters} />
         )}
-        {activeTab === 'seguimiento' && <TabSeguimiento projects={projects} />}
+        {activeTab === 'seguimiento' && <TabSeguimiento projects={projects} filters={filters} />}
         {activeTab === 'capacidad'   && <TabCapacidad capacity={capacity} workload={workload} programs={stats.programs_breakdown ?? []} />}
-        {activeTab === 'produccion'  && <TabProduccion />}
+        {activeTab === 'produccion'  && <TabProduccion externalRole={filters.role} />}
         {activeTab === 'reportes'    && <TabReportes stats={stats} health={health} />}
       </div>
 
