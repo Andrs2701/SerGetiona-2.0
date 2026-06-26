@@ -93,9 +93,17 @@ function getActiveActivity(d: Deliverable): RoleActivity | undefined {
   );
 }
 
-// Finds the activity that is actually ready to be delivered (actively in development)
+// Finds the next activity the admin can deliver: in_development takes priority, else first not_started
 function getDeliverableActivity(d: Deliverable): RoleActivity | undefined {
-  return (d.role_activities ?? []).find(a => a.status === 'in_development');
+  const acts = d.role_activities ?? [];
+  return acts.find(a => a.status === 'in_development') ?? acts.find(a => a.status === 'not_started');
+}
+
+// Finds the current activity that can be approved (delivered/in_review/with_observations)
+function getApprovableActivity(d: Deliverable): RoleActivity | undefined {
+  return (d.role_activities ?? []).find(a =>
+    a.status === 'delivered' || a.status === 'in_review' || a.status === 'with_observations' || a.status === 'adjustments_requested'
+  );
 }
 
 function isOverdue(d: Deliverable): boolean {
@@ -248,7 +256,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
   const { pct, done, total } = calcProgressExcNA(acts);
   const isFinished = d.global_status === 'finished';
 
-  const canApprove = d.global_status === 'in_review' || d.global_status === 'with_observations';
+  const canApprove = !!getApprovableActivity(d);
   const canDeliver = !!getDeliverableActivity(d);
   const canAdjust  = d.global_status === 'in_review';
 
@@ -1335,7 +1343,9 @@ export default function EntregablesPage() {
   }
 
   async function handleQuickAction(d: Deliverable, action: QuickAction) {
-    const activity = action === 'deliver' ? getDeliverableActivity(d) : getActiveActivity(d);
+    const activity = action === 'deliver' ? getDeliverableActivity(d)
+                   : action === 'approve' ? getApprovableActivity(d)
+                   : getActiveActivity(d);
     if (!activity) { addToast('No hay actividad en estado para esta acción.', 'error'); return; }
     try {
       await api.post(ENDPOINTS.ACTIVITY_QUICK_ACTION(activity.id), { action });
@@ -1615,11 +1625,11 @@ export default function EntregablesPage() {
                                         className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                                     </>
                                   )}
-                                  {(d.global_status === 'in_review' || d.global_status === 'with_observations') && (
+                                  {!!getApprovableActivity(d) && (
                                     <button title="Aprobar" onClick={() => handleQuickAction(d, 'approve')}
                                       className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"><CheckCircle2 size={13} /></button>
                                   )}
-                                  {d.global_status === 'in_progress' && (
+                                  {!!getDeliverableActivity(d) && (
                                     <button title="Entregar" onClick={() => handleQuickAction(d, 'deliver')}
                                       className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"><Send size={13} /></button>
                                   )}

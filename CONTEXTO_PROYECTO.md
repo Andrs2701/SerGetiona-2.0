@@ -1,6 +1,6 @@
 # Sergestiona 2.0 — Contexto del Proyecto
 
-> Última actualización: 04/06/2026  
+> Última actualización: 26/06/2026  
 > Repositorio: https://github.com/Andrs2701/SerGetiona-2.0
 
 ---
@@ -294,9 +294,11 @@ GET    /api/export/deliverables?project_id=X&format=csv
 
 ---
 
-## Estado actual del desarrollo (05/06/2026)
+## Estado actual del desarrollo (26/06/2026)
 
 ### ✅ Completado y funcionando
+
+**Iteración base (hasta 05/06/2026):**
 - Dashboard operativo rediseñado: 4 KPIs (Pendientes, En Proceso, Vencidas, % Avance) + tarjetas de prioridad con click → /mi-espacio
 - Dashboard admin/coordinador rediseñado: KPIs ejecutivos, avance por programa (barras CSS), distribución por estado, análisis de flujo/cuellos de botella, ranking de programas
 - Backend: endpoint /reports/dashboard extendido con programs_breakdown y activities_by_role_detail
@@ -319,16 +321,32 @@ GET    /api/export/deliverables?project_id=X&format=csv
 - WorkingDayService: cálculo de días hábiles saltando festivos
 - Auditoría automática de cambios (AuditObserver)
 
+**Iteración evolución 2026 (junio 2026):**
+- **Línea de tiempo cross-rol** (`DeliverableTimelineView`): historial unificado por entregable con eventos de creación, asignación, cambios de estado y entregas
+- **Producción N/A por recurso**: toggle "No aplica" en `QuickProductionGrid` — persiste en BD (`production_not_applicable`), evita bloqueo de entrega cuando no hay producción que registrar
+- **Mi Espacio mejorado**: save sticky, filtrado de timeline, pestaña Evidencias con historial completo por rol, ordenamiento por date_status como criterio primario
+- **Observer `RoleActivityObserver`**: auto-asigna `not_applicable` al crear/quitar responsable; resetea a `not_started` al reasignar. Corrige bug donde el restablecimiento de responsable no cambiaba el estado visual
+- **Dashboard filtros avanzados** (Admin/Coordinador): FilterBar con 5 dimensiones — programa, responsable, rol, año, mes. Aplica a TabSeguimiento (Gantt) y TabProduccion. Badge con conteo de filtros activos + botón "Limpiar filtros"
+- **Página Entregables — 5 correcciones**:
+  - Progreso mostraba 0% aun con entregas: `calcProgressExcNA` ahora cuenta `delivered|in_review|with_observations|approved`
+  - Tab Info: añadidos campos Programa, Asignatura, Módulo/Semana, Fecha estimada fin
+  - Botón "Entregar" funcionando con `getDeliverableActivity` (busca `in_development` → `not_started`)
+  - Botón "Aprobar" funcionando con `getApprovableActivity` (busca `delivered|in_review|with_observations`)
+  - Reasignación de responsable actualiza visual inmediatamente (respuesta del PUT + `loadData()`)
+  - Botón "Comentarios" redundante eliminado del panel de acciones rápidas
+
 ### 🔲 Pendiente / Próximas iteraciones
 - Exportación a PDF
 - Subida real de archivos (actualmente solo URLs externas)
 - Notificaciones por correo electrónico (SMTP configurado, solo loggea en dev)
-- Vista Kanban y Gantt como vistas secundarias
+- Vista Kanban
 - Módulo sandbox para capacitación
 - Despliegue en servidor (VPS / Docker)
 - Integración con PostgreSQL para producción
 - Modo recuperación de contraseña con SMTP real
 - Gestión de plantillas de correo desde admin
+- Eventos de evidencia en línea de tiempo
+- Enriquecer payload de notificaciones (proyecto, nombre responsable, fecha real)
 
 ---
 
@@ -346,7 +364,30 @@ GET    /api/export/deliverables?project_id=X&format=csv
 ## Último commit
 
 ```
-118fd0a feat: dashboard operativo, calendario, evidencias, acciones rápidas
+ffd50c6 fix(backend): resetear not_applicable a not_started al reasignar responsable
+b9bc158 fix(entregables): garantizar actualización visual tras reasignación de responsable
+031497c fix(entregables): progreso, info-tab, botón Entregar, responsable visual
+eddf1e8 feat(dashboard): filtros por programa, responsable, rol, año y mes
+89943a7 refactor(mi-espacio): N/A por recurso, save sticky, timeline filtrado
+21d48cd feat(iter2): mejoras funcionales – lotes 1-3
+943e301 feat(timeline): línea de tiempo cross-rol por entregable
 ```
 
 Rama activa: `main`
+
+## Observers activos
+
+| Observer | Archivo | Evento |
+|----------|---------|--------|
+| `RoleActivityObserver` | `app/Observers/RoleActivityObserver.php` | `creating` → `not_applicable` si sin responsable; `updating` → `not_applicable` al quitar / `not_started` al reasignar |
+| `AuditObserver` | `app/Observers/AuditObserver.php` | Registra en `audit_logs` todo cambio de campo en modelos monitoreados |
+
+## Funciones clave de lógica de negocio (frontend)
+
+| Función | Ubicación | Qué hace |
+|---------|-----------|----------|
+| `calcProgressExcNA` | `entregables/page.tsx` | Calcula % excluyendo actividades `not_applicable` |
+| `getDeliverableActivity` | `entregables/page.tsx` | Encuentra actividad entregable: primero `in_development`, luego `not_started` |
+| `getApprovableActivity` | `entregables/page.tsx` | Encuentra actividad aprobable: `delivered|in_review|with_observations|adjustments_requested` |
+| `getActiveActivity` | `entregables/page.tsx` | Actividad genérica activa (para solicitar ajustes) |
+| `calcProgressExcNA` | `mi-espacio/page.tsx` | Misma lógica aplicada en Mi Espacio |

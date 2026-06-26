@@ -39,6 +39,7 @@ The School of Virtual Education (EEV) at Universidad Sergio Arboleda managed the
 
 ### 📊 Analytics & Reporting
 - **Executive dashboard** — KPIs, program progress bars, bottleneck analysis, role ranking
+- **Advanced filters** — filter by program, responsible, role, year and month; applied across Gantt and production tabs
 - **Compliance reports** — on-time vs. overdue delivery tracking per program
 - **Color-coded date indicators** — Green / Yellow / Red based on commitment deadlines
 
@@ -49,9 +50,12 @@ The School of Virtual Education (EEV) at Universidad Sergio Arboleda managed the
 
 ### 🔄 Workflow Management
 - **Visual sequential flow** — `DeliverableFlow` component shows current stage at a glance
-- **Quick actions** — Deliver / Approve / Request Adjustments / Reject in one click
+- **Quick actions** — Deliver / Approve / Request Adjustments from the deliverables list; smart detection of which activity is actionable
+- **Cross-role timeline** — unified event history per deliverable across all 6 roles
 - **Comment threads** — Slack-style conversation per deliverable
 - **Evidence panel** — links (Drive, SharePoint, external URLs) grouped by role in accordion
+- **Production logging** — quantity tracking per resource type; N/A toggle to skip production requirement when not applicable
+- **RoleActivity observer** — auto-sets `not_applicable` when responsible is removed; resets to `not_started` when reassigned
 
 ### 📦 Data Operations
 - **CSV import** with preview modal and downloadable template
@@ -90,7 +94,8 @@ SerGetiona-2.0/
 │   │   │   ├── NotificationService.php
 │   │   │   └── WorkingDayService.php
 │   │   └── Observers/
-│   │       └── AuditObserver.php   # Automatic change tracking
+│   │       ├── AuditObserver.php         # Automatic change tracking
+│   │       └── RoleActivityObserver.php  # Auto not_applicable / not_started on responsible change
 │   ├── database/
 │   │   ├── migrations/             # 15 migrations
 │   │   └── seeders/                # 8 users, 3 projects, 45 deliverables, 270 activities
@@ -217,10 +222,15 @@ GET    /api/export/deliverables             # CSV export with filters
 - [x] Internal notifications system
 - [x] CSV import / export
 - [x] Audit log for all changes
+- [x] Cross-role timeline per deliverable
+- [x] Production logging with N/A option
+- [x] Advanced dashboard filters (program, responsible, role, year, month)
+- [x] Gantt view (TabSeguimiento) for admin/coordinator
+- [x] Smart quick-action buttons (Deliver / Approve) in deliverables list
 - [ ] PDF export
 - [ ] Real file uploads (currently external URLs only)
 - [ ] Email notifications via SMTP
-- [ ] Kanban and Gantt views
+- [ ] Kanban view
 - [ ] PostgreSQL migration for production
 - [ ] Docker deployment setup
 
