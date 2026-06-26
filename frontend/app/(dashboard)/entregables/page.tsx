@@ -76,10 +76,12 @@ function formatDateShort(dateStr?: string | null): string {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 }
 
+const ROLE_DONE_STATUSES = ['delivered', 'in_review', 'with_observations', 'approved'] as const;
+
 function calcProgressExcNA(activities: RoleActivity[]): { pct: number; done: number; total: number } {
   const relevant = activities.filter(a => a.status !== 'not_applicable');
   if (relevant.length === 0) return { pct: 0, done: 0, total: 0 };
-  const done = relevant.filter(a => a.status === 'approved').length;
+  const done = relevant.filter(a => (ROLE_DONE_STATUSES as readonly string[]).includes(a.status)).length;
   return { pct: Math.round((done / relevant.length) * 100), done, total: relevant.length };
 }
 
@@ -89,6 +91,11 @@ function getActiveActivity(d: Deliverable): RoleActivity | undefined {
     acts.find(a => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started') ??
     acts.find(a => a.status === 'not_started')
   );
+}
+
+// Finds the activity that is actually ready to be delivered (actively in development)
+function getDeliverableActivity(d: Deliverable): RoleActivity | undefined {
+  return (d.role_activities ?? []).find(a => a.status === 'in_development');
 }
 
 function isOverdue(d: Deliverable): boolean {
@@ -242,7 +249,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
   const isFinished = d.global_status === 'finished';
 
   const canApprove = d.global_status === 'in_review' || d.global_status === 'with_observations';
-  const canDeliver = d.global_status === 'in_progress';
+  const canDeliver = !!getDeliverableActivity(d);
   const canAdjust  = d.global_status === 'in_review';
 
   return (
@@ -315,10 +322,6 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
           <button title="Ver detalle" onClick={onView}
             className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
             <Eye size={14} />
-          </button>
-          <button title="Comentarios" onClick={onView}
-            className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
-            <MessageCircle size={14} />
           </button>
           {isManager && (
             <>
@@ -499,7 +502,7 @@ const EMPTY_FORM: DeliverableFormData = {
 interface DeliverableFormPanelProps {
   mode: 'create' | 'edit'; deliverable?: Deliverable;
   projects: Array<{ id: number; name: string }>; users: User[]; programs: string[];
-  onClose: () => void; onSave: () => void;
+  onClose: () => void; onSave: (updated?: Deliverable) => void;
   addToast: (msg: string, type: 'success' | 'error') => void;
 }
 
@@ -543,10 +546,15 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         })),
       };
       if (mode === 'create') payload.project_id = form.project_id ? Number(form.project_id) : null;
-      if (mode === 'create') await api.post<Deliverable>(ENDPOINTS.DELIVERABLES, payload);
-      else await api.put<Deliverable>(ENDPOINTS.DELIVERABLE(deliverable!.id), payload);
-      addToast(mode === 'create' ? 'Entregable creado correctamente.' : 'Entregable actualizado correctamente.', 'success');
-      onSave();
+      if (mode === 'create') {
+        await api.post<Deliverable>(ENDPOINTS.DELIVERABLES, payload);
+        addToast('Entregable creado correctamente.', 'success');
+        onSave();
+      } else {
+        const updated = await api.put<Deliverable>(ENDPOINTS.DELIVERABLE(deliverable!.id), payload);
+        addToast('Entregable actualizado correctamente.', 'success');
+        onSave(updated);
+      }
     } catch (e: unknown) {
       addToast(e instanceof Error ? e.message : 'Error al guardar.', 'error');
     } finally { setSaving(false); }
@@ -682,6 +690,15 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
 type PanelTab = 'info' | 'flow' | 'evidencias';
 
+function InfoField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide shrink-0 w-28">{label}</span>
+      <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 truncate">{value ?? '—'}</span>
+    </div>
+  );
+}
+
 function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
   const [flow, setFlow] = useState<DeliverableFlow | null>(null);
@@ -718,8 +735,22 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-          {tab === 'info' && (
+          {tab === 'info' && (() => {
+            const applicableActs = (deliverable.role_activities ?? []).filter(a => a.status !== 'not_applicable');
+            const endDate = applicableActs
+              .map(a => a.commitment_date)
+              .filter(Boolean)
+              .sort()
+              .at(-1);
+            return (
             <div className="space-y-4">
+              {/* Identificación */}
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg px-3 py-2.5 space-y-1.5">
+                <InfoField label="Programa" value={deliverable.program_name} />
+                <InfoField label="Asignatura" value={deliverable.subject_name} />
+                <InfoField label="Módulo / Semana" value={deliverable.name} />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Estado</p><StatusBadge status={deliverable.global_status} type="global" /></div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Tipo</p>
@@ -730,8 +761,13 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Avance (excl. N/A)</p>
                   <ProgressExcNA activities={deliverable.role_activities ?? []} compact />
                 </div>
-                <div><p className="text-xs text-gray-400 uppercase mb-1">Inicio</p>
-                  <span className="text-sm text-gray-700">{formatDate(deliverable.start_date)}</span>
+                <div className="grid grid-cols-2 gap-2 sm:col-span-2">
+                  <div><p className="text-xs text-gray-400 uppercase mb-1">Inicio</p>
+                    <span className="text-sm text-gray-700">{formatDate(deliverable.start_date) ?? '—'}</span>
+                  </div>
+                  <div><p className="text-xs text-gray-400 uppercase mb-1">Fin estimado</p>
+                    <span className="text-sm text-gray-700">{formatDate(endDate) ?? '—'}</span>
+                  </div>
                 </div>
               </div>
               {deliverable.notes && (
@@ -784,7 +820,8 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
           {tab === 'flow' && (
             <div className="space-y-2">
               {ROLES.map(role => {
@@ -1298,13 +1335,20 @@ export default function EntregablesPage() {
   }
 
   async function handleQuickAction(d: Deliverable, action: QuickAction) {
-    const active = getActiveActivity(d);
-    if (!active) { addToast('No hay actividad activa.', 'error'); return; }
+    const activity = action === 'deliver' ? getDeliverableActivity(d) : getActiveActivity(d);
+    if (!activity) { addToast('No hay actividad en estado para esta acción.', 'error'); return; }
     try {
-      await api.post(ENDPOINTS.ACTIVITY_QUICK_ACTION(active.id), { action });
+      await api.post(ENDPOINTS.ACTIVITY_QUICK_ACTION(activity.id), { action });
       addToast(action === 'approve' ? 'Aprobado.' : action === 'deliver' ? 'Entregado.' : 'Ajustes solicitados.', 'success');
       loadData();
-    } catch { addToast('Error al ejecutar la acción.', 'error'); }
+    } catch (e: unknown) {
+      const err = e as { requires_production?: boolean };
+      if (err?.requires_production) {
+        addToast('Esta actividad requiere registrar producción antes de entregar. Abre el detalle para registrarla.', 'error');
+      } else {
+        addToast('Error al ejecutar la acción.', 'error');
+      }
+    }
   }
 
   async function handleDelete(d: Deliverable) {
@@ -1613,7 +1657,14 @@ export default function EntregablesPage() {
           deliverable={formPanel.mode === 'edit' ? formPanel.deliverable : undefined}
           projects={projects} users={users} programs={programNames}
           onClose={() => setFormPanel(null)}
-          onSave={() => { setFormPanel(null); loadData(); }}
+          onSave={(updated) => {
+            setFormPanel(null);
+            if (updated) {
+              setData(prev => prev.map(d => d.id === updated.id ? updated : d));
+            } else {
+              loadData();
+            }
+          }}
           addToast={addToast}
         />
       )}
