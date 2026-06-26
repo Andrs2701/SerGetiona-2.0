@@ -68,16 +68,20 @@ class ExportController extends Controller
 
                 $activities = $deliverable->roleActivities->keyBy('role');
 
-                // Calcular % cumplimiento: roles con status = 'approved'
-                $completedRoles = 0;
-                $totalRoles     = count(self::ROLES);
+                // Calcular % cumplimiento excluyendo roles no_applicable
+                $completedRoles  = 0;
+                $applicableRoles = 0;
                 foreach (array_keys(self::ROLES) as $role) {
                     $act = $activities[$role] ?? null;
+                    if ($act && $act->status === 'not_applicable') {
+                        continue;
+                    }
+                    $applicableRoles++;
                     if ($act && in_array($act->status, ['approved', 'delivered'])) {
                         $completedRoles++;
                     }
                 }
-                $compliance = $totalRoles > 0 ? round(($completedRoles / $totalRoles) * 100, 1) : 0;
+                $compliance = $applicableRoles > 0 ? round(($completedRoles / $applicableRoles) * 100, 1) : 0;
 
                 $row = [
                     $project?->name       ?? '',
@@ -139,11 +143,15 @@ class ExportController extends Controller
                 }
 
                 $totalDeliverables = count($deliverablesList);
-                $totalRoles        = $totalDeliverables * count(self::ROLES);
+                $totalRoles        = 0;
                 $completedRoles    = 0;
 
                 foreach ($deliverablesList as $d) {
                     foreach ($d->roleActivities as $act) {
+                        if ($act->status === 'not_applicable') {
+                            continue;
+                        }
+                        $totalRoles++;
                         if (in_array($act->status, ['approved', 'delivered'])) {
                             $completedRoles++;
                         }

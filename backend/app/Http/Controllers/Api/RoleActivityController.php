@@ -67,49 +67,63 @@ class RoleActivityController extends Controller
             return null;
         }
 
-        $nextRole     = self::ROLE_CHAIN[$currentIdx + 1];
-        $nextActivity = $activity->deliverable?->roleActivities()
-            ->where('role', $nextRole)
+        // Carga todas las actividades del entregable de una sola vez para iterar sin N+1
+        $allActivities = $activity->deliverable?->roleActivities()
             ->with('responsible')
-            ->first();
+            ->get()
+            ->keyBy('role');
 
-        if (!$nextActivity) {
-            return null;
+        $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+        $currentLabel    = NotificationService::translateRole($activity->role);
+        $verb            = $activity->status === 'delivered' ? 'entregó' : 'aprobó';
+
+        // Recorre el resto de la cadena saltando roles 'not_applicable'
+        for ($i = $currentIdx + 1; $i < count(self::ROLE_CHAIN); $i++) {
+            $nextRole     = self::ROLE_CHAIN[$i];
+            $nextActivity = $allActivities[$nextRole] ?? null;
+
+            if (!$nextActivity) {
+                continue;
+            }
+
+            if ($nextActivity->status === 'not_applicable') {
+                continue; // rol sin responsable, saltar automáticamente
+            }
+
+            // Primer rol aplicable encontrado: activar si está en estado inicial
+            if (in_array($nextActivity->status, ['not_started', 'pending'], true)) {
+                $oldNextStatus        = $nextActivity->status;
+                $nextActivity->status = 'in_progress';
+                $nextActivity->save();
+
+                AuditLog::create([
+                    'user_id'      => Auth::id() ?? 1,
+                    'action'       => 'updated',
+                    'entity_type'  => 'RoleActivity',
+                    'entity_id'    => $nextActivity->id,
+                    'field_changed'=> 'status',
+                    'old_value'    => $oldNextStatus,
+                    'new_value'    => 'in_progress',
+                    'ip_address'   => request()->ip(),
+                    'created_at'   => now(),
+                ]);
+            }
+
+            if ($nextActivity->responsible) {
+                $nextLabel = NotificationService::translateRole($nextRole);
+                NotificationService::notify(
+                    $nextActivity->responsible,
+                    'next_in_chain',
+                    'Tu turno en el flujo',
+                    "El rol '{$currentLabel}' {$verb} su actividad en '{$deliverableName}'. Tu rol '{$nextLabel}' es el siguiente en el flujo.",
+                    ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
+                );
+            }
+
+            return $nextActivity;
         }
 
-        if (in_array($nextActivity->status, ['not_started', 'pending'], true)) {
-            $oldNextStatus        = $nextActivity->status;
-            $nextActivity->status = 'in_progress';
-            $nextActivity->save();
-
-            AuditLog::create([
-                'user_id'      => Auth::id() ?? 1,
-                'action'       => 'updated',
-                'entity_type'  => 'RoleActivity',
-                'entity_id'    => $nextActivity->id,
-                'field_changed'=> 'status',
-                'old_value'    => $oldNextStatus,
-                'new_value'    => 'in_progress',
-                'ip_address'   => request()->ip(),
-                'created_at'   => now(),
-            ]);
-        }
-
-        if ($nextActivity->responsible) {
-            $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
-            $currentLabel    = NotificationService::translateRole($activity->role);
-            $nextLabel       = NotificationService::translateRole($nextRole);
-            $verb            = $activity->status === 'delivered' ? 'entregó' : 'aprobó';
-            NotificationService::notify(
-                $nextActivity->responsible,
-                'next_in_chain',
-                'Tu turno en el flujo',
-                "El rol '{$currentLabel}' {$verb} su actividad en '{$deliverableName}'. Tu rol '{$nextLabel}' es el siguiente en el flujo.",
-                ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
-            );
-        }
-
-        return $nextActivity;
+        return null;
     }
 
     public static function translateStatus(string $status): string

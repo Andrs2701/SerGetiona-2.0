@@ -6,6 +6,7 @@ use App\Models\Deliverable;
 use App\Models\Project;
 use App\Models\RoleActivity;
 use App\Observers\AuditObserver;
+use App\Observers\RoleActivityObserver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
 
         Project::observe(AuditObserver::class);
         Deliverable::observe(AuditObserver::class);
+        RoleActivity::observe(RoleActivityObserver::class);
         RoleActivity::observe(AuditObserver::class);
     }
 }

@@ -332,10 +332,11 @@ class DeliverableController extends Controller
         $subject    = $d->subject;
         $program    = $subject?->academicProgram;
         $project    = $program?->project;
-        $activities = $d->roleActivities;
-        $total      = $activities->count();
-        $approved   = $activities->where('status', 'approved')->count();
-        $compliance = $total > 0 ? (int) round(($approved / $total) * 100) : 0;
+        $activities  = $d->roleActivities;
+        $applicable  = $activities->where('status', '!=', 'not_applicable');
+        $total       = $applicable->count();
+        $approved    = $applicable->where('status', 'approved')->count();
+        $compliance  = $total > 0 ? (int) round(($approved / $total) * 100) : 0;
 
         return [
             'id'                    => $d->id,
