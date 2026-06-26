@@ -32,16 +32,16 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <div className="bg-white dark:bg-[#0d2a4f] rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 border border-transparent dark:border-gray-700">
         {!sent ? (
           <>
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Recuperar contraseña</h2>
-            <p className="text-sm text-gray-500 mb-5">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Recuperar contraseña</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
               Ingresa tu correo y te enviaremos instrucciones para restablecer tu contraseña.
             </p>
 
             {error && (
-              <div className="mb-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="mb-4 flex items-start gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                 <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -49,14 +49,14 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Correo electrónico</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="usuario@usa.edu.co"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-[#0a1929] dark:text-white dark:placeholder-gray-500 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
                   onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.2)')}
                   onBlur={e => (e.currentTarget.style.boxShadow = '')}
                 />
@@ -65,7 +65,7 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-2 px-4 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2 px-4 text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -84,11 +84,11 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
           </>
         ) : (
           <div className="text-center py-4">
-            <div className="flex items-center justify-center w-14 h-14 bg-emerald-100 rounded-full mx-auto mb-4">
-              <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+            <div className="flex items-center justify-center w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 rounded-full mx-auto mb-4">
+              <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">¡Correo enviado!</h2>
-            <p className="text-sm text-gray-500 mb-5">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">¡Correo enviado!</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
               Si existe una cuenta con ese correo, recibirás las instrucciones en los próximos minutos.
             </p>
             <button
@@ -148,7 +148,7 @@ export default function LoginPage() {
     <>
       {showRecovery && <PasswordRecoveryModal onClose={() => setShowRecovery(false)} />}
 
-      <div className="min-h-screen flex">
+      <div className="min-h-screen flex dark:bg-[#0a1929]">
 
         {/* ── Panel izquierdo — branding institucional (oculto en móvil) ── */}
         <div
@@ -228,37 +228,47 @@ export default function LoginPage() {
         </div>
 
         {/* ── Panel derecho — formulario ── */}
-        <div className="flex-1 flex items-center justify-center p-6 bg-white">
+        <div className="flex-1 flex items-center justify-center p-6 bg-white dark:bg-[#0d2a4f]">
           <div className="w-full max-w-sm">
 
-            {/* Logo institucional — visible en ambos breakpoints, fondo blanco garantizado */}
+            {/* Logo institucional — light: logo-usa.png / dark: logo-usa_black.png */}
             <div className="flex justify-center mb-8">
+              {/* Modo claro */}
               <Image
                 src="/logo-usa.png"
                 alt="Campus Virtual — Universidad Sergio Arboleda"
                 width={260}
                 height={72}
                 priority
-                className="object-contain"
+                className="object-contain dark:hidden"
+                style={{ maxHeight: 72, width: 'auto', height: 'auto' }}
+              />
+              {/* Modo oscuro */}
+              <Image
+                src="/logo-usa_black.png"
+                alt="Campus Virtual — Universidad Sergio Arboleda"
+                width={260}
+                height={72}
+                priority
+                className="object-contain hidden dark:block"
                 style={{ maxHeight: 72, width: 'auto', height: 'auto' }}
               />
             </div>
 
             {/* Separador con badge de sistema */}
             <div className="flex items-center gap-2 mb-6">
-              <div className="flex-1 h-px bg-gray-100" />
-              <span className="text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full"
-                style={{ color: '#194276', background: 'rgba(25,66,118,0.08)' }}>
+              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full text-[#194276] dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30">
                 Sergestiona 2.0
               </span>
-              <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">Iniciar Sesión</h2>
-            <p className="text-sm text-gray-500 mb-6">Ingresa tus credenciales institucionales para continuar</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Iniciar Sesión</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Ingresa tus credenciales institucionales para continuar</p>
 
             {error && (
-              <div className="mb-5 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="mb-5 flex items-start gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                 <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -268,19 +278,19 @@ export default function LoginPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   Correo electrónico
                 </label>
                 <div className="relative">
-                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="usuario@usa.edu.co"
                     required
-                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
-                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.18)')}
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 dark:border-gray-600 dark:bg-[#0a1929] dark:text-white dark:placeholder-gray-500 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.25)')}
                     onBlur={e => (e.currentTarget.style.boxShadow = '')}
                   />
                 </div>
@@ -288,25 +298,25 @@ export default function LoginPage() {
 
               {/* Contraseña */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   Contraseña
                 </label>
                 <div className="relative">
-                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-9 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
-                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.18)')}
+                    className="w-full pl-9 pr-10 py-2.5 text-sm border border-gray-200 dark:border-gray-600 dark:bg-[#0a1929] dark:text-white dark:placeholder-gray-500 rounded-lg focus:outline-none focus:border-transparent transition-shadow"
+                    onFocus={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(25,66,118,0.25)')}
                     onBlur={e => (e.currentTarget.style.boxShadow = '')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -323,13 +333,12 @@ export default function LoginPage() {
                     className="w-4 h-4 border-gray-300 rounded"
                     style={{ accentColor: '#194276' }}
                   />
-                  <span className="text-sm text-gray-600">Recordar sesión</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Recordar sesión</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowRecovery(true)}
-                  className="text-sm font-medium hover:underline transition-colors"
-                  style={{ color: '#194276' }}
+                  className="text-sm font-medium hover:underline transition-colors text-[#194276] dark:text-blue-400"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
@@ -357,12 +366,12 @@ export default function LoginPage() {
 
             {/* Separador con acento amarillo */}
             <div className="flex items-center gap-2 mt-8 mb-4">
-              <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
               <div className="w-2 h-2 rounded-full" style={{ background: '#ffec00' }} />
-              <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
             </div>
 
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs text-gray-400 dark:text-gray-500">
               Sergestiona 2.0 &copy; {new Date().getFullYear()} &nbsp;·&nbsp; Universidad Sergio Arboleda
             </p>
           </div>
