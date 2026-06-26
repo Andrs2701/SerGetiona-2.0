@@ -1660,10 +1660,11 @@ export default function EntregablesPage() {
           onSave={(updated) => {
             setFormPanel(null);
             if (updated) {
+              // Instant update from PUT response for immediate visual feedback
               setData(prev => prev.map(d => d.id === updated.id ? updated : d));
-            } else {
-              loadData();
             }
+            // Always refresh from server to guarantee consistency
+            loadData();
           }}
           addToast={addToast}
         />
