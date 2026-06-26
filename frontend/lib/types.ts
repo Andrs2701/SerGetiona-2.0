@@ -275,6 +275,8 @@ export interface TimelineEvent {
   label: string;
   user?: string | null;
   date?: string;
+  role?: string;
+  role_label?: string;
 }
 
 export interface WorkspaceActivity {

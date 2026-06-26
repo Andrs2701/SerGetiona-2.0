@@ -114,6 +114,47 @@ function TimelineView({ activityId }: { activityId: number }) {
   );
 }
 
+// Deliverable-level timeline — shows events from ALL roles in chronological order
+const ROLE_DOT_COLORS: Record<string, string> = {
+  expert: 'bg-purple-400', pedagogy: 'bg-pink-400', design: 'bg-blue-400',
+  audiovisual: 'bg-orange-400', engineering: 'bg-cyan-400', qa: 'bg-emerald-400',
+};
+
+function DeliverableTimelineView({ deliverableId }: { deliverableId: number }) {
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get<{ events: TimelineEvent[] }>(ENDPOINTS.DELIVERABLE_TIMELINE(deliverableId))
+      .then((r) => setEvents(r.events ?? []))
+      .catch(() => setEvents([]))
+      .finally(() => setLoading(false));
+  }, [deliverableId]);
+
+  if (loading) return <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse"/>)}</div>;
+  if (!events.length) return <p className="text-sm text-gray-400 py-4 text-center">Sin eventos registrados</p>;
+
+  return (
+    <div className="relative pl-5 space-y-4">
+      <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gray-100"/>
+      {events.map((ev, i) => {
+        const dotColor = ev.role ? (ROLE_DOT_COLORS[ev.role] ?? 'bg-gray-400') : (TIMELINE_COLORS[ev.type] ?? 'bg-gray-400');
+        return (
+          <div key={i} className="relative flex gap-3">
+            <div className={`absolute -left-3 w-2 h-2 rounded-full mt-1.5 ${dotColor}`}/>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{ev.label}</p>
+              <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
+                {ev.user && <span>{ev.user}</span>}
+                {ev.date && <span>{formatDateTime(ev.date)}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Evidence links — controlled pending state, submits via parent handleSave
 function EvidenceLinksPanel({
   activityId,
@@ -708,7 +749,10 @@ function DetailPanel({
           {tab === 'timeline' && (
             <div className="p-5">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Historial de cambios</p>
-              <TimelineView activityId={act.id}/>
+              {act.deliverable
+                ? <DeliverableTimelineView deliverableId={act.deliverable.id}/>
+                : <TimelineView activityId={act.id}/>
+              }
             </div>
           )}
         </div>

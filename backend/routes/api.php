@@ -82,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'byActivity']);
 
     // Evidence links
+    Route::get('deliverables/{deliverable}/timeline', [DeliverableController::class, 'timeline']);
     Route::get('deliverables/{deliverable}/evidence', [EvidenceLinkController::class, 'byDeliverable']);
     Route::post('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'store']);
     Route::delete('evidence/{link}', [EvidenceLinkController::class, 'destroy']);

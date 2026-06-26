@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DeliverableResource;
 use App\Models\AcademicProgram;
+use App\Models\AuditLog;
 use App\Models\Deliverable;
 use App\Models\FlowTemplate;
 use App\Models\RoleActivity;
@@ -12,6 +13,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Support\ResourceAccess;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class DeliverableController extends Controller
@@ -323,6 +325,123 @@ class DeliverableController extends Controller
         }
 
         return new DeliverableResource($deliverable->load('roleActivities.responsible'));
+    }
+
+    // ─── GET /deliverables/{id}/timeline ─────────────────────────────────────
+
+    public function timeline(Request $request, Deliverable $deliverable)
+    {
+        $deliverable->loadMissing('subject.academicProgram.project');
+        abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
+
+        $deliverable->load(['roleActivities.responsible']);
+
+        $roleOrder = self::ALL_ROLES;
+        $roleLabels = [
+            'expert' => 'Experto', 'pedagogy' => 'Pedagogía', 'design' => 'Diseño',
+            'audiovisual' => 'Audiovisual', 'engineering' => 'Ingeniería', 'qa' => 'QA',
+        ];
+
+        $activities  = $deliverable->roleActivities->keyBy('role');
+        $activityIds = $activities->pluck('id')->all();
+
+        // Load all audit logs for all activities in one query
+        $auditLogs = AuditLog::whereIn('entity_id', $activityIds)
+            ->where('entity_type', 'RoleActivity')
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->groupBy('entity_id');
+
+        $allEvents = [];
+
+        foreach ($roleOrder as $role) {
+            $activity = $activities[$role] ?? null;
+            if (!$activity || $activity->status === 'not_applicable') {
+                continue;
+            }
+
+            $roleLabel = $roleLabels[$role] ?? $role;
+
+            $allEvents[] = [
+                'type'       => 'created',
+                'label'      => "Actividad creada — {$roleLabel}",
+                'user'       => null,
+                'date'       => $activity->created_at?->toIso8601String(),
+                'role'       => $role,
+                'role_label' => $roleLabel,
+            ];
+
+            if ($activity->responsible_id && $activity->assigned_at) {
+                $allEvents[] = [
+                    'type'       => 'assigned',
+                    'label'      => "Asignada a {$activity->responsible?->name} — {$roleLabel}",
+                    'user'       => null,
+                    'date'       => Carbon::parse($activity->assigned_at)->toIso8601String(),
+                    'role'       => $role,
+                    'role_label' => $roleLabel,
+                ];
+            }
+
+            foreach ($auditLogs->get($activity->id, collect()) as $log) {
+                if ($log->field_changed === 'status' && $log->new_value) {
+                    $oldLabel = RoleActivityController::translateStatus($log->old_value ?? '');
+                    $newLabel = RoleActivityController::translateStatus($log->new_value);
+                    $allEvents[] = [
+                        'type'       => 'status',
+                        'label'      => "{$roleLabel}: {$oldLabel} → {$newLabel}",
+                        'user'       => $log->user?->name,
+                        'date'       => $log->created_at?->toIso8601String(),
+                        'role'       => $role,
+                        'role_label' => $roleLabel,
+                    ];
+                } elseif ($log->field_changed === 'actual_delivery_date' && $log->new_value) {
+                    $allEvents[] = [
+                        'type'       => 'delivered',
+                        'label'      => "Entrega registrada — {$roleLabel}",
+                        'user'       => $log->user?->name,
+                        'date'       => $log->created_at?->toIso8601String(),
+                        'role'       => $role,
+                        'role_label' => $roleLabel,
+                    ];
+                } elseif ($log->field_changed === 'commitment_date' && $log->new_value) {
+                    $allEvents[] = [
+                        'type'       => 'date_changed',
+                        'label'      => "{$roleLabel}: Fecha límite → {$log->new_value}",
+                        'user'       => $log->user?->name,
+                        'date'       => $log->created_at?->toIso8601String(),
+                        'role'       => $role,
+                        'role_label' => $roleLabel,
+                    ];
+                } elseif ($log->field_changed === 'notes' && $log->new_value) {
+                    $allEvents[] = [
+                        'type'       => 'note',
+                        'label'      => "Observación actualizada — {$roleLabel}",
+                        'user'       => $log->user?->name,
+                        'date'       => $log->created_at?->toIso8601String(),
+                        'role'       => $role,
+                        'role_label' => $roleLabel,
+                    ];
+                }
+            }
+
+            if ($activity->status === 'approved' && $activity->actual_delivery_date) {
+                $onTime = $activity->commitment_date
+                    && $activity->actual_delivery_date->lte(Carbon::parse($activity->commitment_date));
+                $allEvents[] = [
+                    'type'       => 'approved',
+                    'label'      => $onTime ? "{$roleLabel}: Aprobada ✓ (a tiempo)" : "{$roleLabel}: Aprobada (fuera de tiempo)",
+                    'user'       => null,
+                    'date'       => $activity->updated_at?->toIso8601String(),
+                    'role'       => $role,
+                    'role_label' => $roleLabel,
+                ];
+            }
+        }
+
+        usort($allEvents, fn($a, $b) => strcmp($a['date'] ?? '', $b['date'] ?? ''));
+
+        return response()->json(['events' => $allEvents]);
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────

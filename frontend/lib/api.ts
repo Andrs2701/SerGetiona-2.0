@@ -145,6 +145,7 @@ export const ENDPOINTS = {
   ACTIVITY_EVIDENCE: (id: number) => `/role-activities/${id}/evidence`,
   ACTIVITY_QUICK_ACTION: (id: number) => `/activities/${id}/quick-action`,
   ACTIVITY_TIMELINE: (id: number) => `/activities/${id}/timeline`,
+  DELIVERABLE_TIMELINE: (id: number) => `/deliverables/${id}/timeline`,
   DELIVERABLE_FLOW: (id: number) => `/deliverables/${id}/flow`,
 
   // Resource types & production
