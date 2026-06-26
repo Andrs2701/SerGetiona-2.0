@@ -120,7 +120,7 @@ const ROLE_DOT_COLORS: Record<string, string> = {
   audiovisual: 'bg-orange-400', engineering: 'bg-cyan-400', qa: 'bg-emerald-400',
 };
 
-function DeliverableTimelineView({ deliverableId }: { deliverableId: number }) {
+function DeliverableTimelineView({ deliverableId, activityRole }: { deliverableId: number; activityRole?: string }) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -133,10 +133,15 @@ function DeliverableTimelineView({ deliverableId }: { deliverableId: number }) {
   if (loading) return <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse"/>)}</div>;
   if (!events.length) return <p className="text-sm text-gray-400 py-4 text-center">Sin eventos registrados</p>;
 
+  // For creation/assignment events, only show the current user's own role; all other event types are shown for all roles
+  const filtered = activityRole
+    ? events.filter(ev => (ev.type !== 'created' && ev.type !== 'assigned') || ev.role === activityRole)
+    : events;
+
   return (
     <div className="relative pl-5 space-y-4">
       <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gray-100"/>
-      {events.map((ev, i) => {
+      {filtered.map((ev, i) => {
         const dotColor = ev.role ? (ROLE_DOT_COLORS[ev.role] ?? 'bg-gray-400') : (TIMELINE_COLORS[ev.type] ?? 'bg-gray-400');
         return (
           <div key={i} className="relative flex gap-3">
@@ -385,7 +390,8 @@ function QuickProductionGrid({
   quantities, onQuantityChange,
   date, onDateChange,
   onLogsLoaded, refreshKey,
-  productionNA, onProductionNAChange,
+  naResources, onNAResourcesChange,
+  onResourceTypesLoaded,
 }: {
   activityId: number; role: string;
   quantities: Record<number, number>;
@@ -393,8 +399,9 @@ function QuickProductionGrid({
   date: string; onDateChange: (d: string) => void;
   onLogsLoaded: (count: number) => void;
   refreshKey: number;
-  productionNA: boolean;
-  onProductionNAChange: (v: boolean) => void;
+  naResources: Set<number>;
+  onNAResourcesChange: (s: Set<number>) => void;
+  onResourceTypesLoaded: (count: number) => void;
 }) {
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
   const [logs, setLogs] = useState<ProductionLog[]>([]);
@@ -404,7 +411,11 @@ function QuickProductionGrid({
     setLoading(true);
     Promise.all([
       api.get<{ data: ResourceType[] }>(`${ENDPOINTS.RESOURCE_TYPES}?role=${role}`)
-        .then(r => setResourceTypes(((r.data ?? r) as ResourceType[]).filter(rt => rt.is_active))),
+        .then(r => {
+          const types = ((r.data ?? r) as ResourceType[]).filter(rt => rt.is_active);
+          setResourceTypes(types);
+          onResourceTypesLoaded(types.length);
+        }),
       api.get<{ data: ProductionLog[] }>(ENDPOINTS.ACTIVITY_PRODUCTION(activityId))
         .then(r => {
           const data = (r.data ?? r) as ProductionLog[];
@@ -431,23 +442,9 @@ function QuickProductionGrid({
   if (!resourceTypes.length) return <p className="text-xs text-gray-400 dark:text-gray-500 py-1">Este rol no tiene tipos de recurso configurados.</p>;
 
   return (
-    <div className="space-y-3">
-      {/* N/A toggle */}
-      <button
-        type="button"
-        onClick={() => onProductionNAChange(!productionNA)}
-        className={clsx(
-          'w-full text-xs py-1.5 rounded-lg border font-medium transition-colors',
-          productionNA
-            ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'
-            : 'bg-white dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-600 hover:border-gray-400 hover:text-gray-600'
-        )}>
-        {productionNA ? '✓ Producción: No aplica (N/A)' : 'Marcar como No aplica (N/A)'}
-      </button>
-
-      <div className={clsx('space-y-3', productionNA && 'opacity-40 pointer-events-none')}>
+    <div className="space-y-2.5">
       {logs.length > 0 && (
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 space-y-1">
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-2.5 space-y-1">
           <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1">Ya registrado</p>
           {logs.map(l => (
             <div key={l.id} className="flex items-center justify-between text-xs">
@@ -461,26 +458,47 @@ function QuickProductionGrid({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        {resourceTypes.map(rt => (
-          <div key={rt.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-2.5 py-2">
-            <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={rt.name}>{rt.name}</span>
-            <input type="number" min={0}
-              value={quantities[rt.id] ?? ''}
-              placeholder="0"
-              onChange={e => onQuantityChange(rt.id, Math.max(0, Number(e.target.value)))}
-              className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            />
-          </div>
-        ))}
+      <div className="space-y-1">
+        {resourceTypes.map(rt => {
+          const isNA = naResources.has(rt.id);
+          return (
+            <div key={rt.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-2.5 py-1.5">
+              <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={rt.name}>{rt.name}</span>
+              {isNA ? (
+                <span className="text-xs text-gray-400 italic w-12 text-center">N/A</span>
+              ) : (
+                <input type="number" min={0}
+                  value={quantities[rt.id] ?? ''}
+                  placeholder="0"
+                  onChange={e => onQuantityChange(rt.id, Math.max(0, Number(e.target.value)))}
+                  className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new Set(naResources);
+                  if (isNA) { next.delete(rt.id); } else { next.add(rt.id); }
+                  onNAResourcesChange(next);
+                }}
+                className={clsx(
+                  'text-[10px] font-medium px-1.5 py-0.5 rounded border transition-colors flex-shrink-0',
+                  isNA
+                    ? 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500'
+                    : 'bg-white dark:bg-gray-700 text-gray-400 border-gray-200 dark:border-gray-600 hover:border-gray-400 hover:text-gray-500'
+                )}>
+                N/A
+              </button>
+            </div>
+          );
+        })}
       </div>
 
-      <div>
-        <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-0.5">Fecha de producción</label>
+      <div className="flex items-center gap-2">
+        <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">Fecha prod.</label>
         <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
           className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
       </div>
-      </div>{/* end opacity wrapper */}
     </div>
   );
 }
@@ -528,7 +546,8 @@ function DetailPanel({
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [prodDate, setProdDate] = useState(new Date().toISOString().split('T')[0]);
   const [existingLogsCount, setExistingLogsCount] = useState(0);
-  const [productionNA, setProductionNA] = useState(act.production_not_applicable ?? false);
+  const [naResources, setNaResources] = useState<Set<number>>(new Set());
+  const [totalResourceTypes, setTotalResourceTypes] = useState(0);
   // Lifted evidence link state — submitted by handleSave, not by EvidenceLinksPanel
   const [pendingUrl, setPendingUrl] = useState('');
   const [pendingTitle, setPendingTitle] = useState('');
@@ -544,7 +563,8 @@ function DetailPanel({
     setSaveError(null);
     setQuantities({});
     setProdDate(new Date().toISOString().split('T')[0]);
-    setProductionNA(act.production_not_applicable ?? false);
+    setNaResources(new Set());
+    setTotalResourceTypes(0);
     setPendingUrl('');
     setPendingTitle('');
     setExistingLogsCount(0);
@@ -559,9 +579,10 @@ function DetailPanel({
 
   const isProdRole = PRODUCTION_ROLES.has(act.role);
   const toPost = Object.entries(quantities)
-    .filter(([, qty]) => qty > 0)
+    .filter(([rtId, qty]) => qty > 0 && !naResources.has(Number(rtId)))
     .map(([rtId, qty]) => ({ resource_type_id: Number(rtId), quantity: qty }));
   const hasProduction = existingLogsCount > 0 || toPost.length > 0;
+  const allProductionNA = totalResourceTypes > 0 && naResources.size >= totalResourceTypes;
   const hasPendingLink = pendingUrl.trim() !== '' && pendingTitle.trim() !== '';
   const hasLink = existingLinksCount > 0 || hasPendingLink;
   const prodStep = isProdRole ? 2 : undefined;
@@ -571,15 +592,15 @@ function DetailPanel({
     setSaving(true);
     setSaveError(null);
 
-    // Validate before attempting delivery — N/A bypasses both production and link checks
-    if (status === 'delivered' && isProdRole && !productionNA) {
+    // Validate before delivery — bypassed if all resources are marked N/A
+    if (status === 'delivered' && isProdRole && !allProductionNA) {
       if (!hasProduction) {
-        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado, o marca como No aplica.`);
+        setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado, o marca todos los recursos como N/A.`);
         setSaving(false);
         return;
       }
       if (!hasLink) {
-        setSaveError(`Completa la sección ${linkStep} – Enlace antes de marcar como Entregado, o marca producción como No aplica.`);
+        setSaveError(`Completa la sección ${linkStep} – Enlace de entrega antes de marcar como Entregado.`);
         setSaving(false);
         return;
       }
@@ -601,8 +622,8 @@ function DetailPanel({
         setPendingUrl('');
         setPendingTitle('');
       }
-      // 3. PUT status + notes + production_not_applicable
-      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes, production_not_applicable: productionNA });
+      // 3. PUT status + notes + production_not_applicable (true only when ALL resources are N/A'd)
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes, production_not_applicable: allProductionNA });
       onStatusChange(act.id, status);
       setSaved(true);
       setRefreshKey(k => k + 1);
@@ -659,9 +680,9 @@ function DetailPanel({
             <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
 
               {/* ── Paso 1: Información ── */}
-              <div className="px-5 py-4 space-y-3">
+              <div className="px-4 py-3 space-y-2.5">
                 <StepHeader step={1} label="Información"/>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs mt-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mt-2">
                   {[
                     ['Programa', act.program?.name ?? '—'],
                     ['Asignatura', act.subject?.name ?? '—'],
@@ -689,7 +710,7 @@ function DetailPanel({
 
                 <div>
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={1}
                     placeholder="Notas u observaciones..."
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
                 </div>
@@ -697,8 +718,8 @@ function DetailPanel({
 
               {/* ── Paso 2: Producción (solo roles productivos) ── */}
               {isProdRole && (
-                <div className="px-5 py-4 space-y-3">
-                  <StepHeader step={2} label="Producción" done={hasProduction || productionNA}/>
+                <div className="px-4 py-3 space-y-2.5">
+                  <StepHeader step={2} label="Producción" done={hasProduction || allProductionNA}/>
                   <div className="mt-1">
                     <QuickProductionGrid
                       activityId={act.id}
@@ -709,15 +730,16 @@ function DetailPanel({
                       onDateChange={setProdDate}
                       onLogsLoaded={setExistingLogsCount}
                       refreshKey={refreshKey}
-                      productionNA={productionNA}
-                      onProductionNAChange={setProductionNA}
+                      naResources={naResources}
+                      onNAResourcesChange={setNaResources}
+                      onResourceTypesLoaded={setTotalResourceTypes}
                     />
                   </div>
                 </div>
               )}
 
               {/* ── Paso 2 o 3: Enlace de entrega ── */}
-              <div className="px-5 py-4 space-y-3">
+              <div className="px-4 py-3 space-y-2.5">
                 <StepHeader step={linkStep} label="Enlace de entrega" done={hasLink}/>
                 <div className="mt-1">
                   <EvidenceLinksPanel
@@ -730,26 +752,6 @@ function DetailPanel({
                     refreshKey={refreshKey}
                   />
                 </div>
-              </div>
-
-              {/* ── Guardar ── */}
-              <div className="px-5 py-4 space-y-3">
-                {saveError && (
-                  <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
-                    {saveError}
-                  </p>
-                )}
-                <button onClick={handleSave} disabled={saving}
-                  className={clsx('w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors',
-                    saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
-                    saving && 'opacity-60')}>
-                  {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
-                </button>
-                {status === 'delivered' && isProdRole && !productionNA && (!hasProduction || !hasLink) && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">
-                    Para marcar como Entregado: registra producción y enlace, o marca producción como N/A.
-                  </p>
-                )}
               </div>
 
             </div>
@@ -771,12 +773,34 @@ function DetailPanel({
             <div className="p-5">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Historial de cambios</p>
               {act.deliverable
-                ? <DeliverableTimelineView deliverableId={act.deliverable.id}/>
+                ? <DeliverableTimelineView deliverableId={act.deliverable.id} activityRole={act.role}/>
                 : <TimelineView activityId={act.id}/>
               }
             </div>
           )}
         </div>
+
+        {/* ── Sticky save footer (principal tab only) ── */}
+        {tab === 'principal' && (
+          <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex-shrink-0 space-y-2">
+            {saveError && (
+              <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                {saveError}
+              </p>
+            )}
+            {status === 'delivered' && isProdRole && !allProductionNA && (!hasProduction || !hasLink) && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">
+                Para Entregado: registra producción y enlace, o marca todos los recursos como N/A.
+              </p>
+            )}
+            <button onClick={handleSave} disabled={saving}
+              className={clsx('w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-colors',
+                saved ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700',
+                saving && 'opacity-60')}>
+              {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
