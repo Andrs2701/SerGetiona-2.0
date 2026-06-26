@@ -66,6 +66,7 @@ The School of Virtual Education (EEV) at Universidad Sergio Arboleda managed the
 - **Laravel Sanctum** token-based authentication
 - **Role-based access control** — 3 permission levels (Admin, Coordinator, Operative)
 - **Password recovery flow** (SMTP-ready)
+- **Dark / Light mode** — full UI theming via Tailwind `darkMode: 'class'`; login page uses adaptive institutional logos (`logo-usa.png` / `logo-usa_black.png`)
 
 ---
 

@@ -1,6 +1,6 @@
 # Sergestiona 2.0 — Contexto del Proyecto
 
-> Última actualización: 26/06/2026  
+> Última actualización: 26/06/2026 (tarde)  
 > Repositorio: https://github.com/Andrs2701/SerGetiona-2.0
 
 ---
@@ -364,16 +364,25 @@ GET    /api/export/deliverables?project_id=X&format=csv
 ## Último commit
 
 ```
+6e88f5f feat(login): logo adaptivo y dark mode completo
+11098d4 fix(entregables): corregir botones Entregar/Aprobar y actualizar docs
 ffd50c6 fix(backend): resetear not_applicable a not_started al reasignar responsable
 b9bc158 fix(entregables): garantizar actualización visual tras reasignación de responsable
 031497c fix(entregables): progreso, info-tab, botón Entregar, responsable visual
 eddf1e8 feat(dashboard): filtros por programa, responsable, rol, año y mes
 89943a7 refactor(mi-espacio): N/A por recurso, save sticky, timeline filtrado
-21d48cd feat(iter2): mejoras funcionales – lotes 1-3
-943e301 feat(timeline): línea de tiempo cross-rol por entregable
 ```
 
 Rama activa: `main`
+
+## Logos institucionales (public/)
+
+| Archivo | Uso |
+|---------|-----|
+| `logo-usa.png` | Login en **modo claro** (colores originales azul/amarillo sobre blanco) |
+| `logo-usa_black.png` | Login en **modo oscuro** (versión para fondo azul oscuro) |
+
+El switch se hace con clases Tailwind: `dark:hidden` / `hidden dark:block` sobre dos `<Image>` en `app/login/page.tsx`.
 
 ## Observers activos
 
