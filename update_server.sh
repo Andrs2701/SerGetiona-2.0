@@ -112,12 +112,13 @@ echo -e "${GREEN}Nginx recargado.${NC}\n"
 # ─────────────────────────────────────────────
 # RESUMEN
 # ─────────────────────────────────────────────
-SERVER_IP=$(hostname -I | awk '{print $1}')
+DOMAIN="virtualidad.usergioarboleda.edu.co"
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   ACTUALIZACIÓN COMPLETADA EXITOSAMENTE            ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 echo ""
-echo -e "  App disponible en:  http://$SERVER_IP"
+echo -e "  App disponible en:  http://$DOMAIN/sergestiona"
+echo -e "  API disponible en:  http://$DOMAIN/api"
 echo -e "  Backup BD en:       $BACKUP_DIR/database_$TIMESTAMP.sqlite"
 echo ""
 echo -e "  Estado PM2:"
