@@ -1,0 +1,14 @@
+[Unit]
+Description=Sergestiona 2.0 - Queue Worker (correo y trabajos en segundo plano)
+After=network.target mysql.service mariadb.service
+
+[Service]
+Type=simple
+User=moodle
+WorkingDirectory=/var/www/html/sergestiona/backend
+ExecStart=/usr/bin/env php artisan queue:work --tries=3 --sleep=3 --max-time=3600
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

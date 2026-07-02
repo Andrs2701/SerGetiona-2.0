@@ -122,6 +122,9 @@ export const ENDPOINTS = {
   // Workspace
   MY_WORKSPACE: '/my-workspace',
 
+  // Preferences
+  PREFERENCES: '/preferences',
+
   // Notifications
   NOTIFICATIONS: '/notifications',
   NOTIFICATION_UNREAD_COUNT: '/notifications/unread-count',

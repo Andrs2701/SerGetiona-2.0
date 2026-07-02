@@ -482,6 +482,10 @@ export type PortfolioView = 'table' | 'cards' | 'timeline';
 export interface UserPreferences {
   portfolio_view?: PortfolioView;
   right_sidebar_open?: boolean;
+  email_notifications_enabled?: boolean;
+  email_tasks?: boolean;
+  email_chat?: boolean;
+  email_deadlines?: boolean;
 }
 
 // ── Configuración avanzada dinámica ──────────────────────────────────────────

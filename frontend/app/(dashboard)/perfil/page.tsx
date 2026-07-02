@@ -5,13 +5,14 @@ import {
   Eye, EyeOff, CheckCircle2, AlertCircle,
   Mail, Phone, Shield, CheckCheck, AlertTriangle, TrendingUp,
   Camera, User, Briefcase, MapPin, Save, Sun, Moon, Monitor,
+  Bell, ClipboardList, MessagesSquare,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { api, ENDPOINTS } from '@/lib/api';
 import { USER_ROLE_LABELS } from '@/lib/types';
-import type { WorkspaceStats, User as UserAccount } from '@/lib/types';
+import type { WorkspaceStats, User as UserAccount, UserPreferences } from '@/lib/types';
 import { Skeleton } from '@/components/LoadingSkeleton';
 
 // ─────────────────────────────────────────────
@@ -82,6 +83,10 @@ export default function PerfilPage() {
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
+  // ── Email notification preferences ──
+  const [prefs, setPrefs] = useState<UserPreferences | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+
   useEffect(() => {
     if (user) {
       setFullName(user.name ?? '');
@@ -101,6 +106,22 @@ export default function PerfilPage() {
       .catch(() => {})
       .finally(() => setStatsLoading(false));
   }, []);
+
+  useEffect(() => {
+    api
+      .get<{ preferences: UserPreferences }>(ENDPOINTS.PREFERENCES)
+      .then((res) => setPrefs(res.preferences ?? {}))
+      .catch(() => setPrefs({}))
+      .finally(() => setPrefsLoading(false));
+  }, []);
+
+  function togglePref(key: keyof UserPreferences) {
+    if (!prefs) return;
+    const previous = prefs;
+    const next = { ...prefs, [key]: !prefs[key] };
+    setPrefs(next);
+    api.put(ENDPOINTS.PREFERENCES, { [key]: next[key] }).catch(() => setPrefs(previous));
+  }
 
   const strength = getStrength(newPwd);
 
@@ -391,6 +412,74 @@ export default function PerfilPage() {
                 );
               })}
             </div>
+          </div>
+
+          {/* Notificaciones por correo */}
+          <div className={`${cardCls} p-5`}>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <Bell size={16} className="text-indigo-500" />
+              Notificaciones por correo
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Elige qué eventos quieres recibir también por correo electrónico</p>
+
+            {prefsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 mb-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Activar notificaciones por correo</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Interruptor general — apágalo para no recibir ningún correo</p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('email_notifications_enabled')}
+                    className={clsx(
+                      'relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0',
+                      prefs?.email_notifications_enabled ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
+                    )}
+                  >
+                    <span className={clsx(
+                      'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
+                      prefs?.email_notifications_enabled ? 'translate-x-4' : 'translate-x-1'
+                    )} />
+                  </button>
+                </div>
+
+                {([
+                  { key: 'email_tasks' as const, icon: <ClipboardList size={15} />, label: 'Tareas', desc: 'Asignaciones, cambios de estado, ajustes solicitados' },
+                  { key: 'email_chat' as const, icon: <MessagesSquare size={15} />, label: 'Chat', desc: 'Menciones, comentarios, canales' },
+                  { key: 'email_deadlines' as const, icon: <AlertTriangle size={15} />, label: 'Vencimientos', desc: 'Próximas a vencer y vencidas' },
+                ]).map(({ key, icon, label, desc }) => {
+                  const disabled = !prefs?.email_notifications_enabled;
+                  return (
+                    <div key={key} className={clsx('flex items-center justify-between py-2', disabled && 'opacity-40')}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 dark:text-gray-500">{icon}</span>
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{label}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{desc}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => !disabled && togglePref(key)}
+                        disabled={disabled}
+                        className={clsx(
+                          'relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 disabled:cursor-not-allowed',
+                          prefs?.[key] ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
+                        )}
+                      >
+                        <span className={clsx(
+                          'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
+                          prefs?.[key] ? 'translate-x-4' : 'translate-x-1'
+                        )} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Stats */}

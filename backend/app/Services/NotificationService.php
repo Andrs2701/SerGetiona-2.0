@@ -2,15 +2,38 @@
 
 namespace App\Services;
 
+use App\Mail\NotificationMail;
 use App\Models\Notification;
 use App\Models\User;
+use App\Models\UserPreference;
 use App\Models\RoleActivity;
 use App\Http\Controllers\Api\RoleActivityController;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
+    /**
+     * Agrupa los ~13 tipos de notificación en 3 categorías, misma
+     * clasificación que ya usan las pestañas de filtro en
+     * frontend/app/(dashboard)/notificaciones/page.tsx. Un tipo no
+     * listado aquí (ej. executive_summary) no dispara correo.
+     */
+    private const TYPE_CATEGORY = [
+        'task_assigned'         => 'email_tasks',
+        'status_changed'        => 'email_tasks',
+        'date_changed'          => 'email_tasks',
+        'adjustments_requested' => 'email_tasks',
+        'activity_modified'     => 'email_tasks',
+        'next_in_chain'         => 'email_tasks',
+        'mention'               => 'email_chat',
+        'channel_added'         => 'email_chat',
+        'comment_added'         => 'email_chat',
+        'deadline_approaching'  => 'email_deadlines',
+        'overdue'               => 'email_deadlines',
+        'overdue_reminder'      => 'email_deadlines',
+    ];
+
     public static function translateRole(string $role): string
     {
         return match($role) {
@@ -74,7 +97,33 @@ class NotificationService
             'created_at' => now(),
         ]);
 
-        Log::info("EMAIL: {$title} -> {$user->email} | {$message}");
+        self::maybeSendEmail($user, $type, $title, $message);
+    }
+
+    private static function maybeSendEmail(User $user, string $type, string $title, string $message): void
+    {
+        $category = self::TYPE_CATEGORY[$type] ?? null;
+        if (!$category || !$user->email) {
+            return;
+        }
+
+        $pref = UserPreference::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'portfolio_view' => 'table',
+                'right_sidebar_open' => true,
+                'email_notifications_enabled' => true,
+                'email_tasks' => true,
+                'email_chat' => true,
+                'email_deadlines' => true,
+            ]
+        );
+
+        if (!$pref->email_notifications_enabled || !$pref->{$category}) {
+            return;
+        }
+
+        Mail::to($user->email)->queue(new NotificationMail($title, $message));
     }
 
     public static function notifyMany(Collection $users, string $type, string $title, string $message, array $data = []): void
