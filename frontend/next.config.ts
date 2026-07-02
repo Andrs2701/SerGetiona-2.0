@@ -27,6 +27,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   basePath: '/sergestiona',
+  images: {
+    unoptimized: true,
+  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },

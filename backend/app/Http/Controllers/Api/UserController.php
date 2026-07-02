@@ -76,6 +76,10 @@ class UserController extends Controller
             return response()->json(['message' => 'No puedes eliminar tu propia cuenta.'], 422);
         }
 
+        if ($user->role === 'admin') {
+            return response()->json(['message' => 'No se puede eliminar la cuenta de administrador del sistema.'], 422);
+        }
+
         $user->tokens()->delete();
         $user->delete();
 
