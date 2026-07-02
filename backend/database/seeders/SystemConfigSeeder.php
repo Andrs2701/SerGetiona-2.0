@@ -11,6 +11,12 @@ use Illuminate\Database\Seeder;
 
 class SystemConfigSeeder extends Seeder
 {
+    /**
+     * Idempotente por diseño: usa firstOrCreate en vez de updateOrCreate,
+     * es decir solo crea lo que falte y nunca pisa filas existentes.
+     * Necesario porque roles/permisos/estados son editables desde
+     * Configuración: un re-run accidental no debe revertir cambios de un admin.
+     */
     public function run(): void
     {
         // 1. Roles
@@ -26,7 +32,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($roles as $r) {
-            SystemRole::updateOrCreate(['slug' => $r['slug']], $r);
+            SystemRole::firstOrCreate(['slug' => $r['slug']], $r);
         }
 
         // 2. Permissions
@@ -83,7 +89,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($permissions as $p) {
-            SystemPermission::updateOrCreate(
+            SystemPermission::firstOrCreate(
                 ['module' => $p['module'], 'action' => $p['action']],
                 $p
             );
@@ -113,7 +119,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($statuses as $s) {
-            SystemStatus::updateOrCreate(
+            SystemStatus::firstOrCreate(
                 ['type' => $s['type'], 'slug' => $s['slug']],
                 $s
             );
@@ -131,7 +137,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($transitions as $t) {
-            StateTransition::updateOrCreate(
+            StateTransition::firstOrCreate(
                 ['type' => $t['type'], 'from_status' => $t['from_status'], 'to_status' => $t['to_status']],
                 $t
             );
@@ -150,7 +156,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($visibility as $v) {
-            VisibilityRule::updateOrCreate(
+            VisibilityRule::firstOrCreate(
                 ['role_slug' => $v['role_slug']],
                 $v
             );
