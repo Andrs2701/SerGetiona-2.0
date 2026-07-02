@@ -74,6 +74,22 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'phone' => 'nullable|string|max:30',
+            'position' => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:255',
+        ]);
+
+        $user->update($data);
+
+        return new UserResource($user);
+    }
+
     public function destroy(Request $request, User $user)
     {
         if ($request->user()->is($user)) {

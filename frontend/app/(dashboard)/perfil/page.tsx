@@ -155,7 +155,7 @@ export default function PerfilPage() {
     setProfileSuccess(false);
     setSavingProfile(true);
     try {
-      const updated = await api.put<UserAccount>(ENDPOINTS.USER(user.id), { name: fullName, position, phone, department });
+      const updated = await api.put<UserAccount>(ENDPOINTS.PROFILE, { name: fullName, position, phone, department });
       updateUser(updated);
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);

@@ -113,6 +113,7 @@ export const ENDPOINTS = {
   // Users
   USERS: '/users',
   USER: (id: number) => `/users/${id}`,
+  PROFILE: '/profile',
 
   // Reports
   DASHBOARD: '/reports/dashboard',
