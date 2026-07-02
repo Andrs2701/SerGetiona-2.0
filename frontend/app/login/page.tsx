@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User } from '@/lib/types';
+import { BASE_PATH } from '@/lib/basePath';
 import { AlertCircle, Eye, EyeOff, CheckCircle2, Mail, Lock, GraduationCap, Users, BarChart3, ClipboardList } from 'lucide-react';
 
 // Colores institucionales Universidad Sergio Arboleda
@@ -235,7 +236,7 @@ export default function LoginPage() {
             <div className="flex justify-center mb-8">
               {/* Modo claro */}
               <Image
-                src="/logo-usa.png"
+                src={`${BASE_PATH}/logo-usa.png`}
                 alt="Campus Virtual — Universidad Sergio Arboleda"
                 width={260}
                 height={72}
@@ -245,7 +246,7 @@ export default function LoginPage() {
               />
               {/* Modo oscuro */}
               <Image
-                src="/logo-usa_black.png"
+                src={`${BASE_PATH}/logo-usa_black.png`}
                 alt="Campus Virtual — Universidad Sergio Arboleda"
                 width={260}
                 height={72}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Search } from 'lucide-react';
+import { Plus, Pencil, Search, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User, UserRole } from '@/lib/types';
@@ -9,6 +9,18 @@ import { USER_ROLE_LABELS } from '@/lib/types';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+
+function parseApiError(err: unknown): string {
+  if (!(err instanceof Error)) return 'No se pudo guardar el usuario. Intenta de nuevo.';
+  const body = err.message.replace(/^HTTP \d+:\s*/, '');
+  try {
+    const parsed = JSON.parse(body) as { message?: string; errors?: Record<string, string[]> };
+    const firstFieldError = parsed.errors && Object.values(parsed.errors)[0]?.[0];
+    return firstFieldError ?? parsed.message ?? body;
+  } catch {
+    return body || 'No se pudo guardar el usuario. Intenta de nuevo.';
+  }
+}
 
 const USER_ROLES: UserRole[] = [
   'admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa',
@@ -53,6 +65,7 @@ export default function UsuariosPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     api
@@ -65,6 +78,7 @@ export default function UsuariosPage() {
   function openCreate() {
     setEditUser(null);
     setForm(emptyForm);
+    setSaveError('');
     setShowModal(true);
   }
 
@@ -80,11 +94,13 @@ export default function UsuariosPage() {
       weekly_capacity_points:
         u.weekly_capacity_points != null ? String(u.weekly_capacity_points) : '',
     });
+    setSaveError('');
     setShowModal(true);
   }
 
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     const payload = {
       ...form,
       weekly_capacity_points:
@@ -98,29 +114,11 @@ export default function UsuariosPage() {
         const created = await api.post<User>(ENDPOINTS.USERS, payload);
         setData((prev) => [...prev, created]);
       }
-    } catch {
-      if (editUser) {
-        setData((prev) =>
-          prev.map((u) =>
-            u.id === editUser.id
-              ? { ...u, name: form.name, email: form.email, role: form.role, phone: form.phone, is_active: form.is_active }
-              : u
-          )
-        );
-      } else {
-        const newUser: User = {
-          id: Date.now(),
-          name: form.name,
-          email: form.email,
-          role: form.role,
-          phone: form.phone || undefined,
-          is_active: form.is_active,
-        };
-        setData((prev) => [...prev, newUser]);
-      }
+      setShowModal(false);
+    } catch (err) {
+      setSaveError(parseApiError(err));
     } finally {
       setSaving(false);
-      setShowModal(false);
     }
   }
 
@@ -265,6 +263,12 @@ export default function UsuariosPage() {
         }
       >
         <div className="space-y-4">
+          {saveError && (
+            <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+              <span>{saveError}</span>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
             <input

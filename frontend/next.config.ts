@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { BASE_PATH } from "./lib/basePath";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 const apiOrigin = new URL(apiUrl).origin;
@@ -26,7 +27,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  basePath: '/sergestiona',
+  basePath: BASE_PATH,
   images: {
     unoptimized: true,
   },

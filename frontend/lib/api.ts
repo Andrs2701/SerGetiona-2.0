@@ -79,9 +79,9 @@ export async function downloadCsv(path: string, filename: string): Promise<void>
 
 export const api = {
   get: <T>(path: string) => request<unknown>('GET', path).then((r) => unwrap<T>(r)),
-  post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
-  postForm: <T>(path: string, body: FormData) => requestForm<T>('POST', path, body),
-  put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
+  post: <T>(path: string, body: unknown) => request<unknown>('POST', path, body).then((r) => unwrap<T>(r)),
+  postForm: <T>(path: string, body: FormData) => requestForm<unknown>('POST', path, body).then((r) => unwrap<T>(r)),
+  put: <T>(path: string, body: unknown) => request<unknown>('PUT', path, body).then((r) => unwrap<T>(r)),
   delete: <T>(path: string) => request<T>('DELETE', path),
 };
 
