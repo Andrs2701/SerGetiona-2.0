@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { BASE_PATH } from "@/lib/basePath";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   title: "Sergestiona 2.0 | Universidad Sergio Arboleda",
   description: "Plataforma de gestión de producción de contenidos académicos virtuales",
   icons: {
-    icon: "/favicon.ico",
+    icon: `${BASE_PATH}/favicon.ico`,
   },
 };
 
