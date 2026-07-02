@@ -16,6 +16,7 @@ export interface AuthState {
   login(email: string, password: string): Promise<void>;
   logout(): Promise<void>;
   changePassword(current: string, newPwd: string, confirm: string): Promise<void>;
+  updateUser(patch: Partial<User>): void;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);
@@ -99,6 +100,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem(USER_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -109,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         changePassword,
+        updateUser,
       }}
     >
       {children}

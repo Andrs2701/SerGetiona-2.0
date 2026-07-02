@@ -34,6 +34,8 @@ class UserController extends Controller
             'role' => 'required|in:admin,coordinator,expert,pedagogy,design,audiovisual,engineering,qa',
             'is_active' => 'nullable|boolean',
             'phone' => 'nullable|string|max:30',
+            'position' => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:255',
             'weekly_capacity_points' => 'nullable|integer|min:1|max:200',
         ]);
 
@@ -58,6 +60,8 @@ class UserController extends Controller
             'role' => 'sometimes|in:admin,coordinator,expert,pedagogy,design,audiovisual,engineering,qa',
             'is_active' => 'nullable|boolean',
             'phone' => 'nullable|string|max:30',
+            'position' => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:255',
             'weekly_capacity_points' => 'nullable|integer|min:1|max:200',
         ]);
 

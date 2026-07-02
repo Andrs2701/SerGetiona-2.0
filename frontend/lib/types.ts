@@ -44,6 +44,8 @@ export interface User {
   role: UserRole;
   is_active: boolean;
   phone?: string;
+  position?: string | null;
+  department?: string | null;
   weekly_capacity_points?: number | null;
 }
 

@@ -156,7 +156,10 @@ html.dark .text-amber-500   { color: #fcd34d !important; }
 html.dark .text-amber-600   { color: #fcd34d !important; }
 html.dark .text-purple-700, html.dark .text-purple-800  { color: #c4b5fd !important; }
 
-/* Inputs y selects */
+/* Inputs y selects
+   input:not([type]) cubre los <input> sin atributo type explícito: en HTML
+   por defecto son de tipo texto, pero el selector [type="text"] NO los
+   alcanza porque React omite el atributo del DOM cuando no se especifica. */
 html.dark input[type="text"],
 html.dark input[type="search"],
 html.dark input[type="email"],
@@ -164,6 +167,12 @@ html.dark input[type="password"],
 html.dark input[type="number"],
 html.dark input[type="date"],
 html.dark input[type="time"],
+html.dark input[type="datetime-local"],
+html.dark input[type="month"],
+html.dark input[type="week"],
+html.dark input[type="tel"],
+html.dark input[type="url"],
+html.dark input:not([type]),
 html.dark textarea,
 html.dark select {
   background-color: #1e293b !important;
@@ -173,6 +182,13 @@ html.dark select {
 html.dark input::placeholder,
 html.dark textarea::placeholder {
   color: #64748b !important;
+}
+
+/* Iconos nativos de date/time pickers son oscuros por defecto — invertir para verse en fondo oscuro */
+html.dark input[type="date"]::-webkit-calendar-picker-indicator,
+html.dark input[type="time"]::-webkit-calendar-picker-indicator,
+html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
 /* Shadow softer en oscuro */

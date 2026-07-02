@@ -20,6 +20,8 @@ class User extends Authenticatable
         'role',
         'is_active',
         'phone',
+        'position',
+        'department',
         'weekly_capacity_points',
     ];
 

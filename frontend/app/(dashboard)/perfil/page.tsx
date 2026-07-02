@@ -11,7 +11,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme, type Theme } from '@/contexts/ThemeContext';
 import { api, ENDPOINTS } from '@/lib/api';
 import { USER_ROLE_LABELS } from '@/lib/types';
-import type { WorkspaceStats } from '@/lib/types';
+import type { WorkspaceStats, User as UserAccount } from '@/lib/types';
 import { Skeleton } from '@/components/LoadingSkeleton';
 
 // ─────────────────────────────────────────────
@@ -51,7 +51,7 @@ function getMockHistory(): number[] {
 // Page
 // ─────────────────────────────────────────────
 export default function PerfilPage() {
-  const { user, changePassword } = useAuthContext();
+  const { user, changePassword, updateUser } = useAuthContext();
   const { theme, setTheme } = useTheme();
 
   // ── Avatar / photo ──
@@ -86,8 +86,8 @@ export default function PerfilPage() {
     if (user) {
       setFullName(user.name ?? '');
       setPhone(user.phone ?? '');
-      setPosition((user as unknown as Record<string, string>).position ?? '');
-      setDepartment((user as unknown as Record<string, string>).department ?? '');
+      setPosition(user.position ?? '');
+      setDepartment(user.department ?? '');
     }
   }, [user]);
 
@@ -134,7 +134,8 @@ export default function PerfilPage() {
     setProfileSuccess(false);
     setSavingProfile(true);
     try {
-      await api.put(ENDPOINTS.USER(user.id), { name: fullName, position, phone, department });
+      const updated = await api.put<UserAccount>(ENDPOINTS.USER(user.id), { name: fullName, position, phone, department });
+      updateUser(updated);
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch {
