@@ -326,6 +326,7 @@ export interface WorkspaceStats {
   approaching: number;
   overdue: number;
   completed: number;
+  history?: number[];
 }
 
 export interface Workspace {

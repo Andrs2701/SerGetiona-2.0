@@ -54,11 +54,7 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
   qa:           'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
 };
 
-const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
-
-function getMockHistory(): number[] {
-  return [72, 85, 68, 90, 78, 88];
-}
+const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 // ─────────────────────────────────────────────
 // Page
@@ -141,7 +137,7 @@ export default function PerfilPage() {
 
   const total = stats ? stats.completed + stats.overdue + stats.approaching + stats.pending : 0;
   const compliance = total > 0 && stats ? Math.round((stats.completed / total) * 100) : 0;
-  const history = getMockHistory();
+  const history = stats?.history ?? [100, 100, 100, 100, 100, 100];
   const maxBar = Math.max(...history, 1);
 
   const currentMonth = new Date().getMonth();

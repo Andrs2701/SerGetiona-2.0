@@ -66,6 +66,32 @@ class WorkspaceController extends Controller
             ->limit(10)
             ->get();
 
+        // Historial de cumplimiento global de los últimos 6 meses
+        $months = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $months[] = Carbon::today()->subMonths($i)->format('Y-m');
+        }
+
+        $history = [];
+        foreach ($months as $month) {
+            $totalInMonth = 0;
+            $completedInMonth = 0;
+
+            foreach ($allActivities as $a) {
+                if (!$a->commitment_date) continue;
+                $activityMonth = Carbon::parse($a->commitment_date)->format('Y-m');
+
+                if ($activityMonth === $month) {
+                    $totalInMonth++;
+                    if ($a->status === 'approved' || $a->actual_delivery_date) {
+                        $completedInMonth++;
+                    }
+                }
+            }
+
+            $history[] = $totalInMonth > 0 ? (int) round(($completedInMonth / $totalInMonth) * 100) : 100;
+        }
+
         return response()->json([
             'user'  => $user,
             'role'  => $role,
@@ -81,6 +107,7 @@ class WorkspaceController extends Controller
                 'overdue'                => $overdue,
                 'approaching'            => $approaching,
                 'pending'                => max(0, $totalDeliverables - $finishedDeliverables),
+                'history'                => $history,
             ],
             'projects'          => $projects,
             'recent_activities' => $recentActivities,
@@ -195,6 +222,33 @@ class WorkspaceController extends Controller
         // Claves de compatibilidad para el perfil del usuario
         $stats['completed'] = $stats['approved'];
         $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['in_review'] + $stats['returned'];
+
+        // Historial de cumplimiento individual de los últimos 6 meses
+        $months = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $months[] = Carbon::today()->subMonths($i)->format('Y-m');
+        }
+
+        $history = [];
+        foreach ($months as $month) {
+            $totalInMonth = 0;
+            $completedInMonth = 0;
+
+            foreach ($activities as $a) {
+                if (!$a->commitment_date) continue;
+                $activityMonth = Carbon::parse($a->commitment_date)->format('Y-m');
+
+                if ($activityMonth === $month) {
+                    $totalInMonth++;
+                    if ($a->status === 'approved' || $a->actual_delivery_date) {
+                        $completedInMonth++;
+                    }
+                }
+            }
+
+            $history[] = $totalInMonth > 0 ? (int) round(($completedInMonth / $totalInMonth) * 100) : 100;
+        }
+        $stats['history'] = $history;
 
         return response()->json([
             'user'                => $user,
