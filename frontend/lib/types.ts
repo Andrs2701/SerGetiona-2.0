@@ -327,6 +327,7 @@ export interface WorkspaceStats {
   overdue: number;
   completed: number;
   history?: number[];
+  compliance_percentage?: number;
 }
 
 export interface Workspace {

@@ -135,8 +135,7 @@ export default function PerfilPage() {
 
   const strength = getStrength(newPwd);
 
-  const total = stats ? stats.completed + stats.overdue + stats.approaching + stats.pending : 0;
-  const compliance = total > 0 && stats ? Math.round((stats.completed / total) * 100) : 0;
+  const compliance = stats?.compliance_percentage ?? 0;
   const history = stats?.history ?? [100, 100, 100, 100, 100, 100];
   const maxBar = Math.max(...history, 1);
 

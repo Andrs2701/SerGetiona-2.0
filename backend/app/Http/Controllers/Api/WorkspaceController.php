@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\Deliverable;
 use App\Models\Project;
 use App\Models\RoleActivity;
@@ -93,7 +94,7 @@ class WorkspaceController extends Controller
         }
 
         return response()->json([
-            'user'  => $user,
+            'user'  => new UserResource($user),
             'role'  => $role,
             'stats' => [
                 'active_projects'        => $projects->count(),
@@ -108,6 +109,9 @@ class WorkspaceController extends Controller
                 'approaching'            => $approaching,
                 'pending'                => max(0, $totalDeliverables - $finishedDeliverables),
                 'history'                => $history,
+                'compliance_percentage'  => $totalDeliverables > 0
+                    ? (int) round(($finishedDeliverables / $totalDeliverables) * 100)
+                    : 0,
             ],
             'projects'          => $projects,
             'recent_activities' => $recentActivities,
@@ -223,6 +227,11 @@ class WorkspaceController extends Controller
         $stats['completed'] = $stats['approved'];
         $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['in_review'] + $stats['returned'];
 
+        $totalActivities = $activities->count();
+        $stats['compliance_percentage'] = $totalActivities > 0
+            ? (int) round(($stats['approved'] / $totalActivities) * 100)
+            : 0;
+
         // Historial de cumplimiento individual de los últimos 6 meses
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
@@ -251,7 +260,7 @@ class WorkspaceController extends Controller
         $stats['history'] = $history;
 
         return response()->json([
-            'user'                => $user,
+            'user'                => new UserResource($user),
             'role'                => $role,
             'stats'               => $stats,
             'activities'          => $mapped->values(),
