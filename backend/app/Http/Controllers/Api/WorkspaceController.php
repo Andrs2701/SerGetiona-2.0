@@ -75,6 +75,12 @@ class WorkspaceController extends Controller
                 'finished_deliverables'  => $finishedDeliverables,
                 'overdue_activities'     => $overdue,
                 'approaching_activities' => $approaching,
+                
+                // Claves de compatibilidad para el perfil del usuario
+                'completed'              => $finishedDeliverables,
+                'overdue'                => $overdue,
+                'approaching'            => $approaching,
+                'pending'                => max(0, $totalDeliverables - $finishedDeliverables),
             ],
             'projects'          => $projects,
             'recent_activities' => $recentActivities,
@@ -185,6 +191,10 @@ class WorkspaceController extends Controller
             $d = Carbon::parse($a['commitment_date']);
             return $d->between($now, $in30Days);
         })->values();
+
+        // Claves de compatibilidad para el perfil del usuario
+        $stats['completed'] = $stats['approved'];
+        $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['in_review'] + $stats['returned'];
 
         return response()->json([
             'user'                => $user,
