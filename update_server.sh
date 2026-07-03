@@ -80,12 +80,13 @@ echo -e "  Verificando enlace de storage público..."
 php artisan storage:link
 echo -e "  ${GREEN}✓ Storage público enlazado${NC}"
 
-# Regenerar caché de producción
-echo -e "  Regenerando caché de Laravel..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-echo -e "  ${GREEN}✓ Caché regenerada${NC}"
+# Limpiar caché de producción para ejecución dinámica y estable
+echo -e "  Limpiando y preparando caché de Laravel..."
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+rm -f bootstrap/cache/config.php bootstrap/cache/routes-v7.php 2>/dev/null || true
+echo -e "  ${GREEN}✓ Caché limpia y dinámica asegurada${NC}"
 
 # Ajustar permisos para asegurar que el servidor web/PHP-FPM pueda escribir
 echo -e "  Ajustando permisos de directorios..."
