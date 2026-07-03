@@ -155,6 +155,12 @@ server {
         }
     }
 
+    # ─── Servir almacenamiento público (fotos de perfil, etc.) ───
+    location /storage/ {
+        root   $BACKEND_DIR/public;
+        try_files \$uri =404;
+    }
+
     # ─── Frontend (Next.js con basePath=/sergestiona) ───
     # Next.js recibe la ruta completa /sergestiona/... tal como viene
     location /sergestiona {

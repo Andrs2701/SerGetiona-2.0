@@ -80,6 +80,12 @@ echo -e "  Verificando enlace de storage público..."
 php artisan storage:link
 echo -e "  ${GREEN}✓ Storage público enlazado${NC}"
 
+# Ajustar permisos para asegurar que el servidor web/PHP-FPM pueda escribir
+echo -e "  Ajustando permisos de directorios..."
+sudo chown -R moodle:nginx "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
+sudo chmod -R 775 "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
+echo -e "  ${GREEN}✓ Permisos de escritura asegurados${NC}"
+
 # Regenerar caché de producción
 echo -e "  Regenerando caché de Laravel..."
 php artisan config:cache

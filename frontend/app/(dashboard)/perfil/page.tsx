@@ -19,6 +19,17 @@ import Avatar from '@/components/Avatar';
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
+function parseApiError(err: unknown): string {
+  if (!(err instanceof Error)) return 'No se pudo subir la foto. Intenta de nuevo.';
+  const body = err.message.replace(/^HTTP \d+:\s*/, '');
+  try {
+    const parsed = JSON.parse(body) as { message?: string; errors?: Record<string, string[]> };
+    const firstFieldError = parsed.errors && Object.values(parsed.errors)[0]?.[0];
+    return firstFieldError ?? parsed.message ?? body;
+  } catch {
+    return body || 'No se pudo subir la foto. Intenta de nuevo.';
+  }
+}
 function getStrength(pwd: string): { label: string; color: string; width: string } {
   if (pwd.length === 0) return { label: '', color: '', width: '0%' };
   let score = 0;
@@ -153,8 +164,9 @@ export default function PerfilPage() {
     try {
       const updated = await api.postForm<UserAccount>(ENDPOINTS.PROFILE_PHOTO, formData);
       updateUser(updated);
-    } catch {
-      setPhotoError('No se pudo subir la foto. Intenta de nuevo.');
+      setPhotoPreview(null); // Limpiar preview local al tener éxito para validar visualmente la URL del servidor
+    } catch (err) {
+      setPhotoError(parseApiError(err));
       setPhotoPreview(null);
     } finally {
       setUploadingPhoto(false);
