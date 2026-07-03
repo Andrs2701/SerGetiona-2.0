@@ -137,6 +137,13 @@ server {
     server_name $DOMAIN;
 
     # ─── Backend (Laravel API) via PHP-FPM ───
+    # ─── Servir almacenamiento de avatares en la API (producción) ───
+    # Evita que las imágenes se envíen a Laravel y las sirve directamente de forma estática
+    location /api/storage/ {
+        alias  $BACKEND_DIR/storage/app/public/;
+        autoindex off;
+    }
+
     # Debe ir ANTES que /sergestiona para tener precedencia
     location /api/ {
         root   $BACKEND_DIR/public;
