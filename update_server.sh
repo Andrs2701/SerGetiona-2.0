@@ -55,8 +55,11 @@ echo -e "${BLUE}[1/4] Actualizando Backend (Laravel)...${NC}"
 cd "$BACKEND_DIR"
 
 # Instalar/actualizar dependencias PHP (sin dev, optimizado)
+# Sin sudo: el usuario que corre este script ya es dueño de vendor/, y el
+# secure_path por defecto de sudo en RHEL no incluye /usr/local/bin (donde
+# vive composer), lo que hacía fallar "sudo composer" con "command not found".
 echo -e "  Instalando dependencias Composer..."
-sudo composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
+composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
 
 # Limpiar caché de config ANTES de migrar: si quedó una config cacheada
 # desactualizada (p.ej. una ruta de base de datos vieja), migrate la usaría
