@@ -542,6 +542,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
       const match = users.find(u => String(u.id) === act.responsible_id);
       initial[act.role] = match?.name ?? '';
     }
+    return initial;
   });
 
   useEffect(() => {
