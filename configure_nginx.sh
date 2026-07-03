@@ -136,6 +136,9 @@ server {
     listen 80;
     server_name $DOMAIN;
 
+    # Permitir subida de archivos de hasta 10MB (evita error 413)
+    client_max_body_size 10M;
+
     # ─── Backend (Laravel API) via PHP-FPM ───
     # ─── Servir almacenamiento de avatares en la API (producción) ───
     # Evita que las imágenes se envíen a Laravel y las sirve directamente de forma estática
