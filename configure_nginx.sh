@@ -189,6 +189,9 @@ sudo chown -R moodle:nginx "$BACKEND_DIR/storage" 2>/dev/null || true
 sudo chmod -R 775 "$BACKEND_DIR/storage" 2>/dev/null || true
 sudo chown -R moodle:nginx "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
 sudo chmod -R 775 "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
+sudo chown -R moodle:nginx "$BACKEND_DIR/database" 2>/dev/null || true
+sudo chmod -R 775 "$BACKEND_DIR/database" 2>/dev/null || true
+sudo chmod 664 "$BACKEND_DIR/database/database.sqlite" 2>/dev/null || true
 
 # Configurar SELinux para Nginx (necesario en RHEL)
 sudo setsebool -P httpd_can_network_connect 1 2>/dev/null || true

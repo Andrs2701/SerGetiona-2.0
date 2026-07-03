@@ -82,8 +82,9 @@ echo -e "  ${GREEN}✓ Storage público enlazado${NC}"
 
 # Ajustar permisos para asegurar que el servidor web/PHP-FPM pueda escribir
 echo -e "  Ajustando permisos de directorios..."
-sudo chown -R moodle:nginx "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
-sudo chmod -R 775 "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" 2>/dev/null || true
+sudo chown -R moodle:nginx "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" "$BACKEND_DIR/database" 2>/dev/null || true
+sudo chmod -R 775 "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" "$BACKEND_DIR/database" 2>/dev/null || true
+sudo chmod 664 "$BACKEND_DIR/database/database.sqlite" 2>/dev/null || true
 echo -e "  ${GREEN}✓ Permisos de escritura asegurados${NC}"
 
 # Regenerar caché de producción
