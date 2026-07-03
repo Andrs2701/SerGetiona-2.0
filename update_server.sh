@@ -12,6 +12,7 @@
 # ============================================================
 
 set -e
+set -o pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -57,6 +58,14 @@ cd "$BACKEND_DIR"
 echo -e "  Instalando dependencias Composer..."
 sudo composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
 
+# Limpiar caché de config ANTES de migrar: si quedó una config cacheada
+# desactualizada (p.ej. una ruta de base de datos vieja), migrate la usaría
+# en vez de leer el .env real y fallaría de forma confusa.
+echo -e "  Limpiando caché de configuración..."
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
 # Ejecutar SOLO migraciones nuevas (NO migrate:fresh — no borra datos)
 echo -e "  Aplicando migraciones nuevas..."
 php artisan migrate --force
@@ -68,11 +77,8 @@ echo -e "  Verificando enlace de storage público..."
 php artisan storage:link
 echo -e "  ${GREEN}✓ Storage público enlazado${NC}"
 
-# Limpiar y regenerar caché de producción
+# Regenerar caché de producción
 echo -e "  Regenerando caché de Laravel..."
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
