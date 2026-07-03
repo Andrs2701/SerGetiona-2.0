@@ -498,12 +498,14 @@ interface ActivityForm { role: Role; responsible_id: string; commitment_date: st
 interface DeliverableFormData {
   project_id: string; program_name: string; subject_name: string;
   name: string; type: 'creation' | 'update'; start_date: string;
+  semestre: string; ciclo: string;
   activities: ActivityForm[];
 }
 
 const EMPTY_FORM: DeliverableFormData = {
   project_id: '', program_name: '', subject_name: '',
   name: '', type: 'creation', start_date: '',
+  semestre: '', ciclo: '',
   activities: ROLES.map(r => ({ role: r, responsible_id: '', commitment_date: '' })),
 };
 
@@ -524,6 +526,8 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         name: deliverable.name,
         type: deliverable.type,
         start_date: deliverable.start_date ?? '',
+        semestre: deliverable.semestre ?? '',
+        ciclo: deliverable.ciclo ?? '',
         activities: ROLES.map(r => {
           const act = (deliverable.role_activities ?? []).find(a => a.role === r);
           return { role: r, responsible_id: act?.responsible ? String(act.responsible.id) : '', commitment_date: act?.commitment_date ?? '' };
@@ -585,6 +589,8 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         start_date: form.start_date || null,
         program_name: form.program_name.trim() || null,
         subject_name: form.subject_name.trim() || null,
+        semestre: form.semestre || null,
+        ciclo: form.ciclo || null,
         activities: form.activities.filter(a => a.responsible_id || a.commitment_date).map(a => ({
           role: a.role,
           responsible_id: a.responsible_id ? Number(a.responsible_id) : null,
@@ -705,6 +711,33 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                 <label className="block text-xs font-medium text-gray-700 mb-1">Fecha de inicio</label>
                 <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Semestre</label>
+                <select value={form.semestre} onChange={e => setForm(p => ({ ...p, semestre: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="">Selecciona semestre...</option>
+                  <option value="I">I</option>
+                  <option value="II">II</option>
+                  <option value="III">III</option>
+                  <option value="IV">IV</option>
+                  <option value="NA">NA</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Ciclo</label>
+                <select value={form.ciclo} onChange={e => setForm(p => ({ ...p, ciclo: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="">Selecciona ciclo...</option>
+                  <option value="0">0</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="NA">NA</option>
+                </select>
               </div>
             </div>
           </div>
@@ -849,6 +882,8 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                 <InfoField label="Programa" value={deliverable.program_name} />
                 <InfoField label="Asignatura" value={deliverable.subject_name} />
                 <InfoField label="Módulo / Semana" value={deliverable.name} />
+                <InfoField label="Semestre" value={deliverable.semestre === 'NA' ? 'N/A' : (deliverable.semestre ?? 'N/A')} />
+                <InfoField label="Ciclo" value={deliverable.ciclo === 'NA' ? 'N/A' : (deliverable.ciclo ?? 'N/A')} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1326,6 +1361,8 @@ export default function EntregablesPage() {
   const [filterProject, setFilterProject]       = useState('');
   const [filterStatus, setFilterStatus]         = useState('');
   const [filterResponsible, setFilterResponsible] = useState('');
+  const [filterSemestre, setFilterSemestre]     = useState('');
+  const [filterCiclo, setFilterCiclo]           = useState('');
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [panel, setPanel]     = useState<PanelState | null>(null);
@@ -1398,11 +1435,13 @@ export default function EntregablesPage() {
     if (filterProject && d.project_name !== filterProject) return false;
     if (filterStatus && d.global_status !== filterStatus) return false;
     if (filterResponsible && !(d.role_activities ?? []).some(a => a.responsible?.name === filterResponsible)) return false;
+    if (filterSemestre && d.semestre !== filterSemestre) return false;
+    if (filterCiclo && d.ciclo !== filterCiclo) return false;
     if (onlyOverdue && !isOverdue(d)) return false;
     // Hide completed unless the user explicitly filtered for them or toggled showCompleted
     if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  }), [data, search, filterProject, filterStatus, filterResponsible, onlyOverdue, showCompleted]);
+  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, onlyOverdue, showCompleted]);
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
@@ -1501,6 +1540,31 @@ export default function EntregablesPage() {
           <option value="">Todos los responsables</option>
           {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
+
+        {isManager && (
+          <>
+            <select value={filterSemestre} onChange={e => setFilterSemestre(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
+              <option value="">Semestre (Todos)</option>
+              <option value="I">Semestre I</option>
+              <option value="II">Semestre II</option>
+              <option value="III">Semestre III</option>
+              <option value="IV">Semestre IV</option>
+              <option value="NA">Semestre NA</option>
+            </select>
+
+            <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[100px]">
+              <option value="">Ciclo (Todos)</option>
+              <option value="0">Ciclo 0</option>
+              <option value="1">Ciclo 1</option>
+              <option value="2">Ciclo 2</option>
+              <option value="3">Ciclo 3</option>
+              <option value="4">Ciclo 4</option>
+              <option value="NA">Ciclo NA</option>
+            </select>
+          </>
+        )}
 
         <label className="flex min-h-10 items-center gap-1.5 cursor-pointer select-none">
           <input type="checkbox" checked={onlyOverdue} onChange={e => setOnlyOverdue(e.target.checked)}
@@ -1682,7 +1746,16 @@ export default function EntregablesPage() {
                             )}>
                               <td className="px-3 py-2.5 max-w-[200px]">
                                 <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
+                                  {(d.semestre || d.ciclo) && (
+                                    <span className="text-[9px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1 py-0.2 rounded whitespace-nowrap">
+                                      {d.semestre && `Sem ${d.semestre}`}
+                                      {d.semestre && d.ciclo && ' · '}
+                                      {d.ciclo && `Ciclo ${d.ciclo}`}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-3 py-2.5">
                                 <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-full',

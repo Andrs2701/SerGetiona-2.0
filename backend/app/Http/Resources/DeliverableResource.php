@@ -18,6 +18,8 @@ class DeliverableResource extends JsonResource
             'global_status' => $this->global_status,
             'start_date' => $this->start_date,
             'notes' => $this->notes,
+            'semestre' => $this->semestre,
+            'ciclo' => $this->ciclo,
             'created_by' => $this->created_by,
             'creator' => $this->whenLoaded('creator', fn() => new UserResource($this->creator)),
             'role_activities' => $this->whenLoaded('roleActivities', function () {

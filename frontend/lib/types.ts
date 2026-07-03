@@ -101,6 +101,8 @@ export interface Deliverable {
   global_status: GlobalStatus;
   start_date?: string;
   notes?: string;
+  semestre?: string | null;
+  ciclo?: string | null;
   role_activities?: RoleActivity[];
   // enriched fields for table views
   subject_name?: string;

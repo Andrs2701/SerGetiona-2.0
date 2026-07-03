@@ -73,6 +73,8 @@ class DeliverableController extends Controller
             'type'                          => 'nullable|in:creation,update',
             'start_date'                    => 'nullable|date',
             'notes'                         => 'nullable|string',
+            'semestre'                      => 'nullable|in:I,II,III,IV,NA',
+            'ciclo'                         => 'nullable|in:0,1,2,3,4,NA',
             'activities'                    => 'nullable|array',
             'activities.*.role'             => 'required|in:expert,pedagogy,design,audiovisual,engineering,qa',
             'activities.*.responsible_id'   => 'nullable|exists:users,id',
@@ -106,6 +108,8 @@ class DeliverableController extends Controller
             'global_status' => 'unpublished',
             'start_date'    => $data['start_date'] ?? null,
             'notes'         => $data['notes'] ?? null,
+            'semestre'      => $data['semestre'] ?? null,
+            'ciclo'         => $data['ciclo'] ?? null,
             'created_by'    => $userId,
         ]);
 
@@ -154,6 +158,8 @@ class DeliverableController extends Controller
             'global_status'                 => 'nullable|in:unpublished,pending_start,in_progress,in_review,with_observations,finished,cancelled,not_applicable',
             'start_date'                    => 'nullable|date',
             'notes'                         => 'nullable|string',
+            'semestre'                      => 'nullable|in:I,II,III,IV,NA',
+            'ciclo'                         => 'nullable|in:0,1,2,3,4,NA',
             'program_name'                  => 'nullable|string|max:255',
             'subject_name'                  => 'nullable|string|max:255',
             'complexity_level_id'           => 'nullable|exists:complexity_levels,id',
@@ -193,7 +199,7 @@ class DeliverableController extends Controller
 
         // ── Update deliverable fields ─────────────────────────────────────────
         $fields = [];
-        foreach (['name', 'type', 'global_status', 'start_date', 'notes', 'complexity_level_id'] as $f) {
+        foreach (['name', 'type', 'global_status', 'start_date', 'notes', 'complexity_level_id', 'semestre', 'ciclo'] as $f) {
             if (array_key_exists($f, $data)) $fields[$f] = $data[$f];
         }
         if (!empty($fields)) $deliverable->update($fields);
@@ -489,6 +495,8 @@ class DeliverableController extends Controller
             'global_status'         => $d->global_status,
             'start_date'            => $d->start_date,
             'notes'                 => $d->notes,
+            'semestre'              => $d->semestre,
+            'ciclo'                 => $d->ciclo,
             'subject_name'          => $subject?->name,
             'program_id'            => $program?->id,
             'program_name'          => $program?->name,
