@@ -49,7 +49,15 @@ class User extends Authenticatable
     protected function photoUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null,
+            get: function () {
+                if (!$this->photo_path) {
+                    return null;
+                }
+                if (config('app.env') === 'production') {
+                    return '/api/storage/' . $this->photo_path;
+                }
+                return Storage::disk('public')->url($this->photo_path);
+            }
         );
     }
 
