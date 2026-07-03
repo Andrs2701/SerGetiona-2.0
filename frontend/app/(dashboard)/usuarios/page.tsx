@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Search, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
@@ -9,6 +10,8 @@ import { USER_ROLE_LABELS } from '@/lib/types';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+import Avatar from '@/components/Avatar';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 function parseApiError(err: unknown): string {
   if (!(err instanceof Error)) return 'No se pudo guardar el usuario. Intenta de nuevo.';
@@ -58,6 +61,9 @@ const emptyForm: UserForm = {
 };
 
 export default function UsuariosPage() {
+  const { user } = useAuthContext();
+  const router = useRouter();
+
   const [data, setData] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -68,12 +74,17 @@ export default function UsuariosPage() {
   const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
+    if (user && user.role !== 'admin') {
+      router.replace('/');
+      return;
+    }
+
     api
       .get<User[]>(ENDPOINTS.USERS)
       .then(setData)
       .catch(() => setData([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user, router]);
 
   function openCreate() {
     setEditUser(null);
@@ -189,9 +200,11 @@ export default function UsuariosPage() {
                     <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
-                            {u.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                          </div>
+                          <Avatar
+                            name={u.name}
+                            photoUrl={u.photo_url}
+                            className="w-8 h-8 bg-indigo-100 text-indigo-700 text-xs"
+                          />
                           <div>
                             <p className="font-medium text-gray-900">{u.name}</p>
                             {u.phone && <p className="text-xs text-gray-400">{u.phone}</p>}

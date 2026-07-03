@@ -18,6 +18,7 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext";
 import { USER_ROLE_LABELS } from "@/lib/types";
 import { useEffect, useState } from "react";
+import Avatar from "@/components/Avatar";
 import { api, ENDPOINTS } from "@/lib/api";
 
 type UserRole = 'admin' | 'coordinator' | 'expert' | 'pedagogy' | 'design' | 'audiovisual' | 'engineering' | 'qa';
@@ -149,10 +150,6 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
     item.roles.includes(role)
   );
 
-  const initials = user?.name
-    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
-    : 'US';
-
   const sidebarInner = (
     <aside className="w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col transition-colors">
       <div className="h-14 flex items-center justify-between px-6 border-b border-[var(--sidebar-border)] flex-shrink-0">
@@ -229,9 +226,12 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
           onClick={onMobileClose}
           className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
         >
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: '#194276' }}>
-            {initials}
-          </div>
+          <Avatar
+            name={user?.name ?? 'Usuario'}
+            photoUrl={user?.photo_url}
+            className="w-8 h-8 text-white text-xs"
+            style={{ background: '#194276' }}
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate transition-colors"
               onMouseEnter={e => (e.currentTarget.style.color = '#5b8fd6')}

@@ -533,6 +533,25 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
     return { ...EMPTY_FORM };
   });
   const [saving, setSaving] = useState(false);
+  const [creatingNewProject, setCreatingNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [showAllRoles, setShowAllRoles] = useState(false);
+  const [responsibleQuery, setResponsibleQuery] = useState<Record<Role, string>>(() => {
+    const initial = {} as Record<Role, string>;
+    for (const act of form.activities) {
+      const match = users.find(u => String(u.id) === act.responsible_id);
+      initial[act.role] = match?.name ?? '';
+    }
+  });
+
+  useEffect(() => {
+    const initial = {} as Record<Role, string>;
+    for (const act of form.activities) {
+      const match = users.find(u => String(u.id) === act.responsible_id);
+      initial[act.role] = match?.name ?? '';
+    }
+    setResponsibleQuery(initial);
+  }, [deliverable, users]);
 
   function setAct(role: Role, field: keyof ActivityForm, value: string) {
     setForm(prev => ({ ...prev, activities: prev.activities.map(a => a.role === role ? { ...a, [field]: value } : a) }));
@@ -540,8 +559,26 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
   async function handleSave() {
     if (!form.name.trim()) { addToast('El nombre del entregable es obligatorio.', 'error'); return; }
+    if (mode === 'create' && creatingNewProject && !newProjectName.trim()) {
+      addToast('Escribe un nombre para el nuevo proyecto.', 'error'); return;
+    }
     setSaving(true);
     try {
+      let projectId = form.project_id;
+      if (mode === 'create' && creatingNewProject) {
+        const newProject = await api.post<{ id: number }>(ENDPOINTS.PROJECTS, {
+          name: newProjectName.trim(),
+          status: 'draft',
+        });
+        projectId = String(newProject.id);
+        // Fijar el proyecto ya creado de inmediato: si el resto del guardado
+        // falla más abajo, un reintento reutiliza este proyecto en vez de
+        // crear uno duplicado.
+        setForm(p => ({ ...p, project_id: projectId }));
+        setCreatingNewProject(false);
+        setNewProjectName('');
+      }
+
       const payload: Record<string, unknown> = {
         name: form.name.trim(), type: form.type,
         start_date: form.start_date || null,
@@ -553,7 +590,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
           commitment_date: a.commitment_date || null,
         })),
       };
-      if (mode === 'create') payload.project_id = form.project_id ? Number(form.project_id) : null;
+      if (mode === 'create') payload.project_id = projectId ? Number(projectId) : null;
       if (mode === 'create') {
         await api.post<Deliverable>(ENDPOINTS.DELIVERABLES, payload);
         addToast('Entregable creado correctamente.', 'success');
@@ -594,11 +631,35 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
             {mode === 'create' && (
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Proyecto <span className="text-red-500">*</span></label>
-                <select value={form.project_id} onChange={e => setForm(p => ({ ...p, project_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
-                  <option value="">Selecciona un proyecto...</option>
-                  {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                </select>
+                {creatingNewProject ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={newProjectName}
+                      onChange={e => setNewProjectName(e.target.value)}
+                      placeholder="Nombre del nuevo proyecto"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setCreatingNewProject(false); setNewProjectName(''); }}
+                      className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"
+                      title="Cancelar y volver a la lista"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <select value={form.project_id} onChange={e => {
+                    if (e.target.value === '__new__') { setCreatingNewProject(true); return; }
+                    setForm(p => ({ ...p, project_id: e.target.value }));
+                  }}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                    <option value="">Selecciona un proyecto...</option>
+                    {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                    <option value="__new__">+ Crear proyecto nuevo</option>
+                  </select>
+                )}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -649,12 +710,19 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
           {/* Role activities */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-              <UserIcon size={12} /> Responsables y fechas por rol
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <UserIcon size={12} /> Responsables y fechas por rol
+              </p>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer">
+                <input type="checkbox" checked={showAllRoles} onChange={e => setShowAllRoles(e.target.checked)} className="rounded border-gray-300" />
+                Mostrar todos los roles
+              </label>
+            </div>
             <div className="space-y-2">
               {form.activities.map(act => {
                 const colors = ROLE_CELL_COLORS[act.role];
+                const filteredUsers = showAllRoles ? users : users.filter(u => u.role === act.role);
                 return (
                   <div key={act.role} className={clsx('rounded-xl border p-3 space-y-2', colors.bg, colors.border)}>
                     <div className="flex items-center gap-1.5">
@@ -664,11 +732,34 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                       <p className={clsx('text-xs font-semibold', colors.label)}>{ROLE_LABELS[act.role]}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <select value={act.responsible_id} onChange={e => setAct(act.role, 'responsible_id', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20">
-                        <option value="">Sin asignar</option>
-                        {users.map(u => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
-                      </select>
+                      <div>
+                        <input
+                          list={`responsible-list-${act.role}`}
+                          value={responsibleQuery[act.role] ?? ''}
+                          onChange={e => {
+                            const typed = e.target.value;
+                            setResponsibleQuery(prev => ({ ...prev, [act.role]: typed }));
+                            const match = filteredUsers.find(u => u.name === typed);
+                            setAct(act.role, 'responsible_id', match ? String(match.id) : '');
+                          }}
+                          onBlur={e => {
+                            const typed = e.target.value;
+                            if (typed === '') {
+                              setAct(act.role, 'responsible_id', '');
+                              return;
+                            }
+                            const match = filteredUsers.find(u => u.name === typed);
+                            if (!match) {
+                              const currentResp = users.find(u => String(u.id) === act.responsible_id);
+                              setResponsibleQuery(prev => ({ ...prev, [act.role]: currentResp?.name ?? '' }));
+                            }
+                          }}
+                          placeholder="Buscar por nombre..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20" />
+                        <datalist id={`responsible-list-${act.role}`}>
+                          {filteredUsers.map(u => <option key={u.id} value={u.name} />)}
+                        </datalist>
+                      </div>
                       <input type="date" value={act.commitment_date} onChange={e => setAct(act.role, 'commitment_date', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-xs border border-white/70 bg-white/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/20" />
                     </div>

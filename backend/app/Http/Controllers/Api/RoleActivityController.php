@@ -206,6 +206,12 @@ class RoleActivityController extends Controller
         ]);
 
         if (!$isManager) {
+            abort_if(
+                in_array($activity->status, ['approved', 'not_applicable'], true),
+                403,
+                'Esta actividad ya ha sido aprobada o marcada como no aplicable y no puede ser modificada.'
+            );
+
             $forbiddenFields = array_intersect(
                 array_keys($data),
                 ['responsible_id', 'assigned_at', 'commitment_date']
@@ -222,24 +228,8 @@ class RoleActivityController extends Controller
             );
         }
 
-        $original = $activity->getOriginal();
         $activity->update($data);
         $dirty = $activity->getChanges();
-
-        foreach ($dirty as $field => $newValue) {
-            if ($field === 'updated_at') continue;
-            AuditLog::create([
-                'user_id'      => Auth::id(),
-                'action'       => 'updated',
-                'entity_type'  => 'RoleActivity',
-                'entity_id'    => $activity->id,
-                'field_changed'=> $field,
-                'old_value'    => $original[$field] ?? null,
-                'new_value'    => $newValue,
-                'ip_address'   => $request->ip(),
-                'created_at'   => now(),
-            ]);
-        }
 
         $activity->loadMissing('deliverable.subject.academicProgram');
         $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";

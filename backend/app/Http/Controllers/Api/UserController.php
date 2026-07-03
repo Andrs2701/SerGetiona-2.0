@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -86,6 +87,22 @@ class UserController extends Controller
         ]);
 
         $user->update($data);
+
+        return new UserResource($user);
+    }
+
+    public function updatePhoto(Request $request)
+    {
+        $request->validate(['photo' => 'required|mimes:jpeg,png,jpg,webp|max:2048']);
+
+        $user = $request->user();
+
+        if ($user->photo_path) {
+            Storage::disk('public')->delete($user->photo_path);
+        }
+
+        $path = $request->file('photo')->store('avatars', 'public');
+        $user->update(['photo_path' => $path]);
 
         return new UserResource($user);
     }

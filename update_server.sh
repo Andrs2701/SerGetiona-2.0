@@ -62,6 +62,12 @@ echo -e "  Aplicando migraciones nuevas..."
 php artisan migrate --force
 echo -e "  ${GREEN}✓ Migraciones aplicadas (datos conservados)${NC}"
 
+# Enlace simbólico de almacenamiento público (fotos de perfil, etc.)
+# El comando es seguro de repetir: si el enlace ya existe, no hace nada.
+echo -e "  Verificando enlace de storage público..."
+php artisan storage:link
+echo -e "  ${GREEN}✓ Storage público enlazado${NC}"
+
 # Limpiar y regenerar caché de producción
 echo -e "  Regenerando caché de Laravel..."
 php artisan config:clear

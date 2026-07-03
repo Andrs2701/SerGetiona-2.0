@@ -10,6 +10,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Notification } from '@/lib/types';
 import { USER_ROLE_LABELS } from '@/lib/types';
+import Avatar from '@/components/Avatar';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -152,10 +153,6 @@ export default function Header({
     setUnread((prev) => Math.max(0, prev - 1));
   }
 
-  const initials = user?.name
-    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
-    : 'US';
-
   return (
     <header className="h-14 bg-[var(--header-bg)] border-b border-[var(--header-border)] flex items-center justify-between px-3 sm:px-6 flex-shrink-0 transition-colors gap-2">
       {/* Left: hamburger (mobile) + sidebar toggle (desktop) */}
@@ -295,9 +292,11 @@ export default function Header({
             onClick={() => { setUserOpen(!userOpen); setNotifOpen(false); }}
             className="flex items-center gap-2 px-1.5 sm:px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {initials}
-            </div>
+            <Avatar
+              name={user?.name ?? 'Usuario'}
+              photoUrl={user?.photo_url}
+              className="w-8 h-8 sm:w-7 sm:h-7 bg-indigo-600 text-white text-xs"
+            />
             <div className="hidden md:block text-left max-w-[140px]">
               <p className="text-xs font-medium text-gray-900 dark:text-gray-100 leading-tight truncate">{user?.name ?? 'Usuario'}</p>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight truncate">

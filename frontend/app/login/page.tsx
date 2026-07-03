@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User } from '@/lib/types';
@@ -108,8 +108,9 @@ function PasswordRecoveryModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -117,6 +118,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
+
+  useEffect(() => {
+    const expiredFlag = sessionStorage.getItem('sergestiona_session_expired') === '1';
+    if (searchParams.get('expired') === '1' || expiredFlag) {
+      setError('Tu sesión expiró. Inicia sesión de nuevo.');
+      if (expiredFlag) sessionStorage.removeItem('sergestiona_session_expired');
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -380,5 +389,13 @@ export default function LoginPage() {
 
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

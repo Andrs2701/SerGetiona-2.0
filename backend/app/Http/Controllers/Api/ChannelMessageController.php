@@ -15,7 +15,7 @@ class ChannelMessageController extends Controller
         abort_unless($channel->isVisibleTo($request->user()), 403, 'No tienes acceso a este canal.');
 
         $messages = $channel->messages()
-            ->with(['user:id,name,role', 'replies.user:id,name,role'])
+            ->with(['user:id,name,role,photo_path', 'replies.user:id,name,role,photo_path'])
             ->whereNull('parent_id')
             ->orderBy('created_at')
             ->get();
@@ -47,7 +47,7 @@ class ChannelMessageController extends Controller
             $request->user()->id => ['last_read_at' => now()],
         ]);
 
-        return response()->json($msg->load('user:id,name,role'), 201);
+        return response()->json($msg->load('user:id,name,role,photo_path'), 201);
     }
 
     public function destroy(Request $request, Channel $channel, ChannelMessage $message)

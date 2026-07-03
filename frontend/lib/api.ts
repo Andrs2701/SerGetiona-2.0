@@ -5,6 +5,24 @@ function getToken(): string | null {
   return localStorage.getItem('sergestiona_token');
 }
 
+// Rutas donde un 401 es un resultado esperado (credenciales invalidas, o
+// la verificacion inicial de sesion) — no deben disparar la redireccion
+// automatica de "sesion expirada", cada una ya maneja su propio 401.
+const SKIP_EXPIRED_REDIRECT = ['/auth/login', '/auth/me'];
+
+function handleUnauthorized(path: string) {
+  if (SKIP_EXPIRED_REDIRECT.includes(path)) return;
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('sergestiona_token');
+  localStorage.removeItem('sergestiona_user');
+  // El layout del dashboard también redirige a /login (sin query param) en cuanto
+  // detecta que ya no hay sesión, en una carrera con esta navegación dura — por
+  // eso el aviso de "sesión expirada" no depende solo del query param, sino de
+  // este flag en sessionStorage que sobrevive sin importar cuál navegación gane.
+  sessionStorage.setItem('sergestiona_session_expired', '1');
+  window.location.href = '/sergestiona/login?expired=1';
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -13,6 +31,10 @@ async function request<T>(
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    // Sin esto, Laravel no considera la petición como "espera JSON" y en un 401
+    // intenta redirigir a la ruta nombrada "login" (que no existe en esta API) en
+    // vez de responder 401 en JSON — eso producía un 500 en vez del 401 esperado.
+    'Accept': 'application/json',
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -25,6 +47,7 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 401) handleUnauthorized(path);
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
@@ -34,12 +57,13 @@ async function request<T>(
 
 async function requestForm<T>(method: string, path: string, body: FormData): Promise<T> {
   const token = getToken();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'Accept': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE_URL}${path}`, { method, headers, body });
 
   if (!res.ok) {
+    if (res.status === 401) handleUnauthorized(path);
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
@@ -65,10 +89,13 @@ function unwrap<T>(response: unknown): T {
 
 export async function downloadCsv(path: string, filename: string): Promise<void> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('sergestiona_token') : null;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const headers: Record<string, string> = { 'Accept': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}${path}`, { headers });
+  if (!res.ok) {
+    if (res.status === 401) handleUnauthorized(path);
+    throw new Error(`HTTP ${res.status}`);
+  }
   const blob = await res.blob();
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -114,6 +141,7 @@ export const ENDPOINTS = {
   USERS: '/users',
   USER: (id: number) => `/users/${id}`,
   PROFILE: '/profile',
+  PROFILE_PHOTO: '/profile/photo',
 
   // Reports
   DASHBOARD: '/reports/dashboard',

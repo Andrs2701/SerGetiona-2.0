@@ -125,7 +125,7 @@ class ChannelController extends Controller
 
         return response()->json([
             'members' => $channel->members()
-                ->select('users.id', 'users.name', 'users.email', 'users.role')
+                ->select('users.id', 'users.name', 'users.email', 'users.role', 'users.photo_path')
                 ->orderBy('users.name')
                 ->get(),
         ]);

@@ -32,29 +32,32 @@ class CalendarEvent extends Model
             ->orWhere('is_recurring', true);
     }
 
+    private static ?array $holidaysCache = null;
+
     public static function isWorkingDay(Carbon $date): bool
     {
         if ($date->isWeekend()) {
             return false;
         }
 
-        $month = $date->month;
-        $day = $date->day;
-        $year = $date->year;
+        if (self::$holidaysCache === null) {
+            $events = self::all();
+            self::$holidaysCache = [
+                'exact' => $events->where('is_recurring', false)->pluck('date')->map(fn($d) => $d->toDateString())->flip()->all(),
+                'recurring' => $events->where('is_recurring', true)->map(fn($e) => sprintf('%02d-%02d', $e->date->month, $e->date->day))->flip()->all(),
+            ];
+        }
 
-        // Check non-recurring events for specific year
-        $exact = self::where('date', $date->toDateString())->exists();
-        if ($exact) {
+        $dateString = $date->toDateString();
+        if (isset(self::$holidaysCache['exact'][$dateString])) {
             return false;
         }
 
-        // Check recurring events (same month/day any year)
-        $recurring = self::where('is_recurring', true)
-            ->get()
-            ->first(function ($event) use ($month, $day) {
-                return $event->date->month === $month && $event->date->day === $day;
-            });
+        $recurringKey = sprintf('%02d-%02d', $date->month, $date->day);
+        if (isset(self::$holidaysCache['recurring'][$recurringKey])) {
+            return false;
+        }
 
-        return $recurring === null;
+        return true;
     }
 }

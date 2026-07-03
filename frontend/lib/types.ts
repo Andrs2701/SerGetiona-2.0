@@ -46,6 +46,7 @@ export interface User {
   phone?: string;
   position?: string | null;
   department?: string | null;
+  photo_url?: string | null;
   weekly_capacity_points?: number | null;
 }
 
@@ -465,6 +466,7 @@ export interface ChannelMember {
   name: string;
   email: string;
   role: UserRole;
+  photo_url?: string | null;
 }
 
 export interface ChannelMessage {
@@ -472,7 +474,7 @@ export interface ChannelMessage {
   channel_id: number;
   parent_id?: number | null;
   content: string;
-  user: { id: number; name: string; role: UserRole };
+  user: { id: number; name: string; role: UserRole; photo_url?: string | null };
   created_at: string;
   replies?: ChannelMessage[];
 }

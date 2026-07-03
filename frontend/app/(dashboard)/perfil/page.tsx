@@ -14,6 +14,7 @@ import { api, ENDPOINTS } from '@/lib/api';
 import { USER_ROLE_LABELS } from '@/lib/types';
 import type { WorkspaceStats, User as UserAccount, UserPreferences } from '@/lib/types';
 import { Skeleton } from '@/components/LoadingSkeleton';
+import Avatar from '@/components/Avatar';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -58,6 +59,8 @@ export default function PerfilPage() {
   // ── Avatar / photo ──
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   // ── Personal data form ──
   const [fullName, setFullName] = useState('');
@@ -125,10 +128,6 @@ export default function PerfilPage() {
 
   const strength = getStrength(newPwd);
 
-  const initials = user?.name
-    ? user.name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || 'US'
-    : 'US';
-
   const total = stats ? stats.completed + stats.overdue + stats.approaching + stats.pending : 0;
   const compliance = total > 0 && stats ? Math.round((stats.completed / total) * 100) : 0;
   const history = getMockHistory();
@@ -140,12 +139,26 @@ export default function PerfilPage() {
     return MONTH_LABELS[idx] ?? MONTH_LABELS[i] ?? '';
   });
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoError('');
     const reader = new FileReader();
     reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+    setUploadingPhoto(true);
+    try {
+      const updated = await api.postForm<UserAccount>(ENDPOINTS.PROFILE_PHOTO, formData);
+      updateUser(updated);
+    } catch {
+      setPhotoError('No se pudo subir la foto. Intenta de nuevo.');
+      setPhotoPreview(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -211,25 +224,24 @@ export default function PerfilPage() {
           <div className={`${cardCls} p-4 sm:p-6`}>
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md overflow-hidden"
-                  style={{ background: photoPreview ? undefined : 'linear-gradient(135deg, #194276 0%, #4f46e5 100%)' }}
-                >
-                  {photoPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoPreview} alt="foto de perfil" className="w-full h-full object-cover" />
-                  ) : (
-                    initials
-                  )}
-                </div>
+                <Avatar
+                  name={user?.name ?? 'Usuario'}
+                  photoUrl={photoPreview ?? user?.photo_url}
+                  className="w-20 h-20 text-2xl text-white shadow-md"
+                  style={{ background: 'linear-gradient(135deg, #194276 0%, #4f46e5 100%)' }}
+                />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:shadow-md transition-all"
+                  disabled={uploadingPhoto}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:shadow-md transition-all disabled:opacity-60"
                 >
                   <Camera size={13} />
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
               </div>
+              {photoError && (
+                <p className="text-xs text-red-500 dark:text-red-400 -mt-2">{photoError}</p>
+              )}
 
               <div className="text-center">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">{user?.name ?? '—'}</h2>

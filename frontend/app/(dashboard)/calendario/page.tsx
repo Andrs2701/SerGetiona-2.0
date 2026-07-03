@@ -1,16 +1,25 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Calendar, Clock,
   XCircle, CheckCircle2, AlertTriangle, ExternalLink,
-  LayoutGrid, Users,
+  LayoutGrid, Users, Plus,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { WorkspaceActivity, CalendarEvent, Role } from '@/lib/types';
 import { ROLE_STATUS_LABELS, ROLE_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
+import Modal from '@/components/Modal';
+
+const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEvent['type'], string> = {
+  holiday: 'Festivo',
+  non_working: 'Día no laboral',
+  vacation: 'Vacaciones',
+  closure: 'Cierre institucional',
+  event: 'Evento',
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const WEEKDAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -748,12 +757,42 @@ export default function CalendarioPage() {
   }, []);
 
   // Calendar events
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
     api
       .get<CalendarEvent[]>(`${ENDPOINTS.CALENDAR_EVENTS}?year=${year}`)
       .then(setCalEvents)
       .catch(() => setCalEvents([]));
   }, [year]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  // Modal: agregar festivo
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [holidaySaving, setHolidaySaving] = useState(false);
+  const [holidayError, setHolidayError] = useState('');
+  const [holidayForm, setHolidayForm] = useState({ name: '', date: '', type: 'holiday' as CalendarEvent['type'], description: '', is_recurring: false });
+
+  async function handleSaveHoliday() {
+    if (!holidayForm.name.trim() || !holidayForm.date) return;
+    setHolidaySaving(true);
+    setHolidayError('');
+    try {
+      await api.post(ENDPOINTS.CALENDAR_EVENTS, {
+        name: holidayForm.name.trim(),
+        date: holidayForm.date,
+        type: holidayForm.type,
+        description: holidayForm.description.trim() || null,
+        is_recurring: holidayForm.is_recurring,
+      });
+      setShowHolidayModal(false);
+      setHolidayForm({ name: '', date: '', type: 'holiday', description: '', is_recurring: false });
+      loadEvents();
+    } catch {
+      setHolidayError('No se pudo guardar el festivo. Intenta de nuevo.');
+    } finally {
+      setHolidaySaving(false);
+    }
+  }
 
   // All activities (showAll mode) — uses dedicated endpoint
   useEffect(() => {
@@ -905,8 +944,98 @@ export default function CalendarioPage() {
               </button>
             ))}
           </div>
+
+          {isAdminOrCoord && (
+            <button
+              onClick={() => setShowHolidayModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-lg"
+              style={{ background: '#194276' }}
+            >
+              <Plus size={14} /> Agregar festivo
+            </button>
+          )}
         </div>
       </div>
+
+      <Modal
+        open={showHolidayModal}
+        onClose={() => setShowHolidayModal(false)}
+        title="Agregar festivo"
+        footer={
+          <>
+            <button
+              onClick={() => setShowHolidayModal(false)}
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveHoliday}
+              disabled={holidaySaving || !holidayForm.name.trim() || !holidayForm.date}
+              className="px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50"
+              style={{ background: '#194276' }}
+            >
+              {holidaySaving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {holidayError && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{holidayError}</p>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+            <input
+              value={holidayForm.name}
+              onChange={e => setHolidayForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ej. Día de la Independencia"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+              <input
+                type="date"
+                value={holidayForm.date}
+                onChange={e => setHolidayForm(f => ({ ...f, date: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <select
+                value={holidayForm.type}
+                onChange={e => setHolidayForm(f => ({ ...f, type: e.target.value as CalendarEvent['type'] }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {Object.entries(CALENDAR_EVENT_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción (opcional)</label>
+            <textarea
+              value={holidayForm.description}
+              onChange={e => setHolidayForm(f => ({ ...f, description: e.target.value }))}
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={holidayForm.is_recurring}
+              onChange={e => setHolidayForm(f => ({ ...f, is_recurring: e.target.checked }))}
+              className="rounded border-gray-300"
+            />
+            Se repite todos los años (misma fecha)
+          </label>
+        </div>
+      </Modal>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Main calendar area ~70% */}

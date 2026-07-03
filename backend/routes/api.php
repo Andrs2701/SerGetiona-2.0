@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::put('/profile', [UserController::class, 'updateProfile']);
+    Route::post('/profile/photo', [UserController::class, 'updatePhoto']);
 
     // Notificaciones
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);

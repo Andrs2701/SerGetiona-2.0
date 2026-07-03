@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Channel, ChannelMessage, ChannelMember, User } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ChannelMembersModal from '@/components/ChannelMembersModal';
+import Avatar from '@/components/Avatar';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,10 +55,6 @@ function getMentionQuery(text: string, cursorPos: number): string | null {
   const before = text.slice(0, cursorPos);
   const match = before.match(/@([\w.]*)$/);
   return match ? match[1] : null;
-}
-
-function getInitials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase() || '?';
 }
 
 const AVATAR_COLORS = [
@@ -104,9 +101,11 @@ function MentionDropdown({
           onMouseDown={e => { e.preventDefault(); onSelect(toHandle(m.name)); }}
           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-left"
         >
-          <div className={clsx('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-none', avatarColor(m.id))}>
-            {getInitials(m.name)}
-          </div>
+          <Avatar
+            name={m.name}
+            photoUrl={m.photo_url}
+            className={clsx('w-7 h-7 text-xs text-white flex-none', avatarColor(m.id))}
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{m.name}</p>
             <p className="text-[11px] text-gray-400 dark:text-gray-500">@{toHandle(m.name)} · {ROLE_LABELS[m.role] ?? m.role}</p>
@@ -595,9 +594,11 @@ function ColaboracionInner() {
                       {grouped ? (
                         <div className="w-9 flex-none" />
                       ) : (
-                        <div className={clsx('w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-none mt-0.5', avatarColor(msg.user.id))}>
-                          {getInitials(msg.user.name)}
-                        </div>
+                        <Avatar
+                          name={msg.user.name}
+                          photoUrl={msg.user.photo_url}
+                          className={clsx('w-9 h-9 text-xs text-white flex-none mt-0.5', avatarColor(msg.user.id))}
+                        />
                       )}
 
                       <div className="flex-1 min-w-0">
@@ -637,9 +638,13 @@ function ColaboracionInner() {
                             {/* Stacked avatars */}
                             <div className="flex -space-x-1.5">
                               {replies.slice(0, 3).map((r, i) => (
-                                <div key={r.id} className={clsx('w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-2 ring-white dark:ring-gray-800', avatarColor(r.user?.id ?? i))} style={{ zIndex: 3 - i }}>
-                                  {getInitials(r.user?.name ?? '?')}
-                                </div>
+                                <Avatar
+                                  key={r.id}
+                                  name={r.user?.name ?? '?'}
+                                  photoUrl={r.user?.photo_url}
+                                  className={clsx('w-5 h-5 text-[8px] text-white ring-2 ring-white dark:ring-gray-800', avatarColor(r.user?.id ?? i))}
+                                  style={{ zIndex: 3 - i }}
+                                />
                               ))}
                             </div>
                             <span>{replies.length === 1 ? '1 respuesta' : `${replies.length} respuestas`}</span>
@@ -670,9 +675,11 @@ function ColaboracionInner() {
                       <div className="ml-12 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800/50 space-y-0.5 mb-2">
                         {replies.map(r => (
                           <div key={r.id} className="flex items-start gap-2 py-1.5 px-2 -mx-2 rounded-lg hover:bg-gray-50/50 dark:hover:bg-white/[0.02]">
-                            <div className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-none mt-0.5', avatarColor(r.user?.id ?? 0))}>
-                              {getInitials(r.user?.name ?? '?')}
-                            </div>
+                            <Avatar
+                              name={r.user?.name ?? '?'}
+                              photoUrl={r.user?.photo_url}
+                              className={clsx('w-6 h-6 text-[10px] text-white flex-none mt-0.5', avatarColor(r.user?.id ?? 0))}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2">
                                 <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{r.user?.name}</span>

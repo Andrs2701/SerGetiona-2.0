@@ -234,7 +234,7 @@ class ImportController extends Controller
     public function deliverables(Request $request)
     {
         $request->validate([
-            'file'         => 'required|file|max:10240',
+            'file'         => 'required|file|max:2048',
             'project_id'   => 'nullable|integer|exists:projects,id',
             'project_name' => 'nullable|string|max:255',
         ]);
@@ -287,33 +287,48 @@ class ImportController extends Controller
         $preview = [];
         $rowNum  = 1;
 
-        foreach ($rows as $row) {
-            $rowNum++;
-            $rowErrors = $this->validateRow($row, $rowNum, $usersByEmail);
+        if (!$validateOnly) {
+            DB::beginTransaction();
+        }
 
-            if (!empty($rowErrors)) {
-                $errors  = array_merge($errors, $rowErrors);
-                $invalid++;
-                continue;
-            }
+        try {
+            foreach ($rows as $row) {
+                $rowNum++;
+                $rowErrors = $this->validateRow($row, $rowNum, $usersByEmail);
 
-            $valid++;
+                if (!empty($rowErrors)) {
+                    $errors  = array_merge($errors, $rowErrors);
+                    $invalid++;
+                    continue;
+                }
 
-            if (count($preview) < 5) {
-                $preview[] = $this->previewRecord($row);
+                $valid++;
+
+                if (count($preview) < 5) {
+                    $preview[] = $this->previewRecord($row);
+                }
+
+                if (!$validateOnly) {
+                    $this->persistRow($row, $projectId, $userId, $usersByEmail);
+                }
             }
 
             if (!$validateOnly) {
-                try {
-                    DB::transaction(function () use ($row, $projectId, $userId, $usersByEmail) {
-                        $this->persistRow($row, $projectId, $userId, $usersByEmail);
-                    });
-                } catch (\Throwable $e) {
-                    $errors[] = ['row' => $rowNum, 'field' => 'general', 'message' => $e->getMessage()];
-                    $invalid++;
-                    $valid = max(0, $valid - 1);
+                if (empty($errors)) {
+                    DB::commit();
+                } else {
+                    DB::rollBack();
+                    $valid = 0; // Si hay errores, nada se insertó
                 }
             }
+        } catch (\Throwable $e) {
+            if (!$validateOnly) {
+                DB::rollBack();
+            }
+            return response()->json([
+                'imported' => 0,
+                'errors'   => [['row' => $rowNum, 'field' => 'general', 'message' => 'Error inesperado durante la importación: ' . $e->getMessage()]],
+            ], 500);
         }
 
         if ($validateOnly) {
