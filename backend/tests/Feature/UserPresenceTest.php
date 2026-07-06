@@ -61,26 +61,19 @@ class UserPresenceTest extends TestCase
             ->getJson('/api/users')
             ->assertOk();
 
-        // Verificar userOnline
-        $response->assertJsonFragment([
-            'id' => $userOnline->id,
-            'is_online' => true,
-            'last_active_at' => now()->subMinutes(2)->toIso8601String(),
-        ]);
+        // assertJsonFragment no ata las claves a la MISMA fila — comprobar cada
+        // usuario por separado evita falsos positivos (ej. is_online:false de
+        // userNever "cubriendo" por error la aserción de userOffline).
+        $rows = collect($response->json('data'))->keyBy('id');
 
-        // Verificar userOffline
-        $response->assertJsonFragment([
-            'id' => $userOffline->id,
-            'is_online' => false,
-            'last_active_at' => now()->subMinutes(10)->toIso8601String(),
-        ]);
+        $this->assertSame(true, $rows[$userOnline->id]['is_online']);
+        $this->assertSame(now()->subMinutes(2)->toIso8601String(), $rows[$userOnline->id]['last_active_at']);
 
-        // Verificar userNever
-        $response->assertJsonFragment([
-            'id' => $userNever->id,
-            'is_online' => false,
-            'last_active_at' => null,
-        ]);
+        $this->assertSame(false, $rows[$userOffline->id]['is_online']);
+        $this->assertSame(now()->subMinutes(10)->toIso8601String(), $rows[$userOffline->id]['last_active_at']);
+
+        $this->assertSame(false, $rows[$userNever->id]['is_online']);
+        $this->assertNull($rows[$userNever->id]['last_active_at']);
     }
 
     public function test_changing_presence_threshold_affects_is_online(): void
@@ -108,11 +101,29 @@ class UserPresenceTest extends TestCase
             ->getJson('/api/users')
             ->assertOk();
 
-        // Verificar que ahora está online
-        $response->assertJsonFragment([
-            'id' => $userOffline->id,
-            'is_online' => true,
-            'last_active_at' => now()->subMinutes(10)->toIso8601String(),
-        ]);
+        // Verificar que ahora está online (10 min de inactividad, umbral 15 min)
+        $row = collect($response->json('data'))->keyBy('id')[$userOffline->id];
+        $this->assertSame(true, $row['is_online']);
+        $this->assertSame(now()->subMinutes(10)->toIso8601String(), $row['last_active_at']);
+    }
+
+    public function test_admin_can_update_user_without_password_issue(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $user = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+        $oldPassword = $user->password;
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/users/' . $user->id, [
+                'name' => 'Camilo Editado',
+                'role' => 'coordinator',
+                'password' => '',
+            ])
+            ->assertOk();
+
+        $user->refresh();
+        $this->assertEquals('Camilo Editado', $user->name);
+        $this->assertEquals('coordinator', $user->role);
+        $this->assertEquals($oldPassword, $user->password);
     }
 }

@@ -15,7 +15,7 @@ class UpdateUserActivity
         $user = $request->user();
         if ($user) {
             // Actualizar la última actividad del usuario si ha pasado más de 1 minuto desde la última actualización
-            if (!$user->last_active_at || now()->diffInMinutes($user->last_active_at) >= 1) {
+            if (!$user->last_active_at || $user->last_active_at->diffInMinutes(now()) >= 1) {
                 $user->timestamps = false;
                 $user->update(['last_active_at' => now()]);
             }

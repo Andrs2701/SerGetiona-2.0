@@ -68,8 +68,10 @@ class UserController extends Controller
             'weekly_capacity_points' => 'nullable|integer|min:1|max:200',
         ]);
 
-        if (isset($data['password'])) {
+        if (isset($data['password']) && filled($data['password'])) {
             $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
         }
 
         $user->update($data);
