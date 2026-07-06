@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ChevronLeft, ChevronRight, Calendar, Clock,
   XCircle, CheckCircle2, AlertTriangle, ExternalLink,
@@ -146,13 +147,25 @@ function decisionChipClass(d: CalendarDecision): string {
 }
 
 // ─── Activity card (my activities) ────────────────────────────────────────────
-function ActivityCard({ act, onNavigate }: { act: WorkspaceActivity; onNavigate: (id: number) => void }) {
+function ActivityCard({
+  act,
+  onNavigate,
+  onEdit,
+}: {
+  act: WorkspaceActivity;
+  onNavigate: (id: number) => void;
+  onEdit: (activityId: number, deliverableId?: number) => void;
+}) {
   const days = act.commitment_date ? daysUntil(act.commitment_date) : null;
   const isVencida = act.date_status === 'overdue';
   const isUrgente = days !== null && days >= 0 && days <= 3 && !isVencida;
 
   return (
-    <div className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-gray-200 transition-colors">
+    <div
+      onClick={() => onEdit(act.id, act.deliverable?.id)}
+      className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-indigo-200 hover:bg-indigo-50/5 cursor-pointer transition-all hover:shadow-sm"
+      title="Haz clic para ver/editar esta entrega"
+    >
       <p className="text-sm font-semibold text-gray-900 leading-snug">{act.deliverable?.name ?? '—'}</p>
       <p className="text-xs text-gray-500">{act.program?.name ?? '—'}</p>
       <p className="text-xs text-gray-400">{act.subject?.name ?? '—'}</p>
@@ -176,12 +189,17 @@ function ActivityCard({ act, onNavigate }: { act: WorkspaceActivity; onNavigate:
           </span>
         )}
       </div>
-      <button
-        onClick={() => act.project && onNavigate(act.project.id)}
-        className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium pt-0.5"
-      >
-        <ExternalLink size={11} /> Ver proyecto
-      </button>
+      {act.project && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate(act.project!.id);
+          }}
+          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold pt-0.5 hover:underline"
+        >
+          <ExternalLink size={11} /> Ver proyecto
+        </button>
+      )}
     </div>
   );
 }
@@ -191,16 +209,22 @@ function AllActivityCard({
   a,
   todayStr,
   onNavigate,
+  onEdit,
 }: {
   a: AllActivity;
   todayStr: string;
   onNavigate: (id: number) => void;
+  onEdit: (activityId: number, deliverableId?: number) => void;
 }) {
   const badge = allActivityStatusBadge(a, todayStr);
   const initial = a.responsible_name ? a.responsible_name.charAt(0).toUpperCase() : '?';
 
   return (
-    <div className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-gray-200 transition-colors">
+    <div
+      onClick={() => onEdit(a.id, a.deliverable_id)}
+      className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-indigo-200 hover:bg-indigo-50/5 cursor-pointer transition-all hover:shadow-sm"
+      title="Haz clic para ver/editar esta entrega"
+    >
       <div className="flex items-center gap-2">
         <span className="w-6 h-6 rounded-full bg-[#194276] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
           {initial}
@@ -222,8 +246,11 @@ function AllActivityCard({
       </div>
       {a.project_id > 0 && (
         <button
-          onClick={() => onNavigate(a.project_id)}
-          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium pt-0.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate(a.project_id);
+          }}
+          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold pt-0.5 hover:underline"
         >
           <ExternalLink size={11} /> Ver proyecto
         </button>
@@ -237,10 +264,12 @@ function SidePanel({
   activities,
   today,
   onNavigate,
+  onEdit,
 }: {
   activities: WorkspaceActivity[];
   today: Date;
   onNavigate: (id: number) => void;
+  onEdit: (activityId: number, deliverableId?: number) => void;
 }) {
   const todayStr = toYMD(today);
 
@@ -282,8 +311,8 @@ function SidePanel({
             upcoming.map((act) => (
               <div
                 key={act.id}
-                className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => act.project && onNavigate(act.project.id)}
+                className="flex items-start gap-2 p-2 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors"
+                onClick={() => onEdit(act.id, act.deliverable?.id)}
               >
                 <span className={clsx('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', activityDotClass(act))} />
                 <div className="min-w-0">
@@ -311,8 +340,8 @@ function SidePanel({
             {overdueList.map((act) => (
               <div
                 key={act.id}
-                className="p-2 rounded-lg bg-red-50 cursor-pointer"
-                onClick={() => act.project && onNavigate(act.project.id)}
+                className="p-2 rounded-lg bg-red-50 hover:bg-red-100/50 cursor-pointer transition-colors"
+                onClick={() => onEdit(act.id, act.deliverable?.id)}
               >
                 <p className="text-xs font-medium text-red-800 truncate">{act.deliverable?.name ?? '—'}</p>
                 <p className="text-xs text-red-500">{act.subject?.name ?? '—'}</p>
@@ -649,6 +678,7 @@ function DayView({
   eventByDate,
   decisionsByDate,
   onNavigate,
+  onEdit,
   showAll,
   todayStr,
 }: {
@@ -658,6 +688,7 @@ function DayView({
   eventByDate: Record<string, CalendarEvent[]>;
   decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
+  onEdit: (activityId: number, deliverableId?: number) => void;
   showAll: boolean;
   todayStr: string;
 }) {
@@ -713,7 +744,7 @@ function DayView({
             </p>
             <div className="space-y-3">
               {dayActs.map((act) => (
-                <ActivityCard key={act.id} act={act} onNavigate={onNavigate} />
+                <ActivityCard key={act.id} act={act} onNavigate={onNavigate} onEdit={onEdit} />
               ))}
             </div>
           </div>
@@ -725,7 +756,7 @@ function DayView({
             </p>
             <div className="space-y-3">
               {dayAllActs.map((a) => (
-                <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} />
+                <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onEdit={onEdit} />
               ))}
             </div>
           </div>
@@ -743,6 +774,7 @@ function SelectedDayPanel({
   eventByDate,
   decisionsByDate,
   onNavigate,
+  onEdit,
   onClose,
   showAll,
   todayStr,
@@ -753,6 +785,7 @@ function SelectedDayPanel({
   eventByDate: Record<string, CalendarEvent[]>;
   decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
+  onEdit: (activityId: number, deliverableId?: number) => void;
   onClose: () => void;
   showAll: boolean;
   todayStr: string;
@@ -787,10 +820,10 @@ function SelectedDayPanel({
           </div>
         ))}
         {!showAll && dayActs.map((act) => (
-          <ActivityCard key={act.id} act={act} onNavigate={onNavigate} />
+          <ActivityCard key={act.id} act={act} onNavigate={onNavigate} onEdit={onEdit} />
         ))}
         {showAll && dayAllActs.map((a) => (
-          <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} />
+          <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onEdit={onEdit} />
         ))}
         {dayActs.length === 0 && dayAllActs.length === 0 && dayEvts.length === 0 && dayDecisions.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-4">Sin actividades.</p>
@@ -802,8 +835,29 @@ function SelectedDayPanel({
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function CalendarioPage() {
-  const navigate = (id: number) => { void id; };
+  const router = useRouter();
   const { user } = useAuthContext();
+  const isAdminOrCoord = user?.role === 'admin' || user?.role === 'coordinator';
+
+  const navigate = (projectId: number) => {
+    if (isAdminOrCoord) {
+      router.push('/programas');
+    } else {
+      router.push('/mi-espacio');
+    }
+  };
+
+  const handleEdit = (activityId: number, deliverableId?: number) => {
+    if (isAdminOrCoord) {
+      if (deliverableId) {
+        router.push(`/entregables?deliverable=${deliverableId}`);
+      } else {
+        router.push('/entregables');
+      }
+    } else {
+      router.push(`/mi-espacio?open=${activityId}`);
+    }
+  };
   const today = useMemo(() => new Date(), []);
   const todayStr = toYMD(today);
 
@@ -815,7 +869,6 @@ export default function CalendarioPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // Toggle: mis actividades vs todas
-  const isAdminOrCoord = user?.role === 'admin' || user?.role === 'coordinator';
   const [showAll, setShowAll] = useState(false);
 
   const [activities, setActivities] = useState<WorkspaceActivity[]>([]);
@@ -1188,6 +1241,7 @@ export default function CalendarioPage() {
               eventByDate={eventByDate}
               decisionsByDate={decisionsByDate}
               onNavigate={(id) => navigate(id)}
+              onEdit={handleEdit}
               showAll={showAll}
               todayStr={todayStr}
             />
@@ -1203,6 +1257,7 @@ export default function CalendarioPage() {
                 eventByDate={eventByDate}
                 decisionsByDate={decisionsByDate}
                 onNavigate={(id) => navigate(id)}
+                onEdit={handleEdit}
                 onClose={() => setSelectedDay(null)}
                 showAll={showAll}
                 todayStr={todayStr}
@@ -1218,6 +1273,7 @@ export default function CalendarioPage() {
               activities={activities}
               today={today}
               onNavigate={(id) => navigate(id)}
+              onEdit={handleEdit}
             />
           </div>
         </div>
