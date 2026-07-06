@@ -20,6 +20,8 @@ import type {
 import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import FilteredDetailPanel, { PanelRow } from '@/components/FilteredDetailPanel';
+import { isPastDue, isApproaching } from '@/lib/dateStatus';
 
 const ADMIN_ROLES = ['admin', 'coordinator'] as const;
 
@@ -101,10 +103,7 @@ type PanelFilter =
   | 'approaching' | 'with_observations'
   | `status_${string}` | `role_${string}`;
 
-interface PanelRow {
-  id: number; name: string; responsible?: string; program?: string;
-  subject?: string; commitment_date?: string; days_diff?: number; status?: string; role?: string;
-}
+
 
 interface DashFilters {
   programId: string;
@@ -121,119 +120,6 @@ function formatDateStr(date: string) {
 }
 
 // ─── SlidingPanel ─────────────────────────────────────────────────────────────
-
-function SlidingPanel({ filter, onClose }: { filter: PanelFilter | null; onClose: () => void }) {
-  const [rows, setRows] = useState<PanelRow[]>([]);
-  const [loadingPanel, setLoadingPanel] = useState(false);
-
-  const fetchRows = useCallback(async (f: PanelFilter) => {
-    setLoadingPanel(true);
-    try {
-      let endpoint = '/deliverables';
-      const params: Record<string, string> = {};
-      if (f === 'overdue')           { endpoint = '/reports/compliance'; params['date_status'] = 'overdue'; }
-      else if (f === 'approaching')  { endpoint = '/reports/compliance'; params['date_status'] = 'approaching'; }
-      else if (f === 'with_observations') { params['status'] = 'with_observations'; }
-      else if (f.startsWith('status_'))   { params['status'] = f.replace('status_', ''); }
-      const query = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = await api.get<any[]>(endpoint + query);
-      if (Array.isArray(data) && data.length > 0) {
-        setRows(data.map((item, idx) => ({
-          id: item.id ?? idx,
-          name: item.name ?? item.deliverable?.name ?? '—',
-          responsible: item.responsible ?? item.user?.name ?? '—',
-          program: item.program?.name ?? '—',
-          subject: item.subject?.name ?? '—',
-          commitment_date: item.commitment_date ?? item.due_date,
-          days_diff: item.commitment_date
-            ? Math.round((new Date(item.commitment_date + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000)
-            : undefined,
-          status: item.status ?? item.date_status,
-          role: item.role,
-        })));
-      } else { setRows([]); }
-    } catch { setRows([]); }
-    finally { setLoadingPanel(false); }
-  }, []);
-
-  useEffect(() => { if (filter) fetchRows(filter); }, [filter, fetchRows]);
-
-  const visible = filter !== null;
-  const panelTitle = (() => {
-    if (!filter) return '';
-    const map: Record<string, string> = {
-      active_projects: 'Proyectos Activos', programs: 'Programas',
-      total_deliverables: 'Total Entregables', overdue: 'Actividades Vencidas',
-      approaching: 'Por Vencer', with_observations: 'Con Observaciones',
-    };
-    if (map[filter]) return map[filter];
-    if (filter.startsWith('status_')) return STATUS_INFO[filter.replace('status_', '')]?.label ?? filter;
-    if (filter.startsWith('role_'))   return `Rol: ${ROLE_LABELS[filter.replace('role_', '') as keyof typeof ROLE_LABELS] ?? filter}`;
-    return filter;
-  })();
-
-  return (
-    <>
-      {visible && <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />}
-      <div className={`fixed right-0 top-0 h-full w-full sm:w-[480px] max-w-[100vw] bg-white dark:bg-gray-800 shadow-xl z-50 flex flex-col transition-transform duration-300 ${visible ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-          <div className="min-w-0">
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Detalle filtrado</p>
-            <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5 truncate">{panelTitle}</h2>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-400 flex-shrink-0">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-          {loadingPanel ? (
-            <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="bg-gray-100 dark:bg-gray-700 rounded-xl h-20 animate-pulse" />)}</div>
-          ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2 py-20">
-              <CheckCircle2 size={36} className="text-emerald-300" />
-              <p>Sin registros para este filtro</p>
-            </div>
-          ) : rows.map((row) => {
-            const isOverdue    = (row.days_diff ?? 0) < 0;
-            const isApproach   = !isOverdue && (row.days_diff ?? 99) <= 3;
-            const borderCls    = isOverdue ? 'border-l-4 border-l-red-500' : isApproach ? 'border-l-4 border-l-amber-400' : 'border-l-4 border-l-blue-100 dark:border-l-blue-900';
-            return (
-              <div key={row.id} className={`bg-white dark:bg-gray-800/80 rounded-xl border border-gray-200 dark:border-gray-700 p-4 ${borderCls}`}>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate">{row.name}</p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                  {row.responsible && <span className="flex items-center gap-1"><Users size={10} /><span className="truncate">{row.responsible}</span></span>}
-                  {row.program && <span className="flex items-center gap-1 truncate"><BookOpen size={10} /><span className="truncate">{row.program}</span></span>}
-                  {row.commitment_date && <span className="flex items-center gap-1"><CalendarDays size={10} />{formatDateStr(row.commitment_date)}</span>}
-                </div>
-                {row.days_diff !== undefined && (
-                  <div className="mt-2">
-                    {isOverdue ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 dark:bg-red-900/20 rounded-full px-2 py-0.5">
-                        <XCircle size={10} /> Vencida hace {Math.abs(row.days_diff)} día(s)
-                      </span>
-                    ) : isApproach ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-full px-2 py-0.5">
-                        <AlertTriangle size={10} /> Vence en {row.days_diff} día(s)
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-700 rounded-full px-2 py-0.5">
-                        <Clock size={10} /> {row.days_diff} días restantes
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="px-4 sm:px-6 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-          <p className="text-xs text-gray-400 text-center">{rows.length} registros encontrados</p>
-        </div>
-      </div>
-    </>
-  );
-}
 
 // ─── TAB: RESUMEN (sin tabla de Carga de trabajo, movida a Capacidad) ─────────
 
@@ -2177,6 +2063,8 @@ function FilterBar({
 function DashboardAdmin() {
   const [activeTab, setActiveTab] = useState<DashTab>('resumen');
   const [panelFilter, setPanelFilter] = useState<PanelFilter | null>(null);
+  const [panelRows, setPanelRows] = useState<PanelRow[]>([]);
+  const [loadingPanel, setLoadingPanel] = useState(false);
   const [stats, setStats]       = useState<DashboardStats | null>(null);
   const [health, setHealth]     = useState<HealthReport | null>(null);
   const [capacity, setCapacity] = useState<{ summary: CapacitySummary; users: CapacityUser[] } | null>(null);
@@ -2184,6 +2072,119 @@ function DashboardAdmin() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filters, setFilters]   = useState<DashFilters>(EMPTY_FILTERS);
+
+  const fetchRows = useCallback(async (f: PanelFilter) => {
+    setLoadingPanel(true);
+    try {
+      let endpoint = '/deliverables';
+      const params: Record<string, string> = {};
+
+      if (filters.programId) params['program_id'] = filters.programId;
+      if (filters.responsibleId) params['responsible_id'] = filters.responsibleId;
+      if (filters.role) params['role'] = filters.role;
+      if (filters.year) params['year'] = filters.year;
+      if (filters.month) params['month'] = filters.month;
+
+      if (f === 'active_projects') {
+        endpoint = '/projects';
+      } else if (f === 'programs') {
+        endpoint = '/programs';
+      } else if (f === 'overdue' || f === 'approaching') {
+        endpoint = '/deliverables';
+      } else if (f === 'with_observations') {
+        params['global_status'] = 'with_observations';
+      } else if (f.startsWith('status_')) {
+        params['global_status'] = f.replace('status_', '');
+      } else if (f.startsWith('role_')) {
+        params['role'] = f.replace('role_', '');
+      }
+
+      const query = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+      const data = await api.get<any[]>(endpoint + query);
+
+      if (Array.isArray(data)) {
+        if (f === 'active_projects') {
+          setPanelRows(data.map((item, idx) => ({
+            id: item.id ?? idx,
+            name: item.name ?? '—',
+            responsible: item.responsible?.name ?? '—',
+          })));
+        } else if (f === 'programs') {
+          setPanelRows(data.map((item, idx) => ({
+            id: item.id ?? idx,
+            name: item.name ?? '—',
+            program: item.project?.name ?? '—',
+          })));
+        } else if (f === 'overdue' || f === 'approaching') {
+          const list: PanelRow[] = [];
+          for (const d of data) {
+            const acts = d.role_activities ?? [];
+            for (const act of acts) {
+              const matchesFilter = f === 'overdue'
+                ? isPastDue(act.commitment_date, act.status)
+                : isApproaching(act.commitment_date, act.status);
+              
+              if (matchesFilter) {
+                const diffTime = act.commitment_date
+                  ? new Date(act.commitment_date + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)
+                  : 0;
+                const daysDiff = Math.round(diffTime / 86400000);
+
+                list.push({
+                  id: act.id ?? `${d.id}_${act.role}`,
+                  name: `${d.subject_name ?? '—'} / ${d.name ?? '—'} (${ROLE_LABELS[act.role as keyof typeof ROLE_LABELS] ?? act.role})`,
+                  responsible: act.responsible?.name ?? '—',
+                  program: d.program_name ?? '—',
+                  subject: d.subject_name ?? '—',
+                  commitment_date: act.commitment_date,
+                  days_diff: daysDiff,
+                  status: act.status,
+                  role: act.role,
+                });
+              }
+            }
+          }
+          setPanelRows(list);
+        } else {
+          setPanelRows(data.map((item, idx) => {
+            const acts = item.role_activities ?? [];
+            let responsibleName = '—';
+            if (f.startsWith('role_')) {
+              const targetRole = f.replace('role_', '');
+              const act = acts.find((a: any) => a.role === targetRole);
+              if (act?.responsible) responsibleName = act.responsible.name;
+            } else if (filters.role) {
+              const act = acts.find((a: any) => a.role === filters.role);
+              if (act?.responsible) responsibleName = act.responsible.name;
+            } else {
+              const activeAct = acts.find((a: any) => a.status === 'in_progress' || a.status === 'delivered' || a.status === 'in_review');
+              if (activeAct?.responsible) responsibleName = activeAct.responsible.name;
+              else if (acts[0]?.responsible) responsibleName = acts[0].responsible.name;
+            }
+
+            return {
+              id: item.id ?? idx,
+              name: item.name ?? '—',
+              responsible: responsibleName,
+              program: item.program_name ?? '—',
+              subject: item.subject_name ?? '—',
+              commitment_date: item.start_date ?? undefined,
+            };
+          }));
+        }
+      } else {
+        setPanelRows([]);
+      }
+    } catch {
+      setPanelRows([]);
+    } finally {
+      setLoadingPanel(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    if (panelFilter) fetchRows(panelFilter);
+  }, [panelFilter, fetchRows]);
 
   useEffect(() => {
     Promise.all([
@@ -2260,7 +2261,27 @@ function DashboardAdmin() {
         {activeTab === 'reportes'    && <TabReportes stats={stats} health={health} />}
       </div>
 
-      <SlidingPanel filter={panelFilter} onClose={() => setPanelFilter(null)} />
+      <FilteredDetailPanel
+        isOpen={panelFilter !== null}
+        title={(() => {
+          if (!panelFilter) return '';
+          const map: Record<string, string> = {
+            active_projects: 'Proyectos Activos',
+            programs: 'Programas Académicos',
+            total_deliverables: 'Total Entregables',
+            overdue: 'Actividades Vencidas',
+            approaching: 'Por Vencer',
+            with_observations: 'Con Observaciones',
+          };
+          if (map[panelFilter]) return map[panelFilter];
+          if (panelFilter.startsWith('status_')) return STATUS_INFO[panelFilter.replace('status_', '')]?.label ?? panelFilter;
+          if (panelFilter.startsWith('role_'))   return `Rol: ${ROLE_LABELS[panelFilter.replace('role_', '') as keyof typeof ROLE_LABELS] ?? panelFilter}`;
+          return panelFilter;
+        })()}
+        rows={panelRows}
+        loading={loadingPanel}
+        onClose={() => setPanelFilter(null)}
+      />
     </>
   );
 }

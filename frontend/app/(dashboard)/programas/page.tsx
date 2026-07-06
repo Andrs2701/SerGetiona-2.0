@@ -8,6 +8,8 @@ import type { AcademicProgram, Deliverable, DashboardStats, ProgramBreakdown, Ro
 import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+import FilteredDetailPanel, { PanelRow } from '@/components/FilteredDetailPanel';
+import { isPastDue, isApproaching } from '@/lib/dateStatus';
 
 // ─── Role columns ─────────────────────────────────────────────────────────────
 const ROLE_COLS: Array<{ key: Role; abbr: string }> = [
@@ -168,14 +170,22 @@ function QuickCard({
   value,
   sub,
   colorClass,
+  onClick,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   colorClass: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 min-w-[140px]">
+    <div
+      onClick={onClick}
+      className={clsx(
+        "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex-1 min-w-[140px]",
+        onClick && "cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/80 hover:shadow-sm transition-all"
+      )}
+    >
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       <p className={clsx('text-2xl font-bold', colorClass)}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
@@ -318,6 +328,84 @@ function ProgramDetail({
   deliverables: Deliverable[];
   loading: boolean;
 }) {
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTitle, setPanelTitle] = useState('');
+  const [panelRows, setPanelRows] = useState<PanelRow[]>([]);
+  const [panelLoading, setPanelLoading] = useState(false);
+
+  const handleCardClick = async (type: 'avance' | 'vencidos' | 'activos' | 'prox') => {
+    setPanelOpen(true);
+    setPanelLoading(true);
+    
+    let title = '';
+    if (type === 'avance') title = `Entregables — ${pb.name}`;
+    else if (type === 'vencidos') title = `Actividades Vencidas — ${pb.name}`;
+    else if (type === 'activos') title = `Actividades Activas — ${pb.name}`;
+    else if (type === 'prox') title = `Actividades Próximas a Vencer — ${pb.name}`;
+    setPanelTitle(title);
+
+    try {
+      const data = await api.get<any[]>(`/deliverables?program_id=${pb.id}`);
+      if (Array.isArray(data)) {
+        if (type === 'avance') {
+          setPanelRows(data.map((item, idx) => {
+            const acts = item.role_activities ?? [];
+            const activeAct = acts.find((a: any) => a.status === 'in_progress' || a.status === 'delivered' || a.status === 'in_review');
+            return {
+              id: item.id ?? idx,
+              name: item.name ?? '—',
+              responsible: activeAct?.responsible?.name ?? acts[0]?.responsible?.name ?? '—',
+              program: item.program_name ?? '—',
+              subject: item.subject_name ?? '—',
+              commitment_date: item.start_date ?? undefined,
+            };
+          }));
+        } else {
+          const list: PanelRow[] = [];
+          for (const d of data) {
+            const acts = d.role_activities ?? [];
+            for (const act of acts) {
+              let matches = false;
+              if (type === 'vencidos') {
+                matches = isPastDue(act.commitment_date, act.status);
+              } else if (type === 'activos') {
+                matches = !['approved', 'not_applicable', 'not_started'].includes(act.status);
+              } else if (type === 'prox') {
+                matches = isApproaching(act.commitment_date, act.status);
+              }
+
+              if (matches) {
+                const diffTime = act.commitment_date
+                  ? new Date(act.commitment_date + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)
+                  : 0;
+                const daysDiff = Math.round(diffTime / 86400000);
+
+                list.push({
+                  id: act.id ?? `${d.id}_${act.role}`,
+                  name: `${d.subject_name ?? '—'} / ${d.name ?? '—'} (${ROLE_LABELS[act.role as keyof typeof ROLE_LABELS] ?? act.role})`,
+                  responsible: act.responsible?.name ?? '—',
+                  program: d.program_name ?? '—',
+                  subject: d.subject_name ?? '—',
+                  commitment_date: act.commitment_date,
+                  days_diff: daysDiff,
+                  status: act.status,
+                  role: act.role,
+                });
+              }
+            }
+          }
+          setPanelRows(list);
+        }
+      } else {
+        setPanelRows([]);
+      }
+    } catch {
+      setPanelRows([]);
+    } finally {
+      setPanelLoading(false);
+    }
+  };
+
   const pct = Math.round(pb.compliance_percentage ?? 0);
   const nearest = useMemo(() => {
     const today = new Date();
@@ -385,10 +473,10 @@ function ProgramDetail({
 
       {/* Quick indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <QuickCard label="% Avance" value={`${pct}%`} colorClass={complianceText(pct)} />
-        <QuickCard label="Vencidos" value={pb.overdue_count} colorClass="text-red-600" />
-        <QuickCard label="Activos" value={pb.active_count} colorClass="text-blue-600" />
-        <QuickCard label="Próx. vencer" value={nearest} colorClass="text-amber-600" />
+        <QuickCard label="% Avance" value={`${pct}%`} colorClass={complianceText(pct)} onClick={() => handleCardClick('avance')} />
+        <QuickCard label="Vencidos" value={pb.overdue_count} colorClass="text-red-600" onClick={() => handleCardClick('vencidos')} />
+        <QuickCard label="Activos" value={pb.active_count} colorClass="text-blue-600" onClick={() => handleCardClick('activos')} />
+        <QuickCard label="Próx. vencer" value={nearest} colorClass="text-amber-600" onClick={() => handleCardClick('prox')} />
       </div>
 
       {/* Bottlenecks */}
@@ -513,6 +601,13 @@ function ProgramDetail({
           </div>
         )}
       </div>
+      <FilteredDetailPanel
+        isOpen={panelOpen}
+        title={panelTitle}
+        rows={panelRows}
+        loading={panelLoading}
+        onClose={() => setPanelOpen(false)}
+      />
     </div>
   );
 }
