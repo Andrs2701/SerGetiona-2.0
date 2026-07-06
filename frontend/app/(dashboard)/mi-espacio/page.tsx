@@ -1020,6 +1020,7 @@ export default function MiEspacioPage() {
   const [filterSubject, setFilterSubject] = useState('');
   const [filterStatus, setFilterStatus]   = useState<StatusFilter>('');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showFinishedDecisions, setShowFinishedDecisions] = useState(false);
 
   const loadWorkspace = useCallback(() => {
     api.get<Workspace>(ENDPOINTS.MY_WORKSPACE)
@@ -1187,21 +1188,44 @@ export default function MiEspacioPage() {
         </div>
 
         {/* Decisiones asignadas a mí — solo roles no admin/coordinador */}
-        {!isManager && !!workspace?.decisions?.length && (
-          <div className="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-violet-100 bg-violet-100/50 flex items-center gap-2">
-              <Shield size={15} className="text-violet-600" />
-              <h3 className="font-semibold text-violet-900 text-sm">
-                Decisiones asignadas a mí ({workspace.decisions.length})
-              </h3>
+        {!isManager && !!workspace?.decisions?.length && (() => {
+          const totalDecisions = workspace.decisions;
+          const activeDecisions = totalDecisions.filter(d => d.status === 'pending' || d.status === 'in_progress');
+          const finishedDecisions = totalDecisions.filter(d => d.status === 'implemented' || d.status === 'cancelled');
+          const visibleDecisions = showFinishedDecisions ? totalDecisions : activeDecisions;
+
+          return (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-violet-100 bg-violet-100/50 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Shield size={15} className="text-violet-600" />
+                  <h3 className="font-semibold text-violet-900 text-sm">
+                    Decisiones asignadas a mí ({activeDecisions.length} activas / {totalDecisions.length} total)
+                  </h3>
+                </div>
+                {finishedDecisions.length > 0 && (
+                  <button
+                    onClick={() => setShowFinishedDecisions(prev => !prev)}
+                    className="text-xs text-violet-700 hover:text-violet-900 hover:underline font-semibold transition-colors"
+                  >
+                    {showFinishedDecisions ? 'Ocultar finalizadas' : `Ver finalizadas (${finishedDecisions.length})`}
+                  </button>
+                )}
+              </div>
+              <div className="divide-y divide-violet-100">
+                {visibleDecisions.length > 0 ? (
+                  visibleDecisions.map(d => (
+                    <DecisionMiniCard key={d.id} decision={d} onStatusChange={handleDecisionStatusChange} />
+                  ))
+                ) : (
+                  <p className="text-xs text-violet-600 py-4 px-4 text-center font-medium italic">
+                    No tienes decisiones activas pendientes de implementar.
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="divide-y divide-violet-100">
-              {workspace.decisions.map(d => (
-                <DecisionMiniCard key={d.id} decision={d} onStatusChange={handleDecisionStatusChange} />
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* KPI pills + completed toggle */}
         <div className="flex flex-wrap items-center gap-2">
