@@ -4,7 +4,7 @@ import { Fragment, useState, useEffect, useCallback, use } from 'react';
 import { clsx } from 'clsx';
 import { Search, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType } from '@/lib/types';
+import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType, RoleStatus } from '@/lib/types';
 import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
@@ -22,17 +22,11 @@ type Role = RoleType;
 
 const ROLES: Role[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
 
-const MANAGER_ONLY_STATUSES = ['approved', 'not_applicable'];
-
-// Role-specific status options
-const ROLE_STATES: Record<string, string[]> = {
-  expert:      ['not_started', 'draft', 'in_development', 'delivered', 'adjustments_requested', 'approved', 'not_applicable'],
-  pedagogy:    ['not_started', 'in_progress', 'in_review', 'adjusting', 'delivered', 'approved', 'not_applicable'],
-  design:      ['not_started', 'designing', 'adjusting', 'delivered', 'approved', 'not_applicable'],
-  audiovisual: ['not_started', 'production', 'editing', 'delivered', 'approved', 'not_applicable'],
-  engineering: ['not_started', 'implementing', 'validating', 'delivered', 'approved', 'not_applicable'],
-  qa:          ['pending', 'in_testing', 'with_findings', 'approved', 'not_applicable'],
-};
+// Solo "approved" requiere admin/coordinador — coincide con lo que ya exige el
+// backend en RoleActivityController::update() (abort_if de "No puedes aprobar
+// tu propia actividad"). "not_applicable" quedaba restringido aquí antes por
+// error, desincronizado del backend y de Mi Espacio.
+const MANAGER_ONLY_STATUSES = ['approved'];
 
 const PROGRAM_HEADER_COLORS = [
   'bg-indigo-100 text-indigo-800',
@@ -117,6 +111,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showImport, setShowImport] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<'info' | 'flow' | 'evidence' | 'comments'>('info');
   const [loadError, setLoadError] = useState(false);
+  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
+
+  useEffect(() => {
+    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
+      .then((res) => setRoleStatuses(res.role_statuses ?? []))
+      .catch(() => setRoleStatuses([]));
+  }, []);
 
   const loadDeliverables = useCallback(() => {
     api.get<Deliverable[]>(ENDPOINTS.PROJECT_DELIVERABLES(projectId))
@@ -257,10 +258,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const proj = project;
-  const roleStates = selectedActivity
-    ? (ROLE_STATES[selectedActivity.activity.role] ?? Object.keys(ROLE_STATUS_LABELS))
-        .filter((s) => isManager || !MANAGER_ONLY_STATUSES.includes(s))
-    : [];
+  const roleStates = (() => {
+    if (!selectedActivity) return [];
+    const associated = roleStatuses
+      .filter((rs) => rs.role === selectedActivity.activity.role)
+      .map((rs) => rs.status_slug);
+    const allStates = associated.length > 0 ? associated : Object.keys(ROLE_STATUS_LABELS);
+    return allStates.filter((s) => isManager || !MANAGER_ONLY_STATUSES.includes(s));
+  })();
   const flowSteps = selectedActivity ? buildFlowSteps(selectedActivity.deliverable) : [];
 
   return (

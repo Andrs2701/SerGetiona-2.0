@@ -95,6 +95,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tipos de recurso por rol — lectura abierta, gestión solo admin
     Route::get('resource-types', [ResourceTypeController::class, 'index']);
 
+    // Estados por rol — lectura abierta (Mi Espacio los necesita para cualquier rol), gestión solo admin
+    Route::get('config/role-statuses', [SystemConfigurationController::class, 'getRoleStatuses']);
+
     // Registros de producción por actividad
     Route::get('activities/{activity}/production', [ProductionLogController::class, 'byActivity']);
     Route::post('activities/{activity}/production', [ProductionLogController::class, 'store']);
@@ -125,7 +128,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('config/statuses/{id}', [SystemConfigurationController::class, 'updateStatus']);
         Route::delete('config/statuses/{id}', [SystemConfigurationController::class, 'destroyStatus']);
 
-        Route::get('config/role-statuses', [SystemConfigurationController::class, 'getRoleStatuses']);
         Route::post('config/role-statuses', [SystemConfigurationController::class, 'storeRoleStatus']);
         Route::delete('config/role-statuses/{id}', [SystemConfigurationController::class, 'destroyRoleStatus']);
 

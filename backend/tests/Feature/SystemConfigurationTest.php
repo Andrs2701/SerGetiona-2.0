@@ -264,4 +264,24 @@ class SystemConfigurationTest extends TestCase
             'status_slug' => 'custom_status',
         ]);
     }
+
+    public function test_any_authenticated_role_can_read_role_statuses_but_not_write(): void
+    {
+        // Mi Espacio y la página de proyecto necesitan leer esto para CUALQUIER
+        // rol operativo, no solo admin — de lo contrario el selector de estado
+        // cae en la lista completa de estados de todos los roles mezclados.
+        $expert = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        $this->actingAs($expert, 'sanctum')
+            ->getJson('/api/config/role-statuses')
+            ->assertStatus(200);
+
+        $this->actingAs($expert, 'sanctum')
+            ->postJson('/api/config/role-statuses', ['role' => 'expert', 'status_slug' => 'not_started'])
+            ->assertStatus(403);
+
+        $this->actingAs($expert, 'sanctum')
+            ->deleteJson('/api/config/role-statuses/1')
+            ->assertStatus(403);
+    }
 }
