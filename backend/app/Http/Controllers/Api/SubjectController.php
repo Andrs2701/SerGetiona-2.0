@@ -39,7 +39,17 @@ class SubjectController extends Controller
 
         $data['created_by'] = $request->user()->id;
 
-        $subject = Subject::create($data);
+        $subject = Subject::firstOrCreate(
+            [
+                'name' => $data['name'],
+                'academic_program_id' => (int) $data['academic_program_id']
+            ],
+            [
+                'code' => $data['code'] ?? null,
+                'credits' => $data['credits'] ?? null,
+                'created_by' => $data['created_by']
+            ]
+        );
 
         return response()->json($subject->load('academicProgram', 'creator'), 201);
     }

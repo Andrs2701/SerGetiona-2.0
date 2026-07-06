@@ -10,6 +10,8 @@ use App\Models\Project;
 use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
 
+use Illuminate\Validation\Rule;
+
 class ProjectController extends Controller
 {
     private const OPERATIONAL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
@@ -51,7 +53,12 @@ class ProjectController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('projects', 'name')->whereNull('deleted_at')
+            ],
             'description' => 'nullable|string',
             'status' => 'nullable|in:draft,pending_params,parameterized,in_progress,suspended,finished,cancelled',
             'responsible_id' => 'nullable|exists:users,id',

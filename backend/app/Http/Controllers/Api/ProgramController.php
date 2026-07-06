@@ -39,7 +39,17 @@ class ProgramController extends Controller
 
         $data['created_by'] = $request->user()->id;
 
-        $program = AcademicProgram::create($data);
+        $program = AcademicProgram::firstOrCreate(
+            [
+                'name' => $data['name'],
+                'project_id' => (int) $data['project_id']
+            ],
+            [
+                'code' => $data['code'] ?? null,
+                'description' => $data['description'] ?? null,
+                'created_by' => $data['created_by']
+            ]
+        );
 
         return response()->json($program->load('project', 'creator'), 201);
     }

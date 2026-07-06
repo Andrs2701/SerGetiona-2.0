@@ -53,8 +53,9 @@ function roleActivityCircle(status: string): string {
 
 function isOverdue(act: RoleActivity): boolean {
   if (!act.commitment_date) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   return (
-    new Date(act.commitment_date) < new Date() &&
+    new Date(act.commitment_date + 'T00:00:00') < today &&
     act.status !== 'approved' &&
     act.status !== 'not_applicable'
   );
