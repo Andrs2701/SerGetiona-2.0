@@ -95,6 +95,8 @@ function formatLastActive(seconds?: number | null, iso?: string | null): string 
 export default function UsuariosPage() {
   const { user } = useAuthContext();
   const router = useRouter();
+  
+  const isManagement = user?.role === 'admin';
 
   const [data, setData] = useState<User[]>([]);
   const [dataLoadedAt, setDataLoadedAt] = useState(Date.now());
@@ -139,7 +141,7 @@ export default function UsuariosPage() {
   }, []);
 
   useEffect(() => {
-    if (user && user.role !== 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'coordinator') {
       router.replace('/');
       return;
     }
@@ -157,7 +159,7 @@ export default function UsuariosPage() {
 
   // Polling cada 30s
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!user || (user.role !== 'admin' && user.role !== 'coordinator')) return;
     const interval = setInterval(fetchUsersSilent, 30000);
     return () => clearInterval(interval);
   }, [user, fetchUsersSilent]);
@@ -354,13 +356,15 @@ export default function UsuariosPage() {
         subtitle="Gestión de usuarios del sistema"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Usuarios' }]}
         actions={
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus size={16} />
-            Nuevo Usuario
-          </button>
+          isManagement ? (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Plus size={16} />
+              Nuevo Usuario
+            </button>
+          ) : undefined
         }
       />
 
@@ -418,7 +422,9 @@ export default function UsuariosPage() {
                       <SortHeader field="last_active_at" label="Último Acceso" />
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
+                    {isManagement && (
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -457,10 +463,12 @@ export default function UsuariosPage() {
                       </td>
                       <td className="px-5 py-3">
                         <button
-                          onClick={() => toggleActive(u)}
+                          onClick={() => isManagement && toggleActive(u)}
+                          disabled={!isManagement}
                           className={clsx(
                             'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                            u.is_active ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'
+                            u.is_active ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700',
+                            !isManagement && 'opacity-60 cursor-not-allowed'
                           )}
                         >
                           <span
@@ -471,29 +479,31 @@ export default function UsuariosPage() {
                           />
                         </button>
                       </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => openEdit(u)}
-                            className="text-gray-400 hover:text-indigo-600 transition-colors"
-                            title="Editar usuario"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleGenerateResetLink(u)}
-                            className="text-gray-400 hover:text-indigo-600 transition-colors"
-                            title="Generar enlace de acceso"
-                          >
-                            <KeyRound size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      {isManagement && (
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEdit(u)}
+                              className="text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="Editar usuario"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleGenerateResetLink(u)}
+                              className="text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="Generar enlace de acceso"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-gray-400 italic">
+                      <td colSpan={isManagement ? 6 : 5} className="px-5 py-8 text-center text-gray-400 italic">
                         No se encontraron usuarios coincidentes.
                       </td>
                     </tr>

@@ -83,7 +83,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     href: '/usuarios',
     label: 'Usuarios',
     icon: Users,
-    roles: ['admin'],
+    roles: ['admin', 'coordinator'],
   },
   {
     href: '/configuracion',
