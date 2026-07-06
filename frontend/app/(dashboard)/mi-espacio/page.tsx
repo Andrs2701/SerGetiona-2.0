@@ -13,6 +13,8 @@ import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, Resourc
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
+import Modal from '@/components/Modal';
+import { AlertCircle } from 'lucide-react';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -958,9 +960,7 @@ function ProgramGroup({
 
 // ─── Decisiones asignadas a mí ────────────────────────────────────────────────
 
-function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionRecord; onStatusChange: (id: number, status: DecisionStatus) => void }) {
-  const [expanded, setExpanded] = useState(false);
-
+function DecisionMiniCard({ decision, onStatusChange, onViewDetails }: { decision: DecisionRecord; onStatusChange: (id: number, status: DecisionStatus) => void; onViewDetails: (d: DecisionRecord) => void }) {
   const overdue = !!decision.due_date
     && decision.status !== 'implemented' && decision.status !== 'cancelled'
     && daysDiff(decision.due_date.slice(0, 10)) < 0;
@@ -981,11 +981,8 @@ function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionReco
             )}
           </div>
           <p 
-            onClick={() => setExpanded(!expanded)}
-            className={clsx(
-              "text-sm font-medium text-gray-900 leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1",
-              !expanded && "line-clamp-2"
-            )}
+            onClick={() => onViewDetails(decision)}
+            className="text-sm font-medium text-gray-900 leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1 line-clamp-2"
             title="Haz clic para ver todos los detalles"
           >
             {decision.description}
@@ -1005,13 +1002,6 @@ function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionReco
         )}
       </div>
 
-      {expanded && decision.observations && (
-        <div className="bg-white/80 rounded-lg p-2.5 text-xs text-gray-600 border border-violet-100/60 leading-relaxed animate-in fade-in duration-200">
-          <strong className="text-gray-700 block mb-0.5">Observaciones:</strong>
-          {decision.observations}
-        </div>
-      )}
-
       <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
         <div className="flex items-center gap-3">
           {decision.due_date && (
@@ -1021,10 +1011,10 @@ function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionReco
             </span>
           )}
           <button 
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => onViewDetails(decision)}
             className="text-[11px] text-violet-700 hover:text-violet-900 font-semibold hover:underline"
           >
-            {expanded ? 'Ocultar detalles' : 'Ver detalles'}
+            Ver detalles
           </button>
         </div>
 
@@ -1063,6 +1053,7 @@ export default function MiEspacioPage() {
   const [filterStatus, setFilterStatus]   = useState<StatusFilter>('');
   const [showCompleted, setShowCompleted] = useState(false);
   const [showFinishedDecisions, setShowFinishedDecisions] = useState(false);
+  const [viewingDecisionDetail, setViewingDecisionDetail] = useState<DecisionRecord | null>(null);
 
   const loadWorkspace = useCallback(() => {
     api.get<Workspace>(ENDPOINTS.MY_WORKSPACE)
@@ -1257,7 +1248,7 @@ export default function MiEspacioPage() {
               <div className="divide-y divide-violet-100">
                 {visibleDecisions.length > 0 ? (
                   visibleDecisions.map(d => (
-                    <DecisionMiniCard key={d.id} decision={d} onStatusChange={handleDecisionStatusChange} />
+                    <DecisionMiniCard key={d.id} decision={d} onStatusChange={handleDecisionStatusChange} onViewDetails={setViewingDecisionDetail} />
                   ))
                 ) : (
                   <p className="text-xs text-violet-600 py-4 px-4 text-center font-medium italic">
@@ -1400,6 +1391,105 @@ export default function MiEspacioPage() {
           )}
         </div>
       </div>
+
+      {/* Modal de Detalles de la Decisión */}
+      <DecisionDetailModal 
+        decision={viewingDecisionDetail}
+        open={!!viewingDecisionDetail}
+        onClose={() => setViewingDecisionDetail(null)}
+      />
     </>
+  );
+}
+
+function DecisionDetailModal({ decision, open, onClose }: { decision: DecisionRecord | null; open: boolean; onClose: () => void }) {
+  if (!decision) return null;
+
+  const overdue = !!decision.due_date
+    && decision.status !== 'implemented' && decision.status !== 'cancelled'
+    && daysDiff(decision.due_date.slice(0, 10)) < 0;
+
+  return (
+    <Modal open={open} onClose={onClose} title="Detalles de la Decisión" size="md">
+      <div className="space-y-4">
+        {/* Alerta de Vencimiento */}
+        {overdue && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2.5 text-sm text-red-700 animate-pulse">
+            <AlertCircle className="shrink-0 mt-0.5" size={16} />
+            <div>
+              <p className="font-semibold">Esta decisión está vencida</p>
+              <p className="text-xs text-red-600 mt-0.5">La fecha límite era el {formatDate(decision.due_date!.slice(0, 10))}.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <span className="text-gray-400 block font-semibold">Estado</span>
+            <span className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1',
+              decision.status === 'implemented' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+              decision.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+              decision.status === 'cancelled' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+              'bg-amber-50 text-amber-700 border border-amber-100'
+            )}>
+              {DECISION_STATUS_LABELS[decision.status]}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Impacto</span>
+            <span className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1',
+              decision.impact === 'high' ? 'bg-red-50 text-red-700 border border-red-100' :
+              decision.impact === 'medium' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+              'bg-gray-100 text-gray-700 border border-gray-200'
+            )}>
+              {DECISION_IMPACT_LABELS[decision.impact]}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Creada por</span>
+            <span className="font-medium text-gray-800 mt-1 block">{decision.creator?.name ?? 'Administrador General'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Responsable asignado</span>
+            <span className="font-medium text-gray-800 mt-1 block">{decision.responsible?.name ?? '—'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Fecha de Decisión</span>
+            <span className="font-medium text-gray-800 mt-1 block">{decision.decision_date ? formatDate(decision.decision_date.slice(0, 10)) : '—'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Fecha Límite</span>
+            <span className="font-medium text-gray-800 mt-1 block">{decision.due_date ? formatDate(decision.due_date.slice(0, 10)) : 'Sin límite'}</span>
+          </div>
+        </div>
+
+        {decision.project?.name && (
+          <div className="text-xs">
+            <span className="text-gray-400 block mb-1 font-semibold">Proyecto relacionado</span>
+            <span className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg font-medium">
+              {decision.project.name}
+            </span>
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 pt-3">
+          <span className="text-xs text-gray-400 block mb-1 font-semibold">Descripción / Contexto</span>
+          <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+            {decision.description}
+          </div>
+        </div>
+
+        {decision.observations && (
+          <div className="border-t border-gray-100 pt-3">
+            <span className="text-xs text-gray-400 block mb-1 font-semibold">Observaciones / Motivo de cambio</span>
+            <div className="bg-violet-50/50 border border-violet-100/50 rounded-lg p-3 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+              {decision.observations}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }

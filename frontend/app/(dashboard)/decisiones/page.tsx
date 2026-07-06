@@ -96,11 +96,21 @@ export default function DecisionesPage() {
   const [form, setForm]               = useState<DecisionForm>(emptyForm);
   const [saving, setSaving]           = useState(false);
   const [formError, setFormError]     = useState('');
-  const [showInfo, setShowInfo] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
+  const [showInfo, setShowInfo] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sergestiona_decisions_show_info');
+      return stored === 'true';
+    }
+    return false;
+  });
+  const [viewingDetailRecord, setViewingDetailRecord] = useState<DecisionRecord | null>(null);
 
-  const toggleExpand = (id: number) => {
-    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  const handleToggleInfo = () => {
+    setShowInfo(prev => {
+      const next = !prev;
+      localStorage.setItem('sergestiona_decisions_show_info', String(next));
+      return next;
+    });
   };
 
   const [projects, setProjects]       = useState<Project[]>([]);
@@ -244,7 +254,7 @@ export default function DecisionesPage() {
         actions={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowInfo(!showInfo)}
+              onClick={handleToggleInfo}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             >
               {showInfo ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -429,40 +439,21 @@ export default function DecisionesPage() {
                         )}
                       </div>
                       <p 
-                        onClick={() => toggleExpand(rec.id)}
-                        className={clsx(
-                          "text-gray-900 font-medium leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1",
-                          !expandedIds[rec.id] && "line-clamp-2"
-                        )}
-                        title="Haz clic para ver más detalles"
+                        onClick={() => setViewingDetailRecord(rec)}
+                        className="text-gray-900 font-medium leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1 line-clamp-2"
+                        title="Haz clic para ver todos los detalles"
                       >
                         {rec.description}
                       </p>
                       {rec.observations && (
                         <p 
-                          onClick={() => toggleExpand(rec.id)}
-                          className={clsx(
-                            "text-xs text-gray-400 mt-1 cursor-pointer hover:text-indigo-600 transition-colors leading-relaxed",
-                            !expandedIds[rec.id] && "truncate"
-                          )}
-                          title="Haz clic para ver más detalles"
+                          onClick={() => setViewingDetailRecord(rec)}
+                          className="text-xs text-gray-400 mt-1 cursor-pointer hover:text-indigo-600 transition-colors truncate"
+                          title="Haz clic para ver todos los detalles"
                         >
-                          {expandedIds[rec.id] ? (
-                            <>
-                              <strong className="text-gray-600 dark:text-gray-400 block mb-0.5">Observaciones:</strong>
-                              {rec.observations}
-                            </>
-                          ) : (
-                            rec.observations
-                          )}
+                          {rec.observations}
                         </p>
                       )}
-                      <button
-                        onClick={() => toggleExpand(rec.id)}
-                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline mt-1 block"
-                      >
-                        {expandedIds[rec.id] ? 'Ver menos' : 'Ver más'}
-                      </button>
                     </td>
                     <td className="px-5 py-4 hidden md:table-cell">
                       {rec.project?.name
@@ -650,6 +641,111 @@ export default function DecisionesPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal de Detalles de la Decisión */}
+      <DecisionDetailModal 
+        decision={viewingDetailRecord}
+        open={!!viewingDetailRecord}
+        onClose={() => setViewingDetailRecord(null)}
+      />
     </div>
   );
+}
+
+function DecisionDetailModal({ decision, open, onClose }: { decision: DecisionRecord | null; open: boolean; onClose: () => void }) {
+  if (!decision) return null;
+
+  const overdue = !!decision.due_date
+    && decision.status !== 'implemented' && decision.status !== 'cancelled'
+    && new Date(decision.due_date.slice(0, 10) + 'T12:00:00') < new Date();
+
+  return (
+    <Modal open={open} onClose={onClose} title="Detalles de la Decisión" size="md">
+      <div className="space-y-4">
+        {/* Alerta de Vencimiento */}
+        {overdue && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2.5 text-sm text-red-700 animate-pulse">
+            <AlertCircle className="shrink-0 mt-0.5" size={16} />
+            <div>
+              <p className="font-semibold">Esta decisión está vencida</p>
+              <p className="text-xs text-red-600 mt-0.5">La fecha límite era el {formatDate(decision.due_date!.slice(0, 10))}.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <span className="text-gray-400 block font-semibold">Estado</span>
+            <span className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1',
+              decision.status === 'implemented' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+              decision.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+              decision.status === 'cancelled' ? 'bg-gray-100 text-gray-700 border border-gray-200' :
+              'bg-amber-50 text-amber-700 border border-amber-100'
+            )}>
+              {DECISION_STATUS_LABELS[decision.status]}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Impacto</span>
+            <span className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold mt-1',
+              decision.impact === 'high' ? 'bg-red-50 text-red-700 border border-red-100' :
+              decision.impact === 'medium' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+              'bg-gray-100 text-gray-700 border border-gray-200'
+            )}>
+              {DECISION_IMPACT_LABELS[decision.impact]}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Creada por</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200 mt-1 block">{decision.creator?.name ?? 'Administrador General'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Responsable asignado</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200 mt-1 block">{decision.responsible?.name ?? '—'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Fecha de Decisión</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200 mt-1 block">{decision.decision_date ? formatDate(decision.decision_date.slice(0, 10)) : '—'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block font-semibold">Fecha Límite</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200 mt-1 block">{decision.due_date ? formatDate(decision.due_date.slice(0, 10)) : 'Sin límite'}</span>
+          </div>
+        </div>
+
+        {decision.project?.name && (
+          <div className="text-xs">
+            <span className="text-gray-400 block mb-1 font-semibold">Proyecto relacionado</span>
+            <span className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg font-medium">
+              {decision.project.name}
+            </span>
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+          <span className="text-xs text-gray-400 block mb-1 font-semibold">Descripción / Contexto</span>
+          <div className="bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg p-3 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+            {decision.description}
+          </div>
+        </div>
+
+        {decision.observations && (
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+            <span className="text-xs text-gray-400 block mb-1 font-semibold">Observaciones / Motivo de cambio</span>
+            <div className="bg-violet-50/50 dark:bg-violet-950/10 border border-violet-100/50 dark:border-violet-900/30 rounded-lg p-3 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+              {decision.observations}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function formatDate(d: string) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-CO', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
 }
