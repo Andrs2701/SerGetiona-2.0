@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Search, Edit2, Trash2, ClipboardList, Info, CheckCircle2, Clock, AlertCircle, XCircle, Shield, Eye, Bell, UserCog, ChevronRight } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ClipboardList, Info, CheckCircle2, Clock, AlertCircle, XCircle, Shield, Eye, EyeOff, Bell, UserCog, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -96,6 +96,12 @@ export default function DecisionesPage() {
   const [form, setForm]               = useState<DecisionForm>(emptyForm);
   const [saving, setSaving]           = useState(false);
   const [formError, setFormError]     = useState('');
+  const [showInfo, setShowInfo] = useState(true);
+  const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const [projects, setProjects]       = useState<Project[]>([]);
   const [users, setUsers]             = useState<User[]>([]);
@@ -236,71 +242,81 @@ export default function DecisionesPage() {
         subtitle="Seguimiento de decisiones clave del equipo de producción académica"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Decisiones' }]}
         actions={
-          <button
-            onClick={openNew}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus size={16} /> Nueva Decisión
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowInfo(!showInfo)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
+            >
+              {showInfo ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showInfo ? 'Ocultar info' : 'Ver info'}
+            </button>
+            <button
+              onClick={openNew}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Plus size={16} /> Nueva Decisión
+            </button>
+          </div>
         }
       />
 
       {/* ── Gobernanza: Permisos + Flujo ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-
-        {/* Matriz de permisos */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Shield size={15} className="text-indigo-500" />
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Permisos del módulo</h3>
-          </div>
-          <div className="space-y-2.5">
-            {[
-              { icon: Plus,     label: 'Crear y editar',  who: 'Administrador · Coordinador', color: 'text-indigo-600 dark:text-indigo-400' },
-              { icon: Eye,      label: 'Visualizar',      who: 'Admin · Coordinador · Stakeholders del proyecto', color: 'text-blue-600 dark:text-blue-400' },
-              { icon: UserCog,  label: 'Aprobar / cerrar', who: 'Administrador (impacto alto) · Coordinador (resto)', color: 'text-emerald-600 dark:text-emerald-400' },
-              { icon: Bell,     label: 'Notificaciones',  who: 'Responsable asignado · Equipo del proyecto', color: 'text-amber-600 dark:text-amber-400' },
-            ].map(({ icon: Icon, label, who, color }) => (
-              <div key={label} className="flex items-start gap-3 text-xs">
-                <Icon size={14} className={`${color} mt-0.5 shrink-0`} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-700 dark:text-gray-300">{label}</p>
-                  <p className="text-gray-500 dark:text-gray-400 leading-snug">{who}</p>
+      {showInfo && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Matriz de permisos */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield size={15} className="text-indigo-500" />
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Permisos del módulo</h3>
+            </div>
+            <div className="space-y-2.5">
+              {[
+                { icon: Plus,     label: 'Crear y editar',  who: 'Administrador · Coordinador', color: 'text-indigo-600 dark:text-indigo-400' },
+                { icon: Eye,      label: 'Visualizar',      who: 'Admin · Coordinador · Stakeholders del proyecto', color: 'text-blue-600 dark:text-blue-400' },
+                { icon: UserCog,  label: 'Aprobar / cerrar', who: 'Administrador (impacto alto) · Coordinador (resto)', color: 'text-emerald-600 dark:text-emerald-400' },
+                { icon: Bell,     label: 'Notificaciones',  who: 'Responsable asignado · Equipo del proyecto', color: 'text-amber-600 dark:text-amber-400' },
+              ].map(({ icon: Icon, label, who, color }) => (
+                <div key={label} className="flex items-start gap-3 text-xs">
+                  <Icon size={14} className={`${color} mt-0.5 shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-700 dark:text-gray-300">{label}</p>
+                    <p className="text-gray-500 dark:text-gray-400 leading-snug">{who}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* Flujo de la decisión */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <ChevronRight size={15} className="text-indigo-500" />
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Flujo de la decisión</h3>
+            </div>
+            <div className="flex items-center gap-1 mb-3 flex-wrap">
+              {[
+                { key: 'pending',     label: 'Pendiente',    color: 'bg-amber-400',   icon: Clock },
+                { key: 'in_progress', label: 'En progreso',  color: 'bg-blue-500',    icon: AlertCircle },
+                { key: 'implemented', label: 'Implementada', color: 'bg-emerald-500', icon: CheckCircle2 },
+              ].map(({ key, label, color, icon: Icon }, i, arr) => (
+                <div key={key} className="flex items-center gap-1 flex-1 min-w-0">
+                  <div className={`${color} w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0`}>
+                    <Icon size={13} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 truncate">{label}</span>
+                  {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300 shrink-0" />}
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-700 pt-2.5 space-y-1">
+              <p><strong className="text-gray-700 dark:text-gray-300">Pendiente:</strong> registrada, aún sin acción.</p>
+              <p><strong className="text-gray-700 dark:text-gray-300">En progreso:</strong> el responsable está ejecutando el cambio acordado.</p>
+              <p><strong className="text-gray-700 dark:text-gray-300">Implementada:</strong> aplicada y verificada — historial auditable cerrado.</p>
+              <p className="text-gray-400 italic">Cancelada se reserva para decisiones revertidas o descartadas.</p>
+            </div>
           </div>
         </div>
-
-        {/* Flujo de la decisión */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <ChevronRight size={15} className="text-indigo-500" />
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Flujo de la decisión</h3>
-          </div>
-          <div className="flex items-center gap-1 mb-3 flex-wrap">
-            {[
-              { key: 'pending',     label: 'Pendiente',    color: 'bg-amber-400',   icon: Clock },
-              { key: 'in_progress', label: 'En progreso',  color: 'bg-blue-500',    icon: AlertCircle },
-              { key: 'implemented', label: 'Implementada', color: 'bg-emerald-500', icon: CheckCircle2 },
-            ].map(({ key, label, color, icon: Icon }, i, arr) => (
-              <div key={key} className="flex items-center gap-1 flex-1 min-w-0">
-                <div className={`${color} w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0`}>
-                  <Icon size={13} />
-                </div>
-                <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 truncate">{label}</span>
-                {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300 shrink-0" />}
-              </div>
-            ))}
-          </div>
-          <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-700 pt-2.5 space-y-1">
-            <p><strong className="text-gray-700 dark:text-gray-300">Pendiente:</strong> registrada, aún sin acción.</p>
-            <p><strong className="text-gray-700 dark:text-gray-300">En progreso:</strong> el responsable está ejecutando el cambio acordado.</p>
-            <p><strong className="text-gray-700 dark:text-gray-300">Implementada:</strong> aplicada y verificada — historial auditable cerrado.</p>
-            <p className="text-gray-400 italic">Cancelada se reserva para decisiones revertidas o descartadas.</p>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -402,19 +418,51 @@ export default function DecisionesPage() {
                     <td className="px-5 py-4 max-w-xs">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {isMine && (
-                          <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
                             Asignada a ti
                           </span>
                         )}
+                        {overdue && (
+                          <span className="inline-flex items-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide animate-pulse">
+                            ⚠️ Vencida
+                          </span>
+                        )}
                       </div>
-                      <p className="text-gray-900 font-medium leading-snug line-clamp-2 mt-1" title={rec.description}>
+                      <p 
+                        onClick={() => toggleExpand(rec.id)}
+                        className={clsx(
+                          "text-gray-900 font-medium leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1",
+                          !expandedIds[rec.id] && "line-clamp-2"
+                        )}
+                        title="Haz clic para ver más detalles"
+                      >
                         {rec.description}
                       </p>
                       {rec.observations && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate" title={rec.observations}>
-                          {rec.observations}
+                        <p 
+                          onClick={() => toggleExpand(rec.id)}
+                          className={clsx(
+                            "text-xs text-gray-400 mt-1 cursor-pointer hover:text-indigo-600 transition-colors leading-relaxed",
+                            !expandedIds[rec.id] && "truncate"
+                          )}
+                          title="Haz clic para ver más detalles"
+                        >
+                          {expandedIds[rec.id] ? (
+                            <>
+                              <strong className="text-gray-600 dark:text-gray-400 block mb-0.5">Observaciones:</strong>
+                              {rec.observations}
+                            </>
+                          ) : (
+                            rec.observations
+                          )}
                         </p>
                       )}
+                      <button
+                        onClick={() => toggleExpand(rec.id)}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold hover:underline mt-1 block"
+                      >
+                        {expandedIds[rec.id] ? 'Ver menos' : 'Ver más'}
+                      </button>
                     </td>
                     <td className="px-5 py-4 hidden md:table-cell">
                       {rec.project?.name

@@ -959,6 +959,8 @@ function ProgramGroup({
 // ─── Decisiones asignadas a mí ────────────────────────────────────────────────
 
 function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionRecord; onStatusChange: (id: number, status: DecisionStatus) => void }) {
+  const [expanded, setExpanded] = useState(false);
+
   const overdue = !!decision.due_date
     && decision.status !== 'implemented' && decision.status !== 'cancelled'
     && daysDiff(decision.due_date.slice(0, 10)) < 0;
@@ -968,28 +970,68 @@ function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionReco
     : decision.impact === 'medium' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600';
 
   return (
-    <div className="p-4 space-y-2">
+    <div className="p-4 space-y-2 hover:bg-violet-100/20 transition-colors">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-gray-900 leading-snug flex-1">{decision.description}</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {overdue && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide animate-pulse">
+                ⚠️ Vencida
+              </span>
+            )}
+          </div>
+          <p 
+            onClick={() => setExpanded(!expanded)}
+            className={clsx(
+              "text-sm font-medium text-gray-900 leading-snug cursor-pointer hover:text-indigo-600 transition-colors mt-1",
+              !expanded && "line-clamp-2"
+            )}
+            title="Haz clic para ver todos los detalles"
+          >
+            {decision.description}
+          </p>
+        </div>
         <span className={clsx('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0', impactCls)}>
           {DECISION_IMPACT_LABELS[decision.impact]}
         </span>
       </div>
+
       <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
         {[decision.project?.name, decision.program?.name].filter(Boolean).join(' · ') || null}
-        {decision.creator?.name && <span>Creada por <strong className="text-gray-600">{decision.creator.name}</strong></span>}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap pt-0.5">
-        {decision.due_date && (
-          <span className={clsx('inline-flex items-center gap-1 text-xs font-medium', overdue ? 'text-red-600' : 'text-gray-500')}>
-            <CalendarDays size={12} />
-            {overdue ? 'Vencida: ' : 'Vence: '}{formatDate(decision.due_date.slice(0, 10))}
+        {decision.creator?.name && (
+          <span>
+            · Creada por <strong className="text-gray-600">{decision.creator.name}</strong>
           </span>
         )}
+      </div>
+
+      {expanded && decision.observations && (
+        <div className="bg-white/80 rounded-lg p-2.5 text-xs text-gray-600 border border-violet-100/60 leading-relaxed animate-in fade-in duration-200">
+          <strong className="text-gray-700 block mb-0.5">Observaciones:</strong>
+          {decision.observations}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+        <div className="flex items-center gap-3">
+          {decision.due_date && (
+            <span className={clsx('inline-flex items-center gap-1 text-xs font-medium', overdue ? 'text-red-600' : 'text-gray-500')}>
+              <CalendarDays size={12} />
+              {overdue ? 'Vencida: ' : 'Vence: '}{formatDate(decision.due_date.slice(0, 10))}
+            </span>
+          )}
+          <button 
+            onClick={() => setExpanded(!expanded)}
+            className="text-[11px] text-violet-700 hover:text-violet-900 font-semibold hover:underline"
+          >
+            {expanded ? 'Ocultar detalles' : 'Ver detalles'}
+          </button>
+        </div>
+
         <select
           value={decision.status}
           onChange={(e) => onStatusChange(decision.id, e.target.value as DecisionStatus)}
-          className="ml-auto text-xs border border-violet-200 text-violet-700 bg-white rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
+          className="text-xs border border-violet-200 text-violet-700 bg-white rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
         >
           {(['pending', 'in_progress', 'implemented', 'cancelled'] as DecisionStatus[]).map((s) => (
             <option key={s} value={s}>{DECISION_STATUS_LABELS[s]}</option>
