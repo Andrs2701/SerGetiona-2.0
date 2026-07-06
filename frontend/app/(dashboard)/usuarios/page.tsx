@@ -168,8 +168,35 @@ export default function UsuariosPage() {
   }
 
   async function handleCopyResetLink() {
-    await navigator.clipboard.writeText(resetLinkUrl);
-    setResetLinkCopied(true);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(resetLinkUrl);
+        setResetLinkCopied(true);
+        return;
+      } catch (err) {
+        console.error('Failed to copy using clipboard API, trying fallback:', err);
+      }
+    }
+
+    // Fallback para HTTP ordinario (no seguro)
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = resetLinkUrl;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (successful) {
+        setResetLinkCopied(true);
+      } else {
+        alert('No se pudo copiar el enlace automáticamente. Por favor, selecciónalo y cópialo manualmente.');
+      }
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      alert('No se pudo copiar el enlace. Por favor, selecciónalo y cópialo manualmente.');
+    }
   }
 
   const filtered = data.filter(

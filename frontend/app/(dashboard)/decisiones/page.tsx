@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { DecisionRecord, DecisionStatus, DecisionImpact, Project, User } from '@/lib/types';
 import { DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
 import Modal from '@/components/Modal';
+import PageHeader from '@/components/PageHeader';
 import { StatsSkeleton } from '@/components/LoadingSkeleton';
 
 // ── color maps ────────────────────────────────────────────────────────────────
@@ -229,26 +230,23 @@ export default function DecisionesPage() {
   }
 
   return (
-    <div className="space-y-6 p-1">
-
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Registro de Decisiones</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Seguimiento de decisiones clave del equipo de producción académica
-          </p>
-        </div>
-        <button
-          onClick={openNew}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} /> Nueva Decisión
-        </button>
-      </div>
+    <div className="p-4 sm:p-6">
+      <PageHeader
+        title="Registro de Decisiones"
+        subtitle="Seguimiento de decisiones clave del equipo de producción académica"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Decisiones' }]}
+        actions={
+          <button
+            onClick={openNew}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Nueva Decisión
+          </button>
+        }
+      />
 
       {/* ── Gobernanza: Permisos + Flujo ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 
         {/* Matriz de permisos */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
@@ -305,7 +303,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatCard label="Total decisiones"   value={stats.total}       color="bg-white border-gray-200 text-gray-800" />
         <StatCard label="Pendientes"         value={stats.pending}     color="bg-amber-50 border-amber-200 text-amber-700" />
         <StatCard label="En progreso"        value={stats.in_progress} color="bg-blue-50 border-blue-200 text-blue-700" />
@@ -313,7 +311,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 mb-6">
         <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -343,7 +341,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm mb-6">
         {loading ? (
           <div className="p-6"><StatsSkeleton /></div>
         ) : sorted.length === 0 ? (

@@ -90,6 +90,12 @@ class User extends Authenticatable
     {
         $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
 
+        // Si la solicitud actual al servidor no es por HTTPS (puerto 443),
+        // forzamos el enlace generado a usar HTTP para evitar bloqueos del navegador.
+        if (!request()->secure()) {
+            $frontendUrl = str_replace('https://', 'http://', $frontendUrl);
+        }
+
         return $frontendUrl.'/reset-password?token='.urlencode($token)
             .'&email='.urlencode($this->getEmailForPasswordReset());
     }
