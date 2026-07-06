@@ -723,6 +723,12 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                   <option value="II">II</option>
                   <option value="III">III</option>
                   <option value="IV">IV</option>
+                  <option value="V">V</option>
+                  <option value="VI">VI</option>
+                  <option value="VII">VII</option>
+                  <option value="VIII">VIII</option>
+                  <option value="IX">IX</option>
+                  <option value="X">X</option>
                   <option value="NA">NA</option>
                 </select>
               </div>
@@ -1550,6 +1556,12 @@ export default function EntregablesPage() {
               <option value="II">Semestre II</option>
               <option value="III">Semestre III</option>
               <option value="IV">Semestre IV</option>
+              <option value="V">Semestre V</option>
+              <option value="VI">Semestre VI</option>
+              <option value="VII">Semestre VII</option>
+              <option value="VIII">Semestre VIII</option>
+              <option value="IX">Semestre IX</option>
+              <option value="X">Semestre X</option>
               <option value="NA">Semestre NA</option>
             </select>
 
