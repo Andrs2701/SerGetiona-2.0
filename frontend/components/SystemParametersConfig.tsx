@@ -7,6 +7,7 @@ import type { SystemSetting } from '@/lib/types';
 const GROUP_LABELS: Record<string, string> = {
   health: 'Salud de proyecto',
   capacity: 'Capacidad operativa',
+  presence: 'Presencia de usuarios',
 };
 
 export default function SystemParametersConfig() {

@@ -48,6 +48,8 @@ export interface User {
   department?: string | null;
   photo_url?: string | null;
   weekly_capacity_points?: number | null;
+  last_active_at?: string | null;
+  is_online?: boolean;
 }
 
 export interface Project {

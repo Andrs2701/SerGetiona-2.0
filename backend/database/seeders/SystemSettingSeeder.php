@@ -26,6 +26,9 @@ class SystemSettingSeeder extends Seeder
             ['key' => 'capacity.default_points',           'value' => '3',   'label' => 'Puntos por defecto (entregable sin nivel)', 'group' => 'capacity'],
             ['key' => 'capacity.threshold_high',           'value' => '80',  'label' => 'Umbral de ocupación alta (%)',             'group' => 'capacity'],
             ['key' => 'capacity.threshold_overload',       'value' => '100', 'label' => 'Umbral de sobrecarga (%)',                 'group' => 'capacity'],
+
+            // Presencia
+            ['key' => 'presence.online_threshold_minutes', 'value' => '5',   'label' => 'Minutos de inactividad antes de marcar "desconectado"', 'group' => 'presence'],
         ];
 
         foreach ($settings as $setting) {
