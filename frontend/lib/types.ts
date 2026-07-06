@@ -538,6 +538,12 @@ export interface StateTransition {
   allowed_roles: string[];
 }
 
+export interface RoleStatus {
+  id: number;
+  role: string;
+  status_slug: string;
+}
+
 export interface VisibilityRule {
   id: number;
   role_slug: string;

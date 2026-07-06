@@ -125,6 +125,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('config/statuses/{id}', [SystemConfigurationController::class, 'updateStatus']);
         Route::delete('config/statuses/{id}', [SystemConfigurationController::class, 'destroyStatus']);
 
+        Route::get('config/role-statuses', [SystemConfigurationController::class, 'getRoleStatuses']);
+        Route::post('config/role-statuses', [SystemConfigurationController::class, 'storeRoleStatus']);
+        Route::delete('config/role-statuses/{id}', [SystemConfigurationController::class, 'destroyRoleStatus']);
+
         Route::get('config/transitions', [SystemConfigurationController::class, 'getTransitions']);
         Route::post('config/transitions', [SystemConfigurationController::class, 'storeTransition']);
         Route::delete('config/transitions/{id}', [SystemConfigurationController::class, 'destroyTransition']);

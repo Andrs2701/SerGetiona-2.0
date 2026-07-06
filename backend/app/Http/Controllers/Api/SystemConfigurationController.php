@@ -9,6 +9,7 @@ use App\Models\SystemStatus;
 use App\Models\StateTransition;
 use App\Models\VisibilityRule;
 use App\Models\AuditLog;
+use App\Models\RoleStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -321,5 +322,62 @@ class SystemConfigurationController extends Controller
         }
 
         return response()->json(['visibility_rules' => $updated]);
+    }
+
+    // --- Role Statuses ---
+    public function getRoleStatuses()
+    {
+        return response()->json(['role_statuses' => RoleStatus::all()]);
+    }
+
+    public function storeRoleStatus(Request $request)
+    {
+        $data = $request->validate([
+            'role' => 'required|string|max:50',
+            'status_slug' => 'required|string|max:50',
+        ]);
+
+        $statusExists = SystemStatus::where('type', 'task')->where('slug', $data['status_slug'])->exists();
+        if (!$statusExists) {
+            return response()->json(['message' => 'El estado de tarea provisto no existe o no es de tipo tarea.'], 422);
+        }
+
+        $exists = RoleStatus::where('role', $data['role'])->where('status_slug', $data['status_slug'])->exists();
+        if ($exists) {
+            return response()->json(['message' => 'Este estado ya está asociado al rol.'], 422);
+        }
+
+        $roleStatus = RoleStatus::create($data);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'action' => 'created',
+            'entity_type' => 'RoleStatus',
+            'entity_id' => $roleStatus->id,
+            'field_changed' => 'all',
+            'new_value' => json_encode($roleStatus),
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json($roleStatus, 201);
+    }
+
+    public function destroyRoleStatus(Request $request, int $id)
+    {
+        $roleStatus = RoleStatus::findOrFail($id);
+        $old = json_encode($roleStatus);
+        $roleStatus->delete();
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'action' => 'deleted',
+            'entity_type' => 'RoleStatus',
+            'entity_id' => $id,
+            'field_changed' => 'all',
+            'old_value' => $old,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => 'Estado del rol desasociado correctamente.']);
     }
 }

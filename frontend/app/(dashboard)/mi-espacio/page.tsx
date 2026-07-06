@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow, DecisionRecord, DecisionStatus } from '@/lib/types';
+import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow, DecisionRecord, DecisionStatus, RoleStatus } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -62,15 +62,6 @@ const DATE_STATUS_SORT: Record<string, number> = {
 
 // Statuses that only admin/coordinator can set (backend enforces this too)
 const MANAGER_ONLY_STATUSES = ['approved'];
-
-const ROLE_STATES: Record<string, string[]> = {
-  expert:      ['not_started','draft','in_development','delivered','adjustments_requested','approved','not_applicable'],
-  pedagogy:    ['not_started','in_progress','in_review','adjusting','delivered','approved','not_applicable'],
-  design:      ['not_started','designing','adjusting','delivered','approved','not_applicable'],
-  audiovisual: ['not_started','production','editing','delivered','approved','not_applicable'],
-  engineering: ['not_started','implementing','validating','delivered','approved','not_applicable'],
-  qa:          ['pending','in_testing','with_findings','approved','not_applicable'],
-};
 
 // ─── Detail Panel tabs ────────────────────────────────────────────────────────
 
@@ -530,12 +521,14 @@ function DetailPanel({
   onStatusChange,
   isManager,
   onSaved,
+  roleStatuses,
 }: {
   act: WorkspaceActivity;
   onClose: () => void;
   onStatusChange: (id: number, status: string) => void;
   isManager: boolean;
   onSaved: () => void;
+  roleStatuses: RoleStatus[];
 }) {
   const [tab, setTab] = useState<PanelTab>('principal');
   const [status, setStatus] = useState(act.status);
@@ -574,7 +567,13 @@ function DetailPanel({
     setRefreshKey(k => k + 1);
   }, [act.id]);
 
-  const allStates = ROLE_STATES[act.role] ?? Object.keys(ROLE_STATUS_LABELS);
+  const allStates = useMemo(() => {
+    const associated = roleStatuses
+      .filter((rs) => rs.role === act.role)
+      .map((rs) => rs.status_slug);
+    return associated.length > 0 ? associated : Object.keys(ROLE_STATUS_LABELS);
+  }, [roleStatuses, act.role]);
+
   const roleStates = isManager
     ? allStates
     : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
@@ -1055,6 +1054,14 @@ export default function MiEspacioPage() {
   const [showFinishedDecisions, setShowFinishedDecisions] = useState(false);
   const [viewingDecisionDetail, setViewingDecisionDetail] = useState<DecisionRecord | null>(null);
 
+  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
+
+  useEffect(() => {
+    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
+      .then((res) => setRoleStatuses(res.role_statuses ?? []))
+      .catch(() => setRoleStatuses([]));
+  }, []);
+
   const loadWorkspace = useCallback(() => {
     api.get<Workspace>(ENDPOINTS.MY_WORKSPACE)
       .then(ws => {
@@ -1210,7 +1217,7 @@ export default function MiEspacioPage() {
   return (
     <>
       {selectedAct && (
-        <DetailPanel act={selectedAct} onClose={() => setSelectedAct(null)} onStatusChange={handleStatusChange} isManager={isManager} onSaved={loadWorkspace}/>
+        <DetailPanel act={selectedAct} onClose={() => setSelectedAct(null)} onStatusChange={handleStatusChange} isManager={isManager} onSaved={loadWorkspace} roleStatuses={roleStatuses}/>
       )}
 
       <div className="p-4 sm:p-6 space-y-5">

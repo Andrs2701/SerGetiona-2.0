@@ -228,4 +228,40 @@ class SystemConfigurationTest extends TestCase
             ->getJson("/api/projects/{$projectId}")
             ->assertStatus(403);
     }
+
+    public function test_admin_can_manage_role_statuses(): void
+    {
+        $status = SystemStatus::create([
+            'type' => 'task',
+            'slug' => 'custom_status',
+            'label' => 'Estado Personalizado',
+        ]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/config/role-statuses')
+            ->assertStatus(200);
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/config/role-statuses', [
+                'role' => 'design',
+                'status_slug' => 'custom_status',
+            ])
+            ->assertStatus(201);
+
+        $roleStatusId = $res->json('id');
+
+        $this->assertDatabaseHas('role_statuses', [
+            'role' => 'design',
+            'status_slug' => 'custom_status',
+        ]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->deleteJson("/api/config/role-statuses/{$roleStatusId}")
+            ->assertStatus(200);
+
+        $this->assertDatabaseMissing('role_statuses', [
+            'role' => 'design',
+            'status_slug' => 'custom_status',
+        ]);
+    }
 }
