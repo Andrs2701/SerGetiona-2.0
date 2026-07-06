@@ -50,6 +50,8 @@ export interface User {
   weekly_capacity_points?: number | null;
   last_active_at?: string | null;
   is_online?: boolean;
+  active_diff_seconds?: number | null;
+  online_threshold_seconds?: number;
 }
 
 export interface Project {

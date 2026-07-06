@@ -69,25 +69,27 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   );
 }
 
-function formatLastActive(iso?: string | null): string {
-  if (!iso) return 'Nunca';
-  const last = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - last.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+function formatLastActive(seconds?: number | null, iso?: string | null): string {
+  if (seconds === undefined || seconds === null) return 'Nunca';
+  const diffMins = Math.floor(seconds / 60);
   const diffHours = Math.floor(diffMins / 60);
 
   if (diffMins < 1) return 'Hace un momento';
   if (diffMins < 60) return `Hace ${diffMins} min`;
   if (diffHours < 24) return `Hace ${diffHours} h`;
 
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (last.toDateString() === yesterday.toDateString()) {
-    return 'Ayer';
+  if (iso) {
+    const last = new Date(iso);
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (last.toDateString() === yesterday.toDateString()) {
+      return 'Ayer';
+    }
+    return last.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  return last.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+  return 'Hace más de un día';
 }
 
 export default function UsuariosPage() {
@@ -95,6 +97,8 @@ export default function UsuariosPage() {
   const router = useRouter();
 
   const [data, setData] = useState<User[]>([]);
+  const [dataLoadedAt, setDataLoadedAt] = useState(Date.now());
+  const [nowTick, setNowTick] = useState(Date.now());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState<string>('');
@@ -116,10 +120,21 @@ export default function UsuariosPage() {
   const [resetLinkError, setResetLinkError] = useState('');
   const [resetLinkCopied, setResetLinkCopied] = useState(false);
 
+  // Tick cada segundo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchUsersSilent = useCallback(() => {
     api
       .get<User[]>(ENDPOINTS.USERS)
-      .then(setData)
+      .then((res) => {
+        setData(res);
+        setDataLoadedAt(Date.now());
+      })
       .catch(() => {});
   }, []);
 
@@ -132,7 +147,10 @@ export default function UsuariosPage() {
     setLoading(true);
     api
       .get<User[]>(ENDPOINTS.USERS)
-      .then(setData)
+      .then((res) => {
+        setData(res);
+        setDataLoadedAt(Date.now());
+      })
       .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, [user, router]);
@@ -258,8 +276,25 @@ export default function UsuariosPage() {
     }
   };
 
+  const usersWithPresence = useMemo(() => {
+    const secondsElapsed = Math.floor((nowTick - dataLoadedAt) / 1000);
+    return data.map((u) => {
+      const activeDiffSeconds = u.active_diff_seconds !== null && u.active_diff_seconds !== undefined
+        ? u.active_diff_seconds + secondsElapsed
+        : null;
+      const thresholdSeconds = u.online_threshold_seconds ?? 300;
+      const isOnline = activeDiffSeconds !== null && activeDiffSeconds <= thresholdSeconds;
+
+      return {
+        ...u,
+        activeDiffSeconds,
+        isOnline,
+      };
+    });
+  }, [data, nowTick, dataLoadedAt]);
+
   const filtered = useMemo(() => {
-    return data
+    return usersWithPresence
       .filter(
         (u) =>
           (!search ||
@@ -286,14 +321,14 @@ export default function UsuariosPage() {
         if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
         return 0;
       });
-  }, [data, search, filterRole, sortBy, sortOrder]);
+  }, [usersWithPresence, search, filterRole, sortBy, sortOrder]);
 
   const stats = useMemo(() => {
-    const total = data.length;
-    const online = data.filter((u) => u.is_online).length;
+    const total = usersWithPresence.length;
+    const online = usersWithPresence.filter((u) => u.isOnline).length;
     const inactive = total - online;
     return { total, online, inactive };
-  }, [data]);
+  }, [usersWithPresence]);
 
   function SortHeader({ field, label }: { field: 'name' | 'role' | 'last_active_at'; label: string }) {
     const active = sortBy === field;
@@ -401,7 +436,7 @@ export default function UsuariosPage() {
                             <span
                               className={clsx(
                                 'absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-gray-800',
-                                u.is_online ? 'bg-emerald-500' : 'bg-gray-300'
+                                u.isOnline ? 'bg-emerald-500' : 'bg-gray-300'
                               )}
                             />
                           </div>
@@ -418,7 +453,7 @@ export default function UsuariosPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium text-xs">
-                        {formatLastActive(u.last_active_at)}
+                        {formatLastActive(u.activeDiffSeconds, u.last_active_at)}
                       </td>
                       <td className="px-5 py-3">
                         <button

@@ -23,6 +23,8 @@ class UserResource extends JsonResource
             'weekly_capacity_points' => $this->weekly_capacity_points,
             'created_at' => $this->created_at,
             'last_active_at' => $this->last_active_at ? \Carbon\Carbon::parse($this->last_active_at)->toIso8601String() : null,
+            'active_diff_seconds' => $this->last_active_at ? now()->diffInSeconds($this->last_active_at) : null,
+            'online_threshold_seconds' => (int) (SystemSetting::num('presence.online_threshold_minutes', 5) * 60),
             'is_online' => $this->last_active_at !== null
                 && now()->diffInMinutes($this->last_active_at) <= SystemSetting::num('presence.online_threshold_minutes', 5),
         ];
