@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
@@ -105,6 +107,28 @@ class UserController extends Controller
         $user->update(['photo_path' => $path]);
 
         return new UserResource($user);
+    }
+
+    public function generateResetLink(Request $request, User $user)
+    {
+        $token = Password::createToken($user);
+
+        AuditLog::create([
+            'user_id'       => $request->user()->id,
+            'action'        => 'password_reset_link_generated',
+            'entity_type'   => 'User',
+            'entity_id'     => $user->id,
+            'field_changed' => null,
+            'old_value'     => null,
+            'new_value'     => null,
+            'ip_address'    => $request->ip(),
+            'created_at'    => now(),
+        ]);
+
+        return response()->json([
+            'url'                => $user->passwordResetUrl($token),
+            'expires_in_minutes' => (int) config('auth.passwords.users.expire'),
+        ]);
     }
 
     public function destroy(Request $request, User $user)

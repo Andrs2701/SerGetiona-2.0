@@ -19,12 +19,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        ResetPassword::createUrlUsing(function ($user, string $token): string {
-            $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
-
-            return $frontendUrl.'/reset-password?token='.urlencode($token)
-                .'&email='.urlencode($user->getEmailForPasswordReset());
-        });
+        ResetPassword::createUrlUsing(fn ($user, string $token): string => $user->passwordResetUrl($token));
 
         Project::observe(AuditObserver::class);
         Deliverable::observe(AuditObserver::class);

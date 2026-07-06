@@ -37,12 +37,36 @@ class ProductionFlowTest extends TestCase
             'status'         => 'in_progress',
         ]);
 
+        $resourceType = \App\Models\ResourceType::where('role', 'expert')->first();
+        if ($resourceType) {
+            \App\Models\ProductionLog::create([
+                'role_activity_id' => $this->expertActivity->id,
+                'resource_type_id' => $resourceType->id,
+                'quantity' => 1,
+                'produced_by' => $this->expert->id,
+                'logged_by' => $this->expert->id,
+                'produced_at' => now(),
+            ]);
+        }
+
         $this->pedagogyActivity = RoleActivity::factory()->create([
             'deliverable_id' => $this->deliverable->id,
             'role'           => 'pedagogy',
             'responsible_id' => $this->pedagogue->id,
             'status'         => 'not_started',
         ]);
+
+        $pedagogyResourceType = \App\Models\ResourceType::where('role', 'pedagogy')->first();
+        if ($pedagogyResourceType) {
+            \App\Models\ProductionLog::create([
+                'role_activity_id' => $this->pedagogyActivity->id,
+                'resource_type_id' => $pedagogyResourceType->id,
+                'quantity' => 1,
+                'produced_by' => $this->pedagogue->id,
+                'logged_by' => $this->pedagogue->id,
+                'produced_at' => now(),
+            ]);
+        }
     }
 
     public function test_assignment_notification_includes_required_fields(): void

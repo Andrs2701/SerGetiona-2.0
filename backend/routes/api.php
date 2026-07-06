@@ -143,6 +143,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:admin,coordinator');
     Route::apiResource('users', UserController::class)->except(['index', 'show'])
         ->middleware('role:admin');
+    Route::post('/users/{user}/reset-link', [UserController::class, 'generateResetLink'])
+        ->middleware('role:admin');
 
     // Reportes, importación y exportación — información gerencial
     Route::middleware('role:admin,coordinator')->group(function () {

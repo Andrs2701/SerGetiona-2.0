@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Search, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Search, AlertCircle, KeyRound, Copy, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { User, UserRole } from '@/lib/types';
@@ -73,6 +73,13 @@ export default function UsuariosPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  const [resetLinkUser, setResetLinkUser] = useState<User | null>(null);
+  const [resetLinkUrl, setResetLinkUrl] = useState('');
+  const [resetLinkExpires, setResetLinkExpires] = useState(60);
+  const [resetLinkLoading, setResetLinkLoading] = useState(false);
+  const [resetLinkError, setResetLinkError] = useState('');
+  const [resetLinkCopied, setResetLinkCopied] = useState(false);
+
   useEffect(() => {
     if (user && user.role !== 'admin') {
       router.replace('/');
@@ -141,6 +148,28 @@ export default function UsuariosPage() {
     } catch {
       // revert silently — mock mode
     }
+  }
+
+  async function handleGenerateResetLink(u: User) {
+    setResetLinkUser(u);
+    setResetLinkUrl('');
+    setResetLinkError('');
+    setResetLinkCopied(false);
+    setResetLinkLoading(true);
+    try {
+      const res = await api.post<{ url: string; expires_in_minutes: number }>(ENDPOINTS.USER_RESET_LINK(u.id), {});
+      setResetLinkUrl(res.url);
+      setResetLinkExpires(res.expires_in_minutes);
+    } catch (err) {
+      setResetLinkError(parseApiError(err));
+    } finally {
+      setResetLinkLoading(false);
+    }
+  }
+
+  async function handleCopyResetLink() {
+    await navigator.clipboard.writeText(resetLinkUrl);
+    setResetLinkCopied(true);
   }
 
   const filtered = data.filter(
@@ -234,12 +263,22 @@ export default function UsuariosPage() {
                         </button>
                       </td>
                       <td className="px-5 py-3">
-                        <button
-                          onClick={() => openEdit(u)}
-                          className="text-gray-400 hover:text-indigo-600 transition-colors"
-                        >
-                          <Pencil size={16} />
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => openEdit(u)}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Editar usuario"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleGenerateResetLink(u)}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Generar enlace de acceso"
+                          >
+                            <KeyRound size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -370,6 +409,62 @@ export default function UsuariosPage() {
             </button>
             <span className="text-sm text-gray-700">{form.is_active ? 'Usuario activo' : 'Usuario inactivo'}</span>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!resetLinkUser}
+        onClose={() => setResetLinkUser(null)}
+        title="Enlace de acceso"
+        footer={
+          <button
+            onClick={() => setResetLinkUser(null)}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            Cerrar
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          {resetLinkError && (
+            <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+              <span>{resetLinkError}</span>
+            </div>
+          )}
+          {resetLinkLoading ? (
+            <p className="text-sm text-gray-500">Generando enlace...</p>
+          ) : resetLinkUrl ? (
+            <>
+              <p className="text-sm text-gray-600">
+                Comparte este enlace con <strong>{resetLinkUser?.name}</strong> por un canal seguro
+                (WhatsApp, Teams, en persona). Al abrirlo podrá definir su propia contraseña nueva.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={resetLinkUrl}
+                  onFocus={(e) => e.target.select()}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                />
+                <button
+                  onClick={handleCopyResetLink}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors',
+                    resetLinkCopied
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  )}
+                >
+                  {resetLinkCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {resetLinkCopied ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                Este enlace expira en {resetLinkExpires} minutos.
+              </p>
+            </>
+          ) : null}
         </div>
       </Modal>
     </div>

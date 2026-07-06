@@ -124,6 +124,18 @@ class AuthorizationMatrixTest extends TestCase
             'responsible_id' => $owner->id,
         ]);
 
+        $resourceType = \App\Models\ResourceType::where('role', 'expert')->first();
+        if ($resourceType) {
+            \App\Models\ProductionLog::create([
+                'role_activity_id' => $activity->id,
+                'resource_type_id' => $resourceType->id,
+                'quantity' => 1,
+                'produced_by' => $owner->id,
+                'logged_by' => $owner->id,
+                'produced_at' => now(),
+            ]);
+        }
+
         $this->actingAs($owner, 'sanctum')
             ->postJson("/api/activities/{$activity->id}/quick-action", ['action' => 'deliver'])
             ->assertOk();

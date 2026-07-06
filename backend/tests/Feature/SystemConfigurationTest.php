@@ -142,8 +142,10 @@ class SystemConfigurationTest extends TestCase
             'label' => 'En Progreso',
         ]);
 
+        $user = User::factory()->create();
         \App\Models\RoleActivity::factory()->create([
             'deliverable_id' => \App\Models\Deliverable::factory(),
+            'responsible_id' => $user->id,
             'status' => 'in_progress',
         ]);
 

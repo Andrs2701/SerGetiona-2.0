@@ -85,4 +85,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(AuditLog::class);
     }
+
+    public function passwordResetUrl(string $token): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
+
+        return $frontendUrl.'/reset-password?token='.urlencode($token)
+            .'&email='.urlencode($this->getEmailForPasswordReset());
+    }
 }

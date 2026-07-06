@@ -140,6 +140,7 @@ export const ENDPOINTS = {
   // Users
   USERS: '/users',
   USER: (id: number) => `/users/${id}`,
+  USER_RESET_LINK: (id: number) => `/users/${id}/reset-link`,
   PROFILE: '/profile',
   PROFILE_PHOTO: '/profile/photo',
 
