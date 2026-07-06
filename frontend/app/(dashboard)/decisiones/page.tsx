@@ -223,7 +223,7 @@ export default function DecisionesPage() {
       </div>
 
       {/* ── Gobernanza: Permisos + Flujo ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Matriz de permisos */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">

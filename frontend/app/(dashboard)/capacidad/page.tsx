@@ -575,19 +575,21 @@ export default function CapacidadPage() {
                       <span className="text-xs text-gray-400 flex-shrink-0">{meta.unit}</span>
                     </div>
                     <p className="text-xs text-gray-500 mb-3 leading-relaxed">{meta.description}</p>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        value={val}
-                        min={meta.min}
-                        max={meta.max}
-                        step={meta.step}
-                        onChange={e => setSettingsDraft(prev => ({ ...prev, [meta.key]: e.target.value }))}
-                        className="w-28 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                      />
-                      <span className="text-sm text-gray-400">{meta.unit}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <input
+                          type="number"
+                          value={val}
+                          min={meta.min}
+                          max={meta.max}
+                          step={meta.step}
+                          onChange={e => setSettingsDraft(prev => ({ ...prev, [meta.key]: e.target.value }))}
+                          className="w-full sm:w-28 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                        />
+                        <span className="text-sm text-gray-400">{meta.unit}</span>
+                      </div>
                       {dbSetting && parseFloat(dbSetting.value) !== parseFloat(val) && (
-                        <span className="text-xs text-amber-600 ml-auto">Cambiado</span>
+                        <span className="text-xs text-amber-600 sm:ml-auto">Cambiado</span>
                       )}
                     </div>
                   </div>

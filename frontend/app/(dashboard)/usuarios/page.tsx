@@ -346,7 +346,7 @@ export default function UsuariosPage() {
               max={200}
               value={form.weekly_capacity_points}
               onChange={(e) => setForm((f) => ({ ...f, weekly_capacity_points: e.target.value }))}
-              className="w-40 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full sm:w-40 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="10 (por defecto)"
             />
             <p className="text-xs text-gray-400 mt-1">

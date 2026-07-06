@@ -98,63 +98,65 @@ export default function ComplexityLevelsConfig() {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Nivel</th>
-              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Puntos</th>
-              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
-              <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {levels.map((l) => (
-              <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-5 py-3 font-medium text-gray-900">{l.name}</td>
-                <td className="px-3 py-3 text-center text-gray-700">{l.points}</td>
-                <td className="px-3 py-3 text-center">
-                  <span
-                    className={clsx(
-                      'px-2 py-0.5 text-xs rounded-full font-medium',
-                      l.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                    )}
-                  >
-                    {l.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <button
-                    onClick={() =>
-                      setForm({
-                        id: l.id,
-                        name: l.name,
-                        points: l.points,
-                        is_active: l.is_active,
-                        sort_order: l.sort_order,
-                      })
-                    }
-                    className="text-gray-400 hover:text-indigo-600 transition-colors mr-3"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(l)}
-                    className="text-gray-400 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {levels.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-gray-400">
-                  No hay niveles configurados.
-                </td>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Nivel</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Puntos</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {levels.map((l) => (
+                <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="px-5 py-3 font-medium text-gray-900">{l.name}</td>
+                  <td className="px-3 py-3 text-center text-gray-700">{l.points}</td>
+                  <td className="px-3 py-3 text-center">
+                    <span
+                      className={clsx(
+                        'px-2 py-0.5 text-xs rounded-full font-medium',
+                        l.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                      )}
+                    >
+                      {l.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      onClick={() =>
+                        setForm({
+                          id: l.id,
+                          name: l.name,
+                          points: l.points,
+                          is_active: l.is_active,
+                          sort_order: l.sort_order,
+                        })
+                      }
+                      className="text-gray-400 hover:text-indigo-600 transition-colors mr-3"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(l)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {levels.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-gray-400">
+                    No hay niveles configurados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Modal
