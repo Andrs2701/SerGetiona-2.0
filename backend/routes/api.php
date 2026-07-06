@@ -194,6 +194,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('channels/{channel}/messages', [ChannelMessageController::class, 'store']);
     Route::delete('channels/{channel}/messages/{message}', [ChannelMessageController::class, 'destroy']);
 
+    // Decisiones asignables (accesible a todos los roles autenticados)
+    Route::put('/decisions/{decision}/status', [DecisionRecordController::class, 'updateStatus']);
+    Route::get('/calendar/my-decisions', [CalendarController::class, 'myDecisions']);
+
     // Administración de canales: solo admin/coordinator
     Route::middleware('role:admin,coordinator')->group(function () {
         Route::post('channels', [ChannelController::class, 'store']);

@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search, X, ChevronDown, ChevronUp, ChevronRight,
-  Clock, XCircle, CheckCircle2, AlertTriangle,
+  Clock, XCircle, CheckCircle2, AlertTriangle, Shield,
   CalendarDays, Link2, MessageSquare, GitCommitHorizontal,
   Send, Plus, Trash2, ExternalLink, Filter, Package,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow } from '@/lib/types';
-import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
+import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow, DecisionRecord, DecisionStatus } from '@/lib/types';
+import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
 
@@ -956,6 +956,50 @@ function ProgramGroup({
   );
 }
 
+// ─── Decisiones asignadas a mí ────────────────────────────────────────────────
+
+function DecisionMiniCard({ decision, onStatusChange }: { decision: DecisionRecord; onStatusChange: (id: number, status: DecisionStatus) => void }) {
+  const overdue = !!decision.due_date
+    && decision.status !== 'implemented' && decision.status !== 'cancelled'
+    && daysDiff(decision.due_date.slice(0, 10)) < 0;
+
+  const impactCls = decision.impact === 'high'
+    ? 'bg-red-100 text-red-700'
+    : decision.impact === 'medium' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600';
+
+  return (
+    <div className="p-4 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-gray-900 leading-snug flex-1">{decision.description}</p>
+        <span className={clsx('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide flex-shrink-0', impactCls)}>
+          {DECISION_IMPACT_LABELS[decision.impact]}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
+        {[decision.project?.name, decision.program?.name].filter(Boolean).join(' · ') || null}
+        {decision.creator?.name && <span>Creada por <strong className="text-gray-600">{decision.creator.name}</strong></span>}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap pt-0.5">
+        {decision.due_date && (
+          <span className={clsx('inline-flex items-center gap-1 text-xs font-medium', overdue ? 'text-red-600' : 'text-gray-500')}>
+            <CalendarDays size={12} />
+            {overdue ? 'Vencida: ' : 'Vence: '}{formatDate(decision.due_date.slice(0, 10))}
+          </span>
+        )}
+        <select
+          value={decision.status}
+          onChange={(e) => onStatusChange(decision.id, e.target.value as DecisionStatus)}
+          className="ml-auto text-xs border border-violet-200 text-violet-700 bg-white rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
+        >
+          {(['pending', 'in_progress', 'implemented', 'cancelled'] as DecisionStatus[]).map((s) => (
+            <option key={s} value={s}>{DECISION_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type StatusFilter = '' | 'pending' | 'overdue' | 'approaching' | 'in_process' | 'completed';
@@ -1027,6 +1071,17 @@ export default function MiEspacioPage() {
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     setSelectedAct(prev => prev?.id === id ? { ...prev, status } : prev);
   }, []);
+
+  const handleDecisionStatusChange = useCallback(async (id: number, status: DecisionStatus) => {
+    setWorkspace(prev => prev
+      ? { ...prev, decisions: (prev.decisions ?? []).map(d => d.id === id ? { ...d, status } : d) }
+      : prev);
+    try {
+      await api.put(ENDPOINTS.DECISION_STATUS(id), { status });
+    } catch {
+      loadWorkspace();
+    }
+  }, [loadWorkspace]);
 
   // Derived lists for filter dropdowns
   const programOptions = useMemo(
@@ -1130,6 +1185,23 @@ export default function MiEspacioPage() {
           <h1 className="text-2xl font-bold text-gray-900">Mi Espacio de Trabajo</h1>
           <p className="text-sm text-gray-500 mt-0.5">{roleLabel} · {total} actividades asignadas</p>
         </div>
+
+        {/* Decisiones asignadas a mí — solo roles no admin/coordinador */}
+        {!isManager && !!workspace?.decisions?.length && (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-violet-100 bg-violet-100/50 flex items-center gap-2">
+              <Shield size={15} className="text-violet-600" />
+              <h3 className="font-semibold text-violet-900 text-sm">
+                Decisiones asignadas a mí ({workspace.decisions.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-violet-100">
+              {workspace.decisions.map(d => (
+                <DecisionMiniCard key={d.id} decision={d} onStatusChange={handleDecisionStatusChange} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* KPI pills + completed toggle */}
         <div className="flex flex-wrap items-center gap-2">

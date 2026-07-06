@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CalendarEvent;
+use App\Models\DecisionRecord;
 use App\Models\RoleActivity;
 use App\Services\WorkingDayService;
 use Carbon\Carbon;
@@ -178,5 +179,24 @@ class CalendarController extends Controller
             });
 
         return response()->json($activities);
+    }
+
+    public function myDecisions(Request $request)
+    {
+        $decisions = DecisionRecord::where('responsible_id', $request->user()->id)
+            ->whereNotNull('due_date')
+            ->with(['project:id,name', 'program:id,name'])
+            ->get()
+            ->map(fn ($d) => [
+                'id'           => $d->id,
+                'description'  => $d->description,
+                'due_date'     => $d->due_date?->toDateString(),
+                'status'       => $d->status,
+                'impact'       => $d->impact,
+                'project_name' => $d->project?->name,
+                'program_name' => $d->program?->name,
+            ]);
+
+        return response()->json($decisions);
     }
 }

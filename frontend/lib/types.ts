@@ -338,6 +338,7 @@ export interface Workspace {
   stats: WorkspaceStats;
   activities: WorkspaceActivity[];
   calendar_activities: WorkspaceActivity[];
+  decisions?: DecisionRecord[];
 }
 
 // ── Evolución 2026: complejidad, capacidad, salud, decisiones, colaboración ──
@@ -437,14 +438,17 @@ export type DecisionImpact = 'low' | 'medium' | 'high';
 export interface DecisionRecord {
   id: number;
   decision_date: string;
+  due_date?: string | null;
   project_id?: number | null;
   academic_program_id?: number | null;
   description: string;
   responsible_id?: number | null;
+  created_by?: number;
   status: DecisionStatus;
   impact: DecisionImpact;
   observations?: string | null;
   responsible?: User | null;
+  creator?: { id: number; name: string } | null;
   project?: { id: number; name: string } | null;
   program?: { id: number; name: string } | null;
   created_at?: string;

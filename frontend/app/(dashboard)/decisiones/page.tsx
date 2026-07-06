@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Search, Edit2, Trash2, ClipboardList, Info, CheckCircle2, Clock, AlertCircle, XCircle, Shield, Eye, Bell, UserCog, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
-import { api } from '@/lib/api';
+import { api, ENDPOINTS } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { DecisionRecord, DecisionStatus, DecisionImpact, Project, User } from '@/lib/types';
 import { DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
@@ -53,6 +53,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 // ── form types ────────────────────────────────────────────────────────────────
 interface DecisionForm {
   decision_date: string;
+  due_date: string;
   description: string;
   project_id: string;
   responsible_id: string;
@@ -63,6 +64,7 @@ interface DecisionForm {
 
 const emptyForm: DecisionForm = {
   decision_date: new Date().toISOString().split('T')[0],
+  due_date: '',
   description: '',
   project_id: '',
   responsible_id: '',
@@ -70,6 +72,13 @@ const emptyForm: DecisionForm = {
   impact: 'medium',
   observations: '',
 };
+
+function isDecisionOverdue(rec: DecisionRecord): boolean {
+  if (!rec.due_date || rec.status === 'implemented' || rec.status === 'cancelled') return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(rec.due_date.slice(0, 10) + 'T00:00:00') < today;
+}
 
 // ── main component ────────────────────────────────────────────────────────────
 export default function DecisionesPage() {
@@ -126,6 +135,11 @@ export default function DecisionesPage() {
     );
   });
 
+  // Decisiones asignadas al usuario actual aparecen primero, con estilo distinto.
+  const mine = filtered.filter((r) => user && r.responsible_id === user.id);
+  const others = filtered.filter((r) => !(user && r.responsible_id === user.id));
+  const sorted = [...mine, ...others];
+
   // Stats
   const stats = {
     total:       records.length,
@@ -146,6 +160,7 @@ export default function DecisionesPage() {
     setEditing(rec);
     setForm({
       decision_date:  rec.decision_date,
+      due_date:       rec.due_date ? rec.due_date.slice(0, 10) : '',
       description:    rec.description,
       project_id:     rec.project_id    ? String(rec.project_id)    : '',
       responsible_id: rec.responsible_id? String(rec.responsible_id): '',
@@ -167,6 +182,7 @@ export default function DecisionesPage() {
     try {
       const payload = {
         decision_date:  form.decision_date,
+        due_date:       form.due_date || null,
         description:    form.description.trim(),
         project_id:     form.project_id     ? Number(form.project_id)     : null,
         responsible_id: form.responsible_id ? Number(form.responsible_id) : null,
@@ -192,6 +208,15 @@ export default function DecisionesPage() {
     if (!confirm(`¿Eliminar "${rec.description.slice(0, 60)}…"?`)) return;
     await api.delete(`/decisions/${rec.id}`).catch(() => alert('No se pudo eliminar.'));
     load();
+  }
+
+  async function handleStatusChange(rec: DecisionRecord, status: DecisionStatus) {
+    try {
+      await api.put(ENDPOINTS.DECISION_STATUS(rec.id), { status });
+      load();
+    } catch {
+      alert('No se pudo actualizar el estado.');
+    }
   }
 
   if (!isManager) {
@@ -321,7 +346,7 @@ export default function DecisionesPage() {
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-6"><StatsSkeleton /></div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div className="flex flex-col items-center py-20 text-gray-400 gap-3">
             <ClipboardList size={40} />
             <p className="text-sm font-medium">No hay decisiones registradas.</p>
@@ -347,10 +372,19 @@ export default function DecisionesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((rec) => {
+              {sorted.map((rec) => {
                 const StatusIcon = STATUS_ICONS[rec.status];
+                const isMine = !!user && rec.responsible_id === user.id;
+                const isOwner = !!user && rec.created_by === user.id;
+                const overdue = isDecisionOverdue(rec);
                 return (
-                  <tr key={rec.id} className="hover:bg-gray-50/60 transition-colors group">
+                  <tr
+                    key={rec.id}
+                    className={clsx(
+                      'hover:bg-gray-50/60 transition-colors group',
+                      isMine && 'bg-violet-50/50 dark:bg-violet-900/10 border-l-2 border-l-violet-400'
+                    )}
+                  >
                     <td className="px-5 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400 text-xs">
                       {(() => {
                         const raw = rec.decision_date;
@@ -360,9 +394,22 @@ export default function DecisionesPage() {
                         if (Number.isNaN(d.getTime())) return <span className="text-gray-300 dark:text-gray-600">—</span>;
                         return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
                       })()}
+                      {rec.due_date && (
+                        <p className={clsx('mt-1 font-medium', overdue ? 'text-red-500' : 'text-gray-400')}>
+                          Vence: {new Date(rec.due_date.slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                          {overdue && ' ⚠'}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4 max-w-xs">
-                      <p className="text-gray-900 font-medium leading-snug line-clamp-2" title={rec.description}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {isMine && (
+                          <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                            Asignada a ti
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-900 font-medium leading-snug line-clamp-2 mt-1" title={rec.description}>
                         {rec.description}
                       </p>
                       {rec.observations && (
@@ -399,22 +446,33 @@ export default function DecisionesPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openEdit(rec)}
-                          className="text-gray-400 hover:text-indigo-600 transition-colors"
-                          title="Editar"
+                      {isOwner ? (
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEdit(rec)}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(rec)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : isMine ? (
+                        <select
+                          value={rec.status}
+                          onChange={(e) => handleStatusChange(rec, e.target.value as DecisionStatus)}
+                          className="text-xs border border-violet-200 text-violet-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          title="Solo puedes actualizar el estado; el creador administra el resto."
                         >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rec)}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                          {STATUSES.map((s) => <option key={s} value={s}>{DECISION_STATUS_LABELS[s]}</option>)}
+                        </select>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -457,13 +515,22 @@ export default function DecisionesPage() {
           {formError && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Fecha *</label>
               <input
                 type="date"
                 value={form.decision_date}
                 onChange={(e) => setForm((f) => ({ ...f, decision_date: e.target.value }))}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Fecha límite</label>
+              <input
+                type="date"
+                value={form.due_date}
+                onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
             </div>

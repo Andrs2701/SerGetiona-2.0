@@ -265,6 +265,11 @@ class WorkspaceController extends Controller
             'stats'               => $stats,
             'activities'          => $mapped->values(),
             'calendar_activities' => $calendarActivities,
+            'decisions'           => \App\Models\DecisionRecord::where('responsible_id', $user->id)
+                ->whereNotNull('due_date')
+                ->with(['project:id,name', 'program:id,name', 'creator:id,name'])
+                ->orderByDesc('decision_date')
+                ->get(),
         ]);
     }
 

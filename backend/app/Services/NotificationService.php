@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\NotificationMail;
+use App\Models\DecisionRecord;
 use App\Models\Notification;
 use App\Models\User;
 use App\Models\UserPreference;
@@ -32,6 +33,7 @@ class NotificationService
         'deadline_approaching'  => 'email_deadlines',
         'overdue'               => 'email_deadlines',
         'overdue_reminder'      => 'email_deadlines',
+        'decision_assigned'     => 'email_tasks',
     ];
 
     public static function translateRole(string $role): string
@@ -75,6 +77,28 @@ class NotificationService
             'Nueva actividad asignada',
             $message,
             ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+        );
+    }
+
+    public static function notifyDecisionAssigned(DecisionRecord $decision, User $user): void
+    {
+        $decision->loadMissing('project', 'program');
+
+        $projectName = $decision->project?->name ?? 'N/A';
+        $programName = $decision->program?->name ?? 'N/A';
+        $dueDate = $decision->due_date
+            ? (\Carbon\Carbon::parse($decision->due_date)->toDateString())
+            : 'N/A';
+        $description = mb_substr($decision->description, 0, 150);
+
+        $message = "Se te ha asignado la decisión '{$description}' del programa '{$programName}' (Proyecto: '{$projectName}'). Fecha límite: {$dueDate}.";
+
+        self::notify(
+            $user,
+            'decision_assigned',
+            'Nueva decisión asignada',
+            $message,
+            ['entity_type' => 'DecisionRecord', 'entity_id' => $decision->id]
         );
     }
 

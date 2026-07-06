@@ -9,13 +9,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Registro de decisiones — solo admin/coordinator (middleware role en rutas).
+ * Registro de decisiones — solo admin/coordinator (middleware role en rutas),
+ * excepto updateStatus que es accesible para cualquier rol responsable de la decisión.
  * Cada cambio queda en AuditLog para trazabilidad.
  */
 class DecisionRecordController extends Controller
 {
     private const VALIDATION = [
         'decision_date'       => 'required|date',
+        'due_date'            => 'nullable|date',
         'project_id'          => 'nullable|exists:projects,id',
         'academic_program_id' => 'nullable|exists:academic_programs,id',
         'description'         => 'required|string',
@@ -60,6 +62,13 @@ class DecisionRecordController extends Controller
             'created_at'   => now(),
         ]);
 
+        if ($decision->responsible_id) {
+            $responsible = \App\Models\User::find($decision->responsible_id);
+            if ($responsible) {
+                \App\Services\NotificationService::notifyDecisionAssigned($decision, $responsible);
+            }
+        }
+
         return response()->json(
             $decision->load(['project:id,name', 'program:id,name', 'responsible:id,name,role']),
             201
@@ -75,6 +84,8 @@ class DecisionRecordController extends Controller
 
     public function update(Request $request, DecisionRecord $decision)
     {
+        abort_unless($decision->created_by === $request->user()->id, 403, 'Solo quien creó la decisión puede modificarla.');
+
         $rules = self::VALIDATION;
         $rules['decision_date'] = 'sometimes|date';
         $rules['description']   = 'sometimes|string';
@@ -83,6 +94,16 @@ class DecisionRecordController extends Controller
 
         $original = $decision->getOriginal();
         $decision->update($data);
+
+        // Notificar si el responsable cambió o se asignó por primera vez
+        $oldResponsibleId = $original['responsible_id'] ?? null;
+        $newResponsibleId = $decision->responsible_id;
+        if ($newResponsibleId && $newResponsibleId != $oldResponsibleId) {
+            $responsible = \App\Models\User::find($newResponsibleId);
+            if ($responsible) {
+                \App\Services\NotificationService::notifyDecisionAssigned($decision, $responsible);
+            }
+        }
 
         foreach ($decision->getChanges() as $field => $newValue) {
             if ($field === 'updated_at') continue;
@@ -106,6 +127,8 @@ class DecisionRecordController extends Controller
 
     public function destroy(Request $request, DecisionRecord $decision)
     {
+        abort_unless($decision->created_by === $request->user()->id, 403, 'Solo quien creó la decisión puede modificarla.');
+
         AuditLog::create([
             'user_id'      => Auth::id(),
             'action'       => 'deleted',
@@ -121,5 +144,37 @@ class DecisionRecordController extends Controller
         $decision->delete();
 
         return response()->json(['message' => 'Decisión eliminada.']);
+    }
+
+    public function updateStatus(Request $request, DecisionRecord $decision)
+    {
+        abort_unless($decision->responsible_id === $request->user()->id, 403, 'Solo el asignado de esta decisión puede cambiar su estado.');
+
+        $data = $request->validate([
+            'status'       => 'required|in:pending,in_progress,implemented,cancelled',
+            'observations' => 'nullable|string',
+        ]);
+
+        $original = $decision->getOriginal();
+        $decision->update($data);
+
+        foreach ($decision->getChanges() as $field => $newValue) {
+            if ($field === 'updated_at') continue;
+            AuditLog::create([
+                'user_id'      => Auth::id(),
+                'action'       => 'updated',
+                'entity_type'  => 'DecisionRecord',
+                'entity_id'    => $decision->id,
+                'field_changed'=> $field,
+                'old_value'    => is_scalar($original[$field] ?? null) ? (string) $original[$field] : null,
+                'new_value'    => is_scalar($newValue) ? (string) $newValue : null,
+                'ip_address'   => $request->ip(),
+                'created_at'   => now(),
+            ]);
+        }
+
+        return response()->json(
+            $decision->load(['project:id,name', 'program:id,name', 'responsible:id,name,role'])
+        );
     }
 }

@@ -165,6 +165,10 @@ export const ENDPOINTS = {
   CALENDAR_MY_DELIVERABLES: '/calendar/my-deliverables',
   CALENDAR_SUGGEST_DATES: '/calendar/suggest-dates',
   CALENDAR_ALL_ACTIVITIES: '/calendar/all-activities',
+  CALENDAR_MY_DECISIONS: '/calendar/my-decisions',
+
+  // Decisions
+  DECISION_STATUS: (id: number) => `/decisions/${id}/status`,
 
   // Import / Export
   IMPORT_TEMPLATE: '/import/template',

@@ -50,6 +50,17 @@ interface AllActivity {
   project_name?: string;
 }
 
+// ─── CalendarDecision type ────────────────────────────────────────────────────
+interface CalendarDecision {
+  id: number;
+  description: string;
+  due_date: string;
+  status: string;
+  impact: string;
+  project_name?: string;
+  program_name?: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function toYMD(d: Date): string {
   const y = d.getFullYear();
@@ -124,6 +135,14 @@ function allActivityStatusBadge(a: AllActivity, _todayStr: string): { label: str
   if (a.date_status === 'overdue') return { label: 'Vencida', cls: 'bg-red-100 text-red-700' };
   if (a.date_status === 'approaching') return { label: 'Urgente', cls: 'bg-amber-100 text-amber-700' };
   return { label: ROLE_STATUS_LABELS[a.status] ?? a.status, cls: 'bg-blue-100 text-blue-700' };
+}
+
+// ─── Decision chip styling — distinta de festivos (ámbar) y actividades (índigo/azul) ──
+function decisionChipClass(d: CalendarDecision): string {
+  const overdue = d.status !== 'implemented' && d.status !== 'cancelled' && daysUntil(d.due_date) < 0;
+  return overdue
+    ? 'bg-red-100 text-red-700 border-l-2 border-red-400'
+    : 'bg-violet-100 text-violet-700 border-l-2 border-violet-400';
 }
 
 // ─── Activity card (my activities) ────────────────────────────────────────────
@@ -351,6 +370,7 @@ function SidePanel({
             { cls: 'bg-purple-400', label: 'En revisión' },
             { cls: 'bg-emerald-400', label: 'Aprobada' },
             { cls: 'bg-amber-400', label: 'Festivo / Urgente' },
+            { cls: 'bg-violet-400', label: 'Decisión asignada' },
           ].map(({ cls, label }) => (
             <div key={label} className="flex items-center gap-2">
               <span className={clsx('w-2.5 h-2.5 rounded-sm flex-shrink-0', cls)} />
@@ -370,6 +390,7 @@ function MonthView({
   actByDate,
   allActByDate,
   eventByDate,
+  decisionsByDate,
   todayStr,
   selectedDay,
   onSelectDay,
@@ -380,6 +401,7 @@ function MonthView({
   actByDate: Record<string, WorkspaceActivity[]>;
   allActByDate: Record<string, AllActivity[]>;
   eventByDate: Record<string, CalendarEvent[]>;
+  decisionsByDate: Record<string, CalendarDecision[]>;
   todayStr: string;
   selectedDay: string | null;
   onSelectDay: (d: string | null) => void;
@@ -411,6 +433,7 @@ function MonthView({
           const dayActs = showAll ? [] : (date ? (actByDate[key] ?? []) : []);
           const dayAllActs = showAll ? (date ? (allActByDate[key] ?? []) : []) : [];
           const dayEvts = date ? (eventByDate[key] ?? []) : [];
+          const dayDecisions = date ? (decisionsByDate[key] ?? []) : [];
           const isToday = date ? key === todayStr : false;
           const isSelected = key === selectedDay;
 
@@ -443,6 +466,15 @@ function MonthView({
                   {dayEvts.map((ev) => (
                     <div key={ev.id} className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium rounded px-1 mb-0.5 truncate">
                       {ev.name}
+                    </div>
+                  ))}
+                  {dayDecisions.map((d) => (
+                    <div
+                      key={`decision-${d.id}`}
+                      className={clsx('text-[10px] rounded px-1 mb-0.5 truncate', decisionChipClass(d))}
+                      title={`Decisión: ${d.description}`}
+                    >
+                      {d.description.length > 14 ? d.description.slice(0, 14) + '…' : d.description}
                     </div>
                   ))}
                   {/* showAll mode: AllActivity chips */}
@@ -499,6 +531,7 @@ function WeekView({
   actByDate,
   allActByDate,
   eventByDate,
+  decisionsByDate,
   todayStr,
   onSelectDay,
   showAll,
@@ -507,6 +540,7 @@ function WeekView({
   actByDate: Record<string, WorkspaceActivity[]>;
   allActByDate: Record<string, AllActivity[]>;
   eventByDate: Record<string, CalendarEvent[]>;
+  decisionsByDate: Record<string, CalendarDecision[]>;
   todayStr: string;
   onSelectDay: (d: string) => void;
   showAll: boolean;
@@ -545,6 +579,7 @@ function WeekView({
           const dayActs = showAll ? [] : (actByDate[key] ?? []);
           const dayAllActs = showAll ? (allActByDate[key] ?? []) : [];
           const dayEvts = eventByDate[key] ?? [];
+          const dayDecisions = decisionsByDate[key] ?? [];
           const isToday = key === todayStr;
 
           return (
@@ -559,6 +594,15 @@ function WeekView({
               {dayEvts.map((ev) => (
                 <div key={ev.id} className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium rounded px-1.5 py-0.5 mb-1 truncate">
                   {ev.name}
+                </div>
+              ))}
+              {dayDecisions.map((d) => (
+                <div
+                  key={`decision-${d.id}`}
+                  className={clsx('text-[10px] rounded px-1.5 py-0.5 mb-1 truncate', decisionChipClass(d))}
+                  title={`Decisión: ${d.description}`}
+                >
+                  {d.description.length > 16 ? d.description.slice(0, 16) + '…' : d.description}
                 </div>
               ))}
               {showAll
@@ -603,6 +647,7 @@ function DayView({
   actByDate,
   allActByDate,
   eventByDate,
+  decisionsByDate,
   onNavigate,
   showAll,
   todayStr,
@@ -611,6 +656,7 @@ function DayView({
   actByDate: Record<string, WorkspaceActivity[]>;
   allActByDate: Record<string, AllActivity[]>;
   eventByDate: Record<string, CalendarEvent[]>;
+  decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
   showAll: boolean;
   todayStr: string;
@@ -619,6 +665,7 @@ function DayView({
   const dayActs = showAll ? [] : (actByDate[key] ?? []);
   const dayAllActs = showAll ? (allActByDate[key] ?? []) : [];
   const dayEvts = eventByDate[key] ?? [];
+  const dayDecisions = decisionsByDate[key] ?? [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -626,7 +673,7 @@ function DayView({
         <h2 className="text-base font-semibold text-gray-900">{getDayLabel(date)}</h2>
       </div>
       <div className="p-6">
-        {dayEvts.length === 0 && dayActs.length === 0 && dayAllActs.length === 0 && (
+        {dayEvts.length === 0 && dayActs.length === 0 && dayAllActs.length === 0 && dayDecisions.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-8">Sin actividades ni eventos para este día.</p>
         )}
         {dayEvts.length > 0 && (
@@ -637,6 +684,23 @@ function DayView({
                 <div key={ev.id} className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                   <p className="font-medium text-amber-800 text-sm">{ev.name}</p>
                   {ev.description && <p className="text-xs text-amber-600 mt-0.5">{ev.description}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {dayDecisions.length > 0 && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Decisiones asignadas a mí ({dayDecisions.length})
+            </p>
+            <div className="space-y-2">
+              {dayDecisions.map((d) => (
+                <div key={d.id} className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
+                  <p className="font-medium text-violet-800 text-sm">{d.description}</p>
+                  <p className="text-xs text-violet-500 mt-0.5">
+                    {[d.project_name, d.program_name].filter(Boolean).join(' · ')}
+                  </p>
                 </div>
               ))}
             </div>
@@ -677,6 +741,7 @@ function SelectedDayPanel({
   actByDate,
   allActByDate,
   eventByDate,
+  decisionsByDate,
   onNavigate,
   onClose,
   showAll,
@@ -686,6 +751,7 @@ function SelectedDayPanel({
   actByDate: Record<string, WorkspaceActivity[]>;
   allActByDate: Record<string, AllActivity[]>;
   eventByDate: Record<string, CalendarEvent[]>;
+  decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
   onClose: () => void;
   showAll: boolean;
@@ -694,6 +760,7 @@ function SelectedDayPanel({
   const dayActs = showAll ? [] : (actByDate[selectedDay] ?? []);
   const dayAllActs = showAll ? (allActByDate[selectedDay] ?? []) : [];
   const dayEvts = eventByDate[selectedDay] ?? [];
+  const dayDecisions = decisionsByDate[selectedDay] ?? [];
   const d = new Date(selectedDay + 'T12:00:00');
 
   return (
@@ -711,13 +778,21 @@ function SelectedDayPanel({
             {ev.description && <p className="text-xs text-amber-500 mt-0.5">{ev.description}</p>}
           </div>
         ))}
+        {dayDecisions.map((dec) => (
+          <div key={dec.id} className="bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+            <p className="font-medium text-violet-800 text-sm">{dec.description}</p>
+            <p className="text-xs text-violet-500 mt-0.5">
+              {[dec.project_name, dec.program_name].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        ))}
         {!showAll && dayActs.map((act) => (
           <ActivityCard key={act.id} act={act} onNavigate={onNavigate} />
         ))}
         {showAll && dayAllActs.map((a) => (
           <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} />
         ))}
-        {dayActs.length === 0 && dayAllActs.length === 0 && dayEvts.length === 0 && (
+        {dayActs.length === 0 && dayAllActs.length === 0 && dayEvts.length === 0 && dayDecisions.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-4">Sin actividades.</p>
         )}
       </div>
@@ -747,6 +822,7 @@ export default function CalendarioPage() {
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([]);
   const [allActivitiesDirect, setAllActivitiesDirect] = useState<AllActivity[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
+  const [decisions, setDecisions] = useState<CalendarDecision[]>([]);
 
   // My activities
   useEffect(() => {
@@ -754,6 +830,14 @@ export default function CalendarioPage() {
       .get<WorkspaceActivity[]>(ENDPOINTS.CALENDAR_MY_DELIVERABLES)
       .then(setActivities)
       .catch(() => setActivities([]));
+  }, []);
+
+  // Decisiones asignadas a mí con fecha límite — cualquier rol
+  useEffect(() => {
+    api
+      .get<CalendarDecision[]>(ENDPOINTS.CALENDAR_MY_DECISIONS)
+      .then((data) => setDecisions(Array.isArray(data) ? data : []))
+      .catch(() => setDecisions([]));
   }, []);
 
   // Calendar events
@@ -837,6 +921,16 @@ export default function CalendarioPage() {
     }
     return map;
   }, [calEvents]);
+
+  const decisionsByDate = useMemo(() => {
+    const map: Record<string, CalendarDecision[]> = {};
+    for (const d of decisions) {
+      const key = d.due_date.slice(0, 10);
+      if (!map[key]) map[key] = [];
+      map[key].push(d);
+    }
+    return map;
+  }, [decisions]);
 
   function prevPeriod() {
     if (view === 'mes') {
@@ -1065,6 +1159,7 @@ export default function CalendarioPage() {
               actByDate={actByDate}
               allActByDate={allActByDate}
               eventByDate={eventByDate}
+              decisionsByDate={decisionsByDate}
               todayStr={todayStr}
               selectedDay={selectedDay}
               onSelectDay={handleSelectDay}
@@ -1078,6 +1173,7 @@ export default function CalendarioPage() {
               actByDate={actByDate}
               allActByDate={allActByDate}
               eventByDate={eventByDate}
+              decisionsByDate={decisionsByDate}
               todayStr={todayStr}
               onSelectDay={(key) => handleSelectDay(key)}
               showAll={showAll}
@@ -1090,6 +1186,7 @@ export default function CalendarioPage() {
               actByDate={actByDate}
               allActByDate={allActByDate}
               eventByDate={eventByDate}
+              decisionsByDate={decisionsByDate}
               onNavigate={(id) => navigate(id)}
               showAll={showAll}
               todayStr={todayStr}
@@ -1104,6 +1201,7 @@ export default function CalendarioPage() {
                 actByDate={actByDate}
                 allActByDate={allActByDate}
                 eventByDate={eventByDate}
+                decisionsByDate={decisionsByDate}
                 onNavigate={(id) => navigate(id)}
                 onClose={() => setSelectedDay(null)}
                 showAll={showAll}

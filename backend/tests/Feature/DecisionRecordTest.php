@@ -40,7 +40,23 @@ class DecisionRecordTest extends TestCase
         $this->assertDatabaseHas('decision_records', ['description' => 'Cambio en metodología de diseño.']);
     }
 
-    public function test_coordinator_can_update_decision(): void
+    public function test_creator_can_update_their_decision(): void
+    {
+        $decision = DecisionRecord::create([
+            'decision_date' => '2026-06-11',
+            'description'   => 'Original',
+            'status'        => 'pending',
+            'impact'        => 'low',
+            'created_by'    => $this->coordinator->id,
+        ]);
+
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->putJson("/api/decisions/{$decision->id}", ['status' => 'implemented'])
+            ->assertStatus(200)
+            ->assertJsonPath('status', 'implemented');
+    }
+
+    public function test_non_creator_cannot_update_decision(): void
     {
         $decision = DecisionRecord::create([
             'decision_date' => '2026-06-11',
@@ -50,10 +66,47 @@ class DecisionRecordTest extends TestCase
             'created_by'    => $this->admin->id,
         ]);
 
+        // El coordinador no creó esta decisión: aunque pasa el middleware de rol, el controlador lo rechaza.
         $this->actingAs($this->coordinator, 'sanctum')
             ->putJson("/api/decisions/{$decision->id}", ['status' => 'implemented'])
+            ->assertStatus(403);
+    }
+
+    public function test_responsible_can_update_status_but_not_the_full_decision(): void
+    {
+        $decision = DecisionRecord::create([
+            'decision_date'  => '2026-06-11',
+            'description'    => 'Original',
+            'status'         => 'pending',
+            'impact'         => 'low',
+            'created_by'     => $this->admin->id,
+            'responsible_id' => $this->coordinator->id,
+        ]);
+
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->putJson("/api/decisions/{$decision->id}/status", ['status' => 'in_progress'])
             ->assertStatus(200)
-            ->assertJsonPath('status', 'implemented');
+            ->assertJsonPath('status', 'in_progress');
+
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->putJson("/api/decisions/{$decision->id}", ['description' => 'Intento de cambio no autorizado'])
+            ->assertStatus(403);
+    }
+
+    public function test_uninvolved_user_cannot_update_decision_status(): void
+    {
+        $decision = DecisionRecord::create([
+            'decision_date'  => '2026-06-11',
+            'description'    => 'Original',
+            'status'         => 'pending',
+            'impact'         => 'low',
+            'created_by'     => $this->admin->id,
+            'responsible_id' => $this->coordinator->id,
+        ]);
+
+        $this->actingAs($this->expert, 'sanctum')
+            ->putJson("/api/decisions/{$decision->id}/status", ['status' => 'in_progress'])
+            ->assertStatus(403);
     }
 
     public function test_expert_cannot_access_decisions(): void

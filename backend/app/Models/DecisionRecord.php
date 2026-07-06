@@ -8,6 +8,7 @@ class DecisionRecord extends Model
 {
     protected $fillable = [
         'decision_date',
+        'due_date',
         'project_id',
         'academic_program_id',
         'description',
@@ -20,6 +21,7 @@ class DecisionRecord extends Model
 
     protected $casts = [
         'decision_date' => 'date',
+        'due_date'      => 'date',
     ];
 
     public function project()
