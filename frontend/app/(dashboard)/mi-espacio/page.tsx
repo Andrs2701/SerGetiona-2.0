@@ -61,7 +61,7 @@ const DATE_STATUS_SORT: Record<string, number> = {
 };
 
 // Statuses that only admin/coordinator can set (backend enforces this too)
-const MANAGER_ONLY_STATUSES = ['approved', 'not_applicable'];
+const MANAGER_ONLY_STATUSES = ['approved'];
 
 const ROLE_STATES: Record<string, string[]> = {
   expert:      ['not_started','draft','in_development','delivered','adjustments_requested','approved','not_applicable'],

@@ -207,9 +207,9 @@ class RoleActivityController extends Controller
 
         if (!$isManager) {
             abort_if(
-                in_array($activity->status, ['approved', 'not_applicable'], true),
+                $activity->status === 'approved',
                 403,
-                'Esta actividad ya ha sido aprobada o marcada como no aplicable y no puede ser modificada.'
+                'Esta actividad ya ha sido aprobada y no puede ser modificada.'
             );
 
             $forbiddenFields = array_intersect(
@@ -222,7 +222,7 @@ class RoleActivityController extends Controller
                 'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
             );
             abort_if(
-                in_array($data['status'] ?? null, ['approved', 'not_applicable'], true),
+                ($data['status'] ?? null) === 'approved',
                 403,
                 'No puedes aprobar tu propia actividad.'
             );
