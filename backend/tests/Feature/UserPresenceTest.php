@@ -12,6 +12,21 @@ class UserPresenceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_middleware_updates_last_active_at_on_authenticated_requests(): void
+    {
+        $user = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        $this->assertNull($user->last_active_at);
+
+        // Realizar request autenticado para disparar el middleware UpdateUserActivity
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/preferences')
+            ->assertOk();
+
+        $user->refresh();
+        $this->assertNotNull($user->last_active_at);
+    }
+
     public function test_admin_can_list_users_with_presence_data(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
@@ -22,21 +37,24 @@ class UserPresenceTest extends TestCase
             ['value' => '5', 'label' => 'Minutos online', 'group' => 'presence']
         );
 
-        // Crear usuarios de prueba
-        $userOnline = User::factory()->create(['role' => 'expert', 'is_active' => true]);
-        $userOffline = User::factory()->create(['role' => 'design', 'is_active' => true]);
-        $userNever = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
-
-        // Token reciente para userOnline (hace 2 minutos)
         Carbon::setTestNow(now());
-        $tokenOnline = $userOnline->createToken('test-token');
-        $tokenOnline->accessToken->last_used_at = now()->subMinutes(2);
-        $tokenOnline->accessToken->save();
 
-        // Token viejo para userOffline (hace 10 minutos)
-        $tokenOffline = $userOffline->createToken('test-token-2');
-        $tokenOffline->accessToken->last_used_at = now()->subMinutes(10);
-        $tokenOffline->accessToken->save();
+        // Crear usuarios de prueba con la columna last_active_at seteada
+        $userOnline = User::factory()->create([
+            'role' => 'expert', 
+            'is_active' => true,
+            'last_active_at' => now()->subMinutes(2)
+        ]);
+        $userOffline = User::factory()->create([
+            'role' => 'design', 
+            'is_active' => true,
+            'last_active_at' => now()->subMinutes(10)
+        ]);
+        $userNever = User::factory()->create([
+            'role' => 'pedagogy', 
+            'is_active' => true,
+            'last_active_at' => null
+        ]);
 
         // Petición del admin
         $response = $this->actingAs($admin, 'sanctum')
@@ -47,14 +65,14 @@ class UserPresenceTest extends TestCase
         $response->assertJsonFragment([
             'id' => $userOnline->id,
             'is_online' => true,
-            'last_active_at' => now()->subMinutes(2)->toDateTimeString(),
+            'last_active_at' => now()->subMinutes(2)->toIso8601String(),
         ]);
 
         // Verificar userOffline
         $response->assertJsonFragment([
             'id' => $userOffline->id,
             'is_online' => false,
-            'last_active_at' => now()->subMinutes(10)->toDateTimeString(),
+            'last_active_at' => now()->subMinutes(10)->toIso8601String(),
         ]);
 
         // Verificar userNever
@@ -78,13 +96,12 @@ class UserPresenceTest extends TestCase
         $setting->save();
         SystemSetting::flushCache('presence.online_threshold_minutes');
 
-        $userOffline = User::factory()->create(['role' => 'design', 'is_active' => true]);
-
-        // Token de hace 10 minutos (debería ser online con umbral 15)
         Carbon::setTestNow(now());
-        $tokenOffline = $userOffline->createToken('test-token');
-        $tokenOffline->accessToken->last_used_at = now()->subMinutes(10);
-        $tokenOffline->accessToken->save();
+        $userOffline = User::factory()->create([
+            'role' => 'design', 
+            'is_active' => true,
+            'last_active_at' => now()->subMinutes(10)
+        ]);
 
         // Petición del admin
         $response = $this->actingAs($admin, 'sanctum')
@@ -95,7 +112,7 @@ class UserPresenceTest extends TestCase
         $response->assertJsonFragment([
             'id' => $userOffline->id,
             'is_online' => true,
-            'last_active_at' => now()->subMinutes(10)->toDateTimeString(),
+            'last_active_at' => now()->subMinutes(10)->toIso8601String(),
         ]);
     }
 }

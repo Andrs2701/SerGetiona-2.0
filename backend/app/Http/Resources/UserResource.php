@@ -22,9 +22,9 @@ class UserResource extends JsonResource
             'photo_url' => $this->photo_url,
             'weekly_capacity_points' => $this->weekly_capacity_points,
             'created_at' => $this->created_at,
-            'last_active_at' => $this->tokens_max_last_used_at,
-            'is_online' => $this->tokens_max_last_used_at !== null
-                && now()->diffInMinutes($this->tokens_max_last_used_at) <= SystemSetting::num('presence.online_threshold_minutes', 5),
+            'last_active_at' => $this->last_active_at ? \Carbon\Carbon::parse($this->last_active_at)->toIso8601String() : null,
+            'is_online' => $this->last_active_at !== null
+                && now()->diffInMinutes($this->last_active_at) <= SystemSetting::num('presence.online_threshold_minutes', 5),
         ];
     }
 }

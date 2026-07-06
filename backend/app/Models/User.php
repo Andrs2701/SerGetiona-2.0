@@ -26,6 +26,7 @@ class User extends Authenticatable
         'department',
         'photo_path',
         'weekly_capacity_points',
+        'last_active_at',
     ];
 
     protected $hidden = [
@@ -43,6 +44,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_active_at' => 'datetime',
         ];
     }
 

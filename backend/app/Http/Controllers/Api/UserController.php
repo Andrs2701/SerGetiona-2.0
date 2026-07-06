@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $users = User::query()->withMax('tokens', 'last_used_at');
+        $users = User::query();
 
         if ($request->filled('role')) {
             $users->where('role', $request->role);
