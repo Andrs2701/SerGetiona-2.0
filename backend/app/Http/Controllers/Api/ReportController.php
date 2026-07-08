@@ -342,7 +342,7 @@ class ReportController extends Controller
             $project = $program?->project;
 
             $commitDate = $a->commitment_date ? Carbon::parse($a->commitment_date) : null;
-            $daysDiff = $commitDate ? $commitDate->diffInDays($today, false) : 0;
+            $daysDiff = $commitDate ? $today->diffInDays($commitDate, false) : 0;
 
             return [
                 'id'              => $a->id,
