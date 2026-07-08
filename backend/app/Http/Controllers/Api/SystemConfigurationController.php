@@ -327,7 +327,7 @@ class SystemConfigurationController extends Controller
     // --- Role Statuses ---
     public function getRoleStatuses()
     {
-        return response()->json(['role_statuses' => RoleStatus::all()]);
+        return response()->json(['role_statuses' => RoleStatus::orderBy('role')->orderBy('sort_order')->get()]);
     }
 
     public function storeRoleStatus(Request $request)
@@ -346,6 +346,9 @@ class SystemConfigurationController extends Controller
         if ($exists) {
             return response()->json(['message' => 'Este estado ya está asociado al rol.'], 422);
         }
+
+        $maxOrder = RoleStatus::where('role', $data['role'])->max('sort_order') ?? -1;
+        $data['sort_order'] = $maxOrder + 1;
 
         $roleStatus = RoleStatus::create($data);
 
@@ -379,5 +382,19 @@ class SystemConfigurationController extends Controller
         ]);
 
         return response()->json(['message' => 'Estado del rol desasociado correctamente.']);
+    }
+
+    public function reorderRoleStatuses(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|integer|exists:role_statuses,id',
+        ]);
+
+        foreach ($data['ids'] as $index => $id) {
+            RoleStatus::where('id', $id)->update(['sort_order' => $index]);
+        }
+
+        return response()->json(['message' => 'Orden actualizado correctamente.']);
     }
 }

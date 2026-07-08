@@ -14,5 +14,6 @@ class RoleStatus extends Model
     protected $fillable = [
         'role',
         'status_slug',
+        'sort_order',
     ];
 }

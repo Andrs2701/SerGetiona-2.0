@@ -284,4 +284,22 @@ class SystemConfigurationTest extends TestCase
             ->deleteJson('/api/config/role-statuses/1')
             ->assertStatus(403);
     }
+
+    public function test_admin_can_reorder_role_statuses(): void
+    {
+        $status1 = SystemStatus::create(['type' => 'task', 'slug' => 'st1', 'label' => 'S1']);
+        $status2 = SystemStatus::create(['type' => 'task', 'slug' => 'st2', 'label' => 'S2']);
+
+        $rs1 = \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'st1', 'sort_order' => 0]);
+        $rs2 = \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'st2', 'sort_order' => 1]);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/config/role-statuses/reorder', [
+                'ids' => [$rs2->id, $rs1->id]
+            ])
+            ->assertStatus(200);
+
+        $this->assertEquals(1, $rs1->fresh()->sort_order);
+        $this->assertEquals(0, $rs2->fresh()->sort_order);
+    }
 }

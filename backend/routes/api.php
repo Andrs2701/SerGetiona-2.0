@@ -130,6 +130,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('config/role-statuses', [SystemConfigurationController::class, 'storeRoleStatus']);
         Route::delete('config/role-statuses/{id}', [SystemConfigurationController::class, 'destroyRoleStatus']);
+        Route::post('config/role-statuses/reorder', [SystemConfigurationController::class, 'reorderRoleStatuses']);
 
         Route::get('config/transitions', [SystemConfigurationController::class, 'getTransitions']);
         Route::post('config/transitions', [SystemConfigurationController::class, 'storeTransition']);

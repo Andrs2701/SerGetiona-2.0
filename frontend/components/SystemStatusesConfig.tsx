@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Pencil, Plus, Trash2, GitBranch } from 'lucide-react';
+import { ArrowRight, Pencil, Plus, Trash2, GitBranch, ArrowUp, ArrowDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import Modal from '@/components/Modal';
 import { api } from '@/lib/api';
@@ -178,6 +178,30 @@ export default function SystemStatusesConfig() {
     }
   }
 
+  async function handleMoveStatus(roleKey: string, index: number, direction: 'up' | 'down') {
+    const associated = roleStatuses.filter((rs) => rs.role === roleKey);
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === associated.length - 1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    const items = [...associated];
+
+    // Intercambiar elementos en el array local
+    const temp = items[index];
+    items[index] = items[newIndex];
+    items[newIndex] = temp;
+
+    // Obtener los IDs en el nuevo orden
+    const ids = items.map((x) => x.id);
+
+    try {
+      await api.post('/config/role-statuses/reorder', { ids });
+      await load();
+    } catch {
+      alert('No se pudo reordenar el estado.');
+    }
+  }
+
   function statusLabel(type: string, slug: string): string {
     const list = type === 'deliverable' ? deliverableStatuses : taskStatuses;
     return list.find((s) => s.slug === slug)?.label ?? slug;
@@ -260,7 +284,7 @@ export default function SystemStatusesConfig() {
           </button>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Asocia los estados de tarea/actividad correspondientes a cada rol. Solo los estados asociados estarán disponibles en "Mi Espacio" para las entregas del respectivo rol.
+          Asocia los estados de tarea/actividad correspondientes a cada rol. Utiliza las flechas de ordenación para organizar la secuencia en que los verán los usuarios en su espacio de trabajo.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -272,22 +296,47 @@ export default function SystemStatusesConfig() {
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">{ROLE_LABELS[roleKey] ?? roleKey}</span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{associated.length} estado(s)</span>
                 </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800 px-4 py-2">
-                  {associated.map((rs) => {
+                <div className="divide-y divide-gray-100 dark:divide-gray-800 px-3 py-2">
+                  {associated.map((rs, idx) => {
                     const statusObj = taskStatuses.find((ts) => ts.slug === rs.status_slug);
                     return (
-                      <div key={rs.id} className="py-2.5 flex items-center justify-between text-xs group">
+                      <div key={rs.id} className="py-2.5 flex items-center justify-between text-xs group hover:bg-gray-50/50 dark:hover:bg-gray-700/20 px-2 rounded-lg transition-colors">
                         <div className="flex items-center gap-2">
                           <div className={clsx('w-2 h-2 rounded-full', statusObj?.color ?? 'bg-gray-300')} />
                           <span className="font-semibold text-gray-800 dark:text-gray-200">{statusObj?.label ?? rs.status_slug}</span>
                           <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">({rs.status_slug})</span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteRoleStatus(rs.id)}
-                          className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleMoveStatus(roleKey, idx, 'up')}
+                            disabled={idx === 0}
+                            className={clsx(
+                              'text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors',
+                              idx === 0 && 'opacity-20 cursor-not-allowed'
+                            )}
+                            title="Subir"
+                          >
+                            <ArrowUp size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleMoveStatus(roleKey, idx, 'down')}
+                            disabled={idx === associated.length - 1}
+                            className={clsx(
+                              'text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors',
+                              idx === associated.length - 1 && 'opacity-20 cursor-not-allowed'
+                            )}
+                            title="Bajar"
+                          >
+                            <ArrowDown size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRoleStatus(rs.id)}
+                            className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                            title="Desasociar"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
