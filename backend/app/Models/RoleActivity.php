@@ -44,7 +44,7 @@ class RoleActivity extends Model
         return $query->whereNotNull('commitment_date')
             ->where('commitment_date', '<', now()->toDateString())
             ->whereNull('actual_delivery_date')
-            ->whereNotIn('status', ['approved', 'not_applicable']);
+            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable']);
     }
 
     public static function defaultChecklist(string $role): array

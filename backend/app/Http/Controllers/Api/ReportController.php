@@ -105,7 +105,7 @@ class ReportController extends Controller
         // de compromiso aún futura, dentro de la ventana de aproximación.
         $approachingCandidates = RoleActivity::whereNotNull('commitment_date')
             ->whereNull('actual_delivery_date')
-            ->whereNotIn('status', ['approved', 'not_applicable'])
+            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
             ->get();
         $approachingActivities = 0;
         foreach ($approachingCandidates as $a) {

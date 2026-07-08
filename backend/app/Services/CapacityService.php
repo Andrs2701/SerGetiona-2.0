@@ -20,7 +20,7 @@ use Illuminate\Support\Collection;
  */
 final class CapacityService
 {
-    public const EXCLUDED_STATUSES = ['approved', 'not_applicable'];
+    public const EXCLUDED_STATUSES = ['approved', 'delivered', 'not_applicable'];
 
     public static function pointsFor(RoleActivity $activity): float
     {
@@ -75,7 +75,8 @@ final class CapacityService
         $overdue = $activities->filter(function ($a) use ($today) {
             return $a->commitment_date
                 && $a->commitment_date->toDateString() < $today
-                && is_null($a->actual_delivery_date);
+                && is_null($a->actual_delivery_date)
+                && !in_array($a->status, ['approved', 'delivered', 'not_applicable']);
         })->count();
 
         return [

@@ -32,14 +32,14 @@ final class ExecutiveSummaryService
         $isOverdue = fn ($a) => $a->commitment_date
             && $a->commitment_date->lt($today)
             && is_null($a->actual_delivery_date)
-            && !in_array($a->status, ['approved', 'not_applicable']);
+            && !in_array($a->status, ['approved', 'delivered', 'not_applicable']);
 
         $overdue = $activities->filter($isOverdue)->count();
 
         $approaching = $activities->filter(
             fn ($a) => $a->commitment_date
                 && !$isOverdue($a)
-                && !in_array($a->status, ['approved', 'not_applicable'])
+                && !in_array($a->status, ['approved', 'delivered', 'not_applicable'])
                 && $a->commitment_date->between($today, $today->copy()->addDays(5))
         )->count();
 

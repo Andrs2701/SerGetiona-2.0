@@ -66,13 +66,13 @@ final class HealthService
     {
         $today  = Carbon::today();
         $active = $activities->filter(
-            fn ($a) => !in_array($a->status, ['approved', 'not_applicable'])
+            fn ($a) => !in_array($a->status, ['approved', 'delivered', 'not_applicable'])
         );
 
         $isOverdue = fn ($a) => $a->commitment_date
             && $a->commitment_date->lt($today)
             && is_null($a->actual_delivery_date)
-            && !in_array($a->status, ['approved', 'not_applicable']);
+            && !in_array($a->status, ['approved', 'delivered', 'not_applicable']);
 
         // Factor 1: proporción de actividades activas vencidas
         $overdueCount  = $activities->filter($isOverdue)->count();
@@ -81,7 +81,7 @@ final class HealthService
         // Factor 2: entregables no terminados con ≥1 actividad vencida
         $byDeliverable      = $activities->groupBy('deliverable_id');
         $openDeliverables   = $byDeliverable->filter(
-            fn ($acts) => $acts->contains(fn ($a) => !in_array($a->status, ['approved', 'not_applicable']))
+            fn ($acts) => $acts->contains(fn ($a) => !in_array($a->status, ['approved', 'delivered', 'not_applicable']))
         );
         $delayedDeliverables = $openDeliverables->filter(
             fn ($acts) => $acts->contains($isOverdue)
