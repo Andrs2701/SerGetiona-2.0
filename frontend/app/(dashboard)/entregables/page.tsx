@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Search, Eye, MessageCircle, FileText, CheckCircle2, Send, RotateCcw,
+  Search, Eye, MessageCircle, FileText, CheckCircle2, RotateCcw,
   X, Download, ChevronDown, AlertCircle, Clock, Filter,
   Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
   BookOpen, FolderOpen, LayoutList, Table2, ExternalLink,
@@ -52,7 +52,7 @@ const ACTIVITY_STATUS_CFG: Record<string, { label: string; dot: string; text: st
   not_applicable:    { label: 'No aplica',     dot: 'bg-gray-200',    text: 'text-gray-400' },
 };
 
-type QuickAction = 'approve' | 'deliver' | 'request_adjustments';
+type QuickAction = 'approve' | 'request_adjustments';
 type ViewMode = 'rows' | 'grouped';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -93,12 +93,6 @@ function getActiveActivity(d: Deliverable): RoleActivity | undefined {
     acts.find(a => a.status !== 'approved' && a.status !== 'not_applicable' && a.status !== 'not_started') ??
     acts.find(a => a.status === 'not_started')
   );
-}
-
-// Finds the next activity the admin can deliver: in_development takes priority, else first not_started
-function getDeliverableActivity(d: Deliverable): RoleActivity | undefined {
-  const acts = d.role_activities ?? [];
-  return acts.find(a => a.status === 'in_development') ?? acts.find(a => a.status === 'not_started');
 }
 
 // Finds the current activity that can be approved (delivered/in_review/with_observations)
@@ -259,7 +253,6 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
   const isFinished = d.global_status === 'finished';
 
   const canApprove = !!getApprovableActivity(d);
-  const canDeliver = !!getDeliverableActivity(d);
   const canAdjust  = d.global_status === 'in_review';
 
   return (
@@ -314,12 +307,6 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
             <button title="Aprobar" onClick={() => onQuickAction('approve')}
               className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors">
               <CheckCircle2 size={14} />
-            </button>
-          )}
-          {canDeliver && (
-            <button title="Entregar" onClick={() => onQuickAction('deliver')}
-              className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors">
-              <Send size={14} />
             </button>
           )}
           {canAdjust && (
@@ -1540,21 +1527,14 @@ export default function EntregablesPage() {
   }
 
   async function handleQuickAction(d: Deliverable, action: QuickAction) {
-    const activity = action === 'deliver' ? getDeliverableActivity(d)
-                   : action === 'approve' ? getApprovableActivity(d)
-                   : getActiveActivity(d);
+    const activity = action === 'approve' ? getApprovableActivity(d) : getActiveActivity(d);
     if (!activity) { addToast('No hay actividad en estado para esta acción.', 'error'); return; }
     try {
       await api.post(ENDPOINTS.ACTIVITY_QUICK_ACTION(activity.id), { action });
-      addToast(action === 'approve' ? 'Aprobado.' : action === 'deliver' ? 'Entregado.' : 'Ajustes solicitados.', 'success');
+      addToast(action === 'approve' ? 'Aprobado.' : 'Ajustes solicitados.', 'success');
       loadData();
-    } catch (e: unknown) {
-      const err = e as { requires_production?: boolean };
-      if (err?.requires_production) {
-        addToast('Esta actividad requiere registrar producción antes de entregar. Abre el detalle para registrarla.', 'error');
-      } else {
-        addToast('Error al ejecutar la acción.', 'error');
-      }
+    } catch {
+      addToast('Error al ejecutar la acción.', 'error');
     }
   }
 
@@ -1865,10 +1845,6 @@ export default function EntregablesPage() {
                                   {!!getApprovableActivity(d) && (
                                     <button title="Aprobar" onClick={() => handleQuickAction(d, 'approve')}
                                       className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"><CheckCircle2 size={13} /></button>
-                                  )}
-                                  {!!getDeliverableActivity(d) && (
-                                    <button title="Entregar" onClick={() => handleQuickAction(d, 'deliver')}
-                                      className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"><Send size={13} /></button>
                                   )}
                                 </div>
                               </td>
