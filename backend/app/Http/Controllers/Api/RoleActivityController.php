@@ -252,20 +252,27 @@ class RoleActivityController extends Controller
             }
         }
 
-        // Notification: status changed — notify coordinators/admin AND responsible AND next in chain
+        // Notification: status changed — notify coordinators/admin AND responsible
         if (isset($dirty['status'])) {
             $newLabel    = self::translateStatus($activity->status);
             $roleLabel   = NotificationService::translateRole($activity->role);
             $managers    = User::whereIn('role', ['admin', 'coordinator'])->get();
             $statusData  = $this->buildStatusNotificationData($activity);
 
-            $isDelivery = $activity->status === 'delivered';
-            $notifTitle  = $isDelivery
-                ? "{$roleLabel} entregó: {$deliverableName}"
-                : 'Estado de actividad cambiado';
-            $notifBody   = $isDelivery
-                ? "Responsable: {$statusData['responsible_name']} | Programa: {$statusData['program']} | Asignatura: {$statusData['subject']}"
-                : "La actividad '{$roleLabel}' de '{$deliverableName}' cambió a '{$newLabel}'.";
+            $verb = match ($activity->status) {
+                'delivered'             => 'entregó',
+                'approved'              => 'aprobó',
+                'adjustments_requested' => 'solicitó ajustes para',
+                'with_findings'         => 'marcó con hallazgos',
+                default                 => "cambió a {$newLabel}",
+            };
+
+            $notifTitle = "{$roleLabel} {$verb}: {$deliverableName}";
+            
+            $respName = $statusData['responsible_name'] ?? 'Sin asignar';
+            $progName = $statusData['program'] ?? '—';
+            $subjName = $statusData['subject'] ?? '—';
+            $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
 
             NotificationService::notifyMany($managers, 'status_changed', $notifTitle, $notifBody, $statusData);
 
@@ -276,8 +283,8 @@ class RoleActivityController extends Controller
                     NotificationService::notify(
                         $responsible,
                         'status_changed',
-                        'Estado de tu actividad actualizado',
-                        "El estado de tu actividad '{$roleLabel}' en '{$deliverableName}' fue cambiado a '{$newLabel}'.",
+                        "Estado de tu actividad actualizado: {$deliverableName}",
+                        "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
                         $statusData
                     );
                 }
@@ -414,13 +421,30 @@ class RoleActivityController extends Controller
         $activity->loadMissing('deliverable.subject.academicProgram');
         $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
         $newLabel = self::translateStatus($activity->status);
+        $roleLabel = NotificationService::translateRole($activity->role);
         $delName  = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
         $statusData = $this->buildStatusNotificationData($activity);
+
+        $verb = match ($activity->status) {
+            'delivered'             => 'entregó',
+            'approved'              => 'aprobó',
+            'adjustments_requested' => 'solicitó ajustes para',
+            'with_findings'         => 'marcó con hallazgos',
+            default                 => "cambió a {$newLabel}",
+        };
+
+        $notifTitle = "{$roleLabel} {$verb}: {$delName}";
+        
+        $respName = $statusData['responsible_name'] ?? 'Sin asignar';
+        $progName = $statusData['program'] ?? '—';
+        $subjName = $statusData['subject'] ?? '—';
+        $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
+
         NotificationService::notifyMany(
             $managers,
             'status_changed',
-            'Estado de actividad cambiado',
-            "La actividad '{$activity->role}' de '{$delName}' cambió a '{$newLabel}'.",
+            $notifTitle,
+            $notifBody,
             $statusData
         );
 
@@ -431,8 +455,8 @@ class RoleActivityController extends Controller
                 NotificationService::notify(
                     $owner,
                     'status_changed',
-                    'Estado de tu actividad actualizado',
-                    "El estado de tu actividad '{$activity->role}' en '{$delName}' fue cambiado a '{$newLabel}'.",
+                    "Estado de tu actividad actualizado: {$delName}",
+                    "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
                     $statusData
                 );
             }
