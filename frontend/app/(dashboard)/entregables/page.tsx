@@ -950,24 +950,53 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                             <td className="px-3 py-2 text-gray-600">
                               {(() => {
                                 if (isNA) return '—';
-                                if (!act?.actual_delivery_date) {
+                                
+                                const status = act?.status ?? 'not_started';
+                                
+                                if (['not_started', 'pending'].includes(status)) {
                                   const todayStr = new Date().toISOString().split('T')[0];
-                                  const isOverdue = act?.commitment_date && act.commitment_date < todayStr && !['approved', 'delivered'].includes(act.status);
+                                  const isOverdue = act?.commitment_date && act.commitment_date < todayStr;
                                   return isOverdue ? (
                                     <span className="text-rose-600 dark:text-rose-400 font-medium">Pendiente (Vencido)</span>
                                   ) : '—';
                                 }
-                                
-                                const isDelayed = act.commitment_date && act.actual_delivery_date > act.commitment_date;
-                                return isDelayed ? (
+
+                                const refDate = act?.actual_delivery_date || act?.updated_at || act?.actual_start_date || null;
+                                if (!refDate) return '—';
+
+                                const refDateShort = formatDateShort(refDate);
+
+                                if (['delivered', 'approved'].includes(status)) {
+                                  const deliveryDay = act?.actual_delivery_date ? act.actual_delivery_date.split('T')[0].split(' ')[0] : refDate.split('T')[0].split(' ')[0];
+                                  const commitmentDay = act?.commitment_date ? act.commitment_date.split('T')[0].split(' ')[0] : '';
+                                  const isDelayed = commitmentDay && deliveryDay > commitmentDay;
+                                  
+                                  return isDelayed ? (
+                                    <div className="flex flex-col">
+                                      <span className="text-rose-600 dark:text-rose-400 font-semibold">{refDateShort}</span>
+                                      <span className="text-[9px] text-rose-500 font-medium">Vencido</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col">
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{refDateShort}</span>
+                                      <span className="text-[9px] text-emerald-500 font-medium">A tiempo</span>
+                                    </div>
+                                  );
+                                }
+
+                                if (['adjustments_requested', 'with_findings'].includes(status)) {
+                                  return (
+                                    <div className="flex flex-col">
+                                      <span className="text-amber-600 dark:text-amber-400 font-semibold">{refDateShort}</span>
+                                      <span className="text-[9px] text-amber-500 font-medium">Devuelto</span>
+                                    </div>
+                                  );
+                                }
+
+                                return (
                                   <div className="flex flex-col">
-                                    <span className="text-rose-600 dark:text-rose-400 font-semibold">{formatDateShort(act.actual_delivery_date)}</span>
-                                    <span className="text-[9px] text-rose-500 font-medium">Vencido</span>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-col">
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{formatDateShort(act.actual_delivery_date)}</span>
-                                    <span className="text-[9px] text-emerald-500 font-medium">A tiempo</span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-semibold">{refDateShort}</span>
+                                    <span className="text-[9px] text-blue-500 font-medium">En proceso</span>
                                   </div>
                                 );
                               })()}

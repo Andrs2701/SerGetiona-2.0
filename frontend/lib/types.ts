@@ -93,6 +93,7 @@ export interface RoleActivity {
   commitment_date?: string;
   actual_start_date?: string;
   actual_delivery_date?: string;
+  updated_at?: string;
   status: string;
   notes?: string;
 }

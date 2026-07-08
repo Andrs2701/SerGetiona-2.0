@@ -31,6 +31,7 @@ class DeliverableResource extends JsonResource
                         'commitment_date' => $activity->commitment_date,
                         'actual_start_date' => $activity->actual_start_date,
                         'actual_delivery_date' => $activity->actual_delivery_date,
+                        'updated_at' => $activity->updated_at?->toIso8601String(),
                         'assigned_at' => $activity->assigned_at,
                         'notes' => $activity->notes,
                         'responsible' => $activity->relationLoaded('responsible') && $activity->responsible

@@ -514,6 +514,7 @@ class DeliverableController extends Controller
                 'commitment_date'      => $a->commitment_date?->toDateString(),
                 'actual_start_date'    => $a->actual_start_date?->toDateString(),
                 'actual_delivery_date' => $a->actual_delivery_date?->toDateString(),
+                'updated_at'           => $a->updated_at?->toIso8601String(),
                 'notes'                => $a->notes,
                 'responsible'          => $a->responsible ? [
                     'id' => $a->responsible->id, 'name' => $a->responsible->name, 'role' => $a->responsible->role,
