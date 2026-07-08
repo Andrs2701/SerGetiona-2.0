@@ -101,17 +101,14 @@ class ReportController extends Controller
         // en todo el dashboard para que las tarjetas y desgloses coincidan.
         $overdueActivities = RoleActivity::overdue()->count();
 
-        // Approaching: mismas actividades candidatas que overdue pero con fecha
-        // de compromiso aún futura, dentro de la ventana de aproximación.
-        $approachingCandidates = RoleActivity::whereNotNull('commitment_date')
+        // Approaching: actividades que vencen exactamente el mismo día de hoy
+        // y aún no están entregadas o aprobadas.
+        $todayStr = Carbon::today()->toDateString();
+        $approachingActivities = RoleActivity::whereNotNull('commitment_date')
+            ->where('commitment_date', $todayStr)
             ->whereNull('actual_delivery_date')
             ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
-            ->get();
-        $approachingActivities = 0;
-        foreach ($approachingCandidates as $a) {
-            $status = WorkingDayService::getStatus(Carbon::parse($a->commitment_date));
-            if ($status === 'approaching') $approachingActivities++;
-        }
+            ->count();
 
         // Per-program breakdown
         $programs = \App\Models\AcademicProgram::with('project')->get();
@@ -316,22 +313,19 @@ class ReportController extends Controller
     }
 
     // ─── GET /reports/approaching-list ────────────────────────────────
-    // Devuelve la lista detallada de actividades por vencer usando EXACTAMENTE
-    // la misma lógica que la tarjeta del dashboard.
+    // Devuelve la lista detallada de actividades por vencer (que vencen hoy)
+    // usando la misma lógica que la tarjeta del dashboard.
     public function approachingList()
     {
-        $candidates = RoleActivity::whereNotNull('commitment_date')
+        $todayStr = Carbon::today()->toDateString();
+        $activities = RoleActivity::whereNotNull('commitment_date')
+            ->where('commitment_date', $todayStr)
             ->whereNull('actual_delivery_date')
             ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
             ->with(['deliverable.subject.academicProgram.project', 'responsible'])
             ->get();
 
-        $approaching = $candidates->filter(function ($a) {
-            $status = WorkingDayService::getStatus(Carbon::parse($a->commitment_date));
-            return $status === 'approaching';
-        });
-
-        return response()->json($this->formatActivityList($approaching));
+        return response()->json($this->formatActivityList($activities));
     }
 
     /**

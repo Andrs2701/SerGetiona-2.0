@@ -93,6 +93,10 @@ export default function FilteredDetailPanel({ isOpen, title, rows, loading, onCl
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 dark:bg-red-900/20 rounded-full px-2 py-0.5">
                         <XCircle size={10} /> Vencida hace {Math.abs(row.days_diff)} día(s)
                       </span>
+                    ) : row.days_diff === 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-full px-2 py-0.5">
+                        <AlertTriangle size={10} /> Vence hoy
+                      </span>
                     ) : isApproach ? (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-full px-2 py-0.5">
                         <AlertTriangle size={10} /> Vence en {row.days_diff} día(s)

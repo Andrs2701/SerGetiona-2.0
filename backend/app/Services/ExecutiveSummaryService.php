@@ -40,7 +40,7 @@ final class ExecutiveSummaryService
             fn ($a) => $a->commitment_date
                 && !$isOverdue($a)
                 && !in_array($a->status, ['approved', 'delivered', 'not_applicable'])
-                && $a->commitment_date->between($today, $today->copy()->addDays(5))
+                && $a->commitment_date->toDateString() === $today->toDateString()
         )->count();
 
         $total    = $activities->count();
