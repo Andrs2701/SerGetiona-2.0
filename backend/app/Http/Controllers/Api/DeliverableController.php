@@ -493,7 +493,7 @@ class DeliverableController extends Controller
             'name'                  => $d->name,
             'type'                  => $d->type,
             'global_status'         => $d->global_status,
-            'start_date'            => $d->start_date,
+            'start_date'            => $d->start_date ? $d->start_date->toDateString() : null,
             'notes'                 => $d->notes,
             'semestre'              => $d->semestre,
             'ciclo'                 => $d->ciclo,

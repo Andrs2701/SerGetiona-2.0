@@ -228,6 +228,16 @@ class RoleActivityController extends Controller
             );
         }
 
+        if (isset($data['status'])) {
+            if (in_array($data['status'], ['delivered', 'approved'], true)) {
+                if (empty($data['actual_delivery_date'])) {
+                    $data['actual_delivery_date'] = Carbon::today()->toDateString();
+                }
+            } else {
+                $data['actual_delivery_date'] = null;
+            }
+        }
+
         $activity->update($data);
         $dirty = $activity->getChanges();
 

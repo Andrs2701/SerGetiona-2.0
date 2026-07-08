@@ -64,14 +64,16 @@ function daysUntil(dateStr?: string): number | null {
 
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
+  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
+  const d = new Date(cleanStr + 'T00:00:00');
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
 function formatDateShort(dateStr?: string | null): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
+  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
+  const d = new Date(cleanStr + 'T00:00:00');
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 }
@@ -946,7 +948,29 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                               {isNA ? <span className="text-gray-400 italic">No aplica</span> : formatDateShort(act?.commitment_date)}
                             </td>
                             <td className="px-3 py-2 text-gray-600">
-                              {isNA ? '—' : formatDateShort(act?.actual_delivery_date)}
+                              {(() => {
+                                if (isNA) return '—';
+                                if (!act?.actual_delivery_date) {
+                                  const todayStr = new Date().toISOString().split('T')[0];
+                                  const isOverdue = act?.commitment_date && act.commitment_date < todayStr && !['approved', 'delivered'].includes(act.status);
+                                  return isOverdue ? (
+                                    <span className="text-rose-600 dark:text-rose-400 font-medium">Pendiente (Vencido)</span>
+                                  ) : '—';
+                                }
+                                
+                                const isDelayed = act.commitment_date && act.actual_delivery_date > act.commitment_date;
+                                return isDelayed ? (
+                                  <div className="flex flex-col">
+                                    <span className="text-rose-600 dark:text-rose-400 font-semibold">{formatDateShort(act.actual_delivery_date)}</span>
+                                    <span className="text-[9px] text-rose-500 font-medium">Vencido</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{formatDateShort(act.actual_delivery_date)}</span>
+                                    <span className="text-[9px] text-emerald-500 font-medium">A tiempo</span>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-3 py-2">
                               <span className={clsx('font-medium', cfg?.text ?? 'text-gray-500')}>
@@ -1048,44 +1072,76 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                     {/* Recursos entregados por rol */}
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recursos entregados por rol</p>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {flow.roles.map(r => {
-                          const totalProd = r.production.reduce((s, p) => s + p.total, 0);
                           if (r.status === 'not_applicable') return null;
                           return (
                             <div key={r.role} className={clsx(
-                              'rounded-lg border p-3',
+                              'rounded-lg border p-3.5 space-y-3.5',
                               ROLE_CELL_COLORS[r.role as Role]?.bg ?? 'bg-gray-50',
                               ROLE_CELL_COLORS[r.role as Role]?.border ?? 'border-gray-100',
                             )}>
-                              <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                   <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[r.role as Role] ?? 'bg-gray-400')}>
                                     {ROLE_ABBR[r.role as Role] ?? r.role.toUpperCase()}
                                   </span>
-                                  <span className={clsx('text-xs font-semibold', ROLE_CELL_COLORS[r.role as Role]?.label ?? 'text-gray-700')}>
+                                  <span className={clsx('text-xs font-bold', ROLE_CELL_COLORS[r.role as Role]?.label ?? 'text-gray-700')}>
                                     {ROLE_LABELS[r.role as Role] ?? r.role}
                                   </span>
                                 </div>
                                 <ActivityStatusBadge status={r.status} />
                               </div>
-                              {r.production.length === 0 ? (
-                                <p className="text-[10px] text-gray-400 italic">Sin producción registrada</p>
-                              ) : (
-                                <div className="flex flex-wrap gap-1.5 mt-1">
-                                  {r.production.map(p => (
-                                    <span key={p.resource_type} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/70 rounded text-[10px] font-medium text-gray-700 border border-white/50">
-                                      <span className="font-bold">{p.total}</span> {p.resource_type}
-                                    </span>
-                                  ))}
+                              
+                              {/* Recursos Producidos */}
+                              <div>
+                                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">Recursos Producidos</p>
+                                {r.production.length === 0 ? (
+                                  <p className="text-[10px] text-gray-400 italic">Sin producción registrada</p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {r.production.map(p => (
+                                      <span key={p.resource_type} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-semibold text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
+                                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{p.total}</span> {p.resource_type}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Enlaces de Evidencia del Rol */}
+                              {r.links.length > 0 && (
+                                <div className="pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
+                                  <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Evidencias y Enlaces</p>
+                                  <div className="space-y-1.5">
+                                    {r.links.map(lk => (
+                                      <div key={lk.id} className="flex items-center gap-2 bg-white/40 dark:bg-gray-900/20 rounded-md px-2.5 py-1.5 border border-white/30 dark:border-gray-700/10">
+                                        <ExternalLink size={10} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          {lk.url ? (
+                                            <a href={lk.url} target="_blank" rel="noopener noreferrer"
+                                              className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline truncate block">
+                                              {lk.title}
+                                            </a>
+                                          ) : (
+                                            <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate block">{lk.title}</span>
+                                          )}
+                                          <p className="text-[8px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                            {lk.user?.name ?? '—'} · {new Date(lk.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
+
                               {r.notes && (
-                                <p className="text-[10px] text-gray-500 mt-1.5 italic leading-relaxed">{r.notes}</p>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 italic leading-relaxed pt-1.5 border-t border-gray-200/30 dark:border-gray-700/30">{r.notes}</p>
                               )}
                               {r.responsible && (
-                                <p className="text-[10px] text-gray-500 mt-1.5 flex items-center gap-1">
-                                  <UserIcon size={9} /> {r.responsible.name}
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1 pt-1">
+                                  <UserIcon size={9} /> <span className="font-medium">{r.responsible.name}</span>
                                 </p>
                               )}
                             </div>
@@ -1093,38 +1149,6 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                         })}
                       </div>
                     </div>
-
-                    {/* Enlaces de evidencia */}
-                    {flow.roles.some(r => r.links.length > 0) && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Evidencias y enlaces</p>
-                        <div className="space-y-1.5">
-                          {flow.roles.flatMap(r => r.links.map(lk => ({ ...lk, role: r.role }))).map(lk => (
-                            <div key={lk.id} className="flex items-start gap-2.5 bg-gray-50 rounded-lg px-3 py-2">
-                              <ExternalLink size={12} className="text-indigo-400 mt-0.5 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[lk.role as Role] ?? 'bg-gray-400')}>
-                                    {ROLE_ABBR[lk.role as Role] ?? lk.role.toUpperCase()}
-                                  </span>
-                                  {lk.url ? (
-                                    <a href={lk.url} target="_blank" rel="noopener noreferrer"
-                                      className="text-xs font-medium text-indigo-600 hover:underline truncate max-w-[220px]">
-                                      {lk.title}
-                                    </a>
-                                  ) : (
-                                    <span className="text-xs font-medium text-gray-700 truncate">{lk.title}</span>
-                                  )}
-                                </div>
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  {lk.user?.name ?? '—'} · {new Date(lk.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
           )}
         </div>
