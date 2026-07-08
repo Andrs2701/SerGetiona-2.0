@@ -113,11 +113,11 @@ export default function ChannelMembersModal({ channel, canManage, allUsers, onCl
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value ? Number(e.target.value) : '')}
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="flex-1 min-w-0 text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-500/20"
             >
-              <option value="">Agregar usuario…</option>
+              <option value="" className="dark:bg-gray-800">Agregar usuario…</option>
               {available.map((u) => (
-                <option key={u.id} value={u.id}>
+                <option key={u.id} value={u.id} className="dark:bg-gray-800">
                   {u.name} ({ROLE_LABELS[u.role] ?? u.role})
                 </option>
               ))}
@@ -125,7 +125,7 @@ export default function ChannelMembersModal({ channel, canManage, allUsers, onCl
             <button
               onClick={handleAdd}
               disabled={selectedId === '' || working === -1}
-              className="flex-none flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40"
+              className="flex-none shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40"
             >
               <UserPlus size={14} />
               Agregar
