@@ -302,4 +302,67 @@ class ReportController extends Controller
             'total_delayed' => $totalDelayed,
         ]);
     }
+
+    // ─── GET /reports/overdue-list ────────────────────────────────────
+    // Devuelve la lista detallada de actividades vencidas usando EXACTAMENTE
+    // el mismo scope que la tarjeta del dashboard para garantizar consistencia.
+    public function overdueList()
+    {
+        $activities = RoleActivity::overdue()
+            ->with(['deliverable.subject.academicProgram.project', 'responsible'])
+            ->get();
+
+        return response()->json($this->formatActivityList($activities));
+    }
+
+    // ─── GET /reports/approaching-list ────────────────────────────────
+    // Devuelve la lista detallada de actividades por vencer usando EXACTAMENTE
+    // la misma lógica que la tarjeta del dashboard.
+    public function approachingList()
+    {
+        $candidates = RoleActivity::whereNotNull('commitment_date')
+            ->whereNull('actual_delivery_date')
+            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
+            ->with(['deliverable.subject.academicProgram.project', 'responsible'])
+            ->get();
+
+        $approaching = $candidates->filter(function ($a) {
+            $status = WorkingDayService::getStatus(Carbon::parse($a->commitment_date));
+            return $status === 'approaching';
+        });
+
+        return response()->json($this->formatActivityList($approaching));
+    }
+
+    /**
+     * Formatea una colección de RoleActivity en un array listo para el frontend.
+     */
+    private function formatActivityList($activities): array
+    {
+        $today = Carbon::today();
+
+        return $activities->map(function ($a) use ($today) {
+            $deliverable = $a->deliverable;
+            $subject = $deliverable?->subject;
+            $program = $subject?->academicProgram;
+            $project = $program?->project;
+
+            $commitDate = $a->commitment_date ? Carbon::parse($a->commitment_date) : null;
+            $daysDiff = $commitDate ? $commitDate->diffInDays($today, false) : 0;
+
+            return [
+                'id'              => $a->id,
+                'role'            => $a->role,
+                'status'          => $a->status,
+                'commitment_date' => $a->commitment_date?->toDateString(),
+                'days_diff'       => (int) round($daysDiff),
+                'responsible'     => $a->responsible?->name ?? '—',
+                'deliverable_id'  => $deliverable?->id,
+                'deliverable'     => $deliverable?->name ?? '—',
+                'subject'         => $subject?->name ?? '—',
+                'program'         => $program?->name ?? '—',
+                'project'         => $project?->name ?? '—',
+            ];
+        })->values()->toArray();
+    }
 }

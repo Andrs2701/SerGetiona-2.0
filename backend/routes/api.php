@@ -174,6 +174,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
         Route::get('reports/compliance', [ReportController::class, 'compliance']);
         Route::get('reports/workload', [ReportController::class, 'workload']);
+        Route::get('reports/overdue-list', [ReportController::class, 'overdueList']);
+        Route::get('reports/approaching-list', [ReportController::class, 'approachingList']);
 
         Route::post('/import/deliverables', [ImportController::class, 'deliverables']);
         Route::get('/import/template', [ImportController::class, 'template']);

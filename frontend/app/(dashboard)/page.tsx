@@ -2091,7 +2091,7 @@ function DashboardAdmin() {
       } else if (f === 'programs') {
         endpoint = '/programs';
       } else if (f === 'overdue' || f === 'approaching') {
-        endpoint = '/deliverables';
+        // Manejado en una rama aparte abajo, no necesita endpoint genérico
       } else if (f === 'with_observations') {
         params['global_status'] = 'with_observations';
       } else if (f.startsWith('status_')) {
@@ -2116,36 +2116,24 @@ function DashboardAdmin() {
             name: item.name ?? '—',
             program: item.project?.name ?? '—',
           })));
-        } else if (f === 'overdue' || f === 'approaching') {
-          const list: PanelRow[] = [];
-          for (const d of data) {
-            const acts = d.role_activities ?? [];
-            for (const act of acts) {
-              const matchesFilter = f === 'overdue'
-                ? isPastDue(act.commitment_date, act.status)
-                : isApproaching(act.commitment_date, act.status);
-              
-              if (matchesFilter) {
-                const diffTime = act.commitment_date
-                  ? new Date(act.commitment_date + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)
-                  : 0;
-                const daysDiff = Math.round(diffTime / 86400000);
-
-                list.push({
-                  id: act.id ?? `${d.id}_${act.role}`,
-                  name: `${d.subject_name ?? '—'} / ${d.name ?? '—'} (${ROLE_LABELS[act.role as keyof typeof ROLE_LABELS] ?? act.role})`,
-                  responsible: act.responsible?.name ?? '—',
-                  program: d.program_name ?? '—',
-                  subject: d.subject_name ?? '—',
-                  commitment_date: act.commitment_date,
-                  days_diff: daysDiff,
-                  status: act.status,
-                  role: act.role,
-                });
-              }
-            }
-          }
+      } else if (f === 'overdue' || f === 'approaching') {
+          // Usar los endpoints dedicados del backend para garantizar que la lista
+          // detallada coincida EXACTAMENTE con el número de la tarjeta del dashboard.
+          const listEndpoint = f === 'overdue' ? '/reports/overdue-list' : '/reports/approaching-list';
+          const listData = await api.get<any[]>(listEndpoint);
+          const list: PanelRow[] = (listData ?? []).map((act: any) => ({
+            id: act.id,
+            name: `${act.subject ?? '—'} / ${act.deliverable ?? '—'} (${ROLE_LABELS[act.role as keyof typeof ROLE_LABELS] ?? act.role})`,
+            responsible: act.responsible ?? '—',
+            program: act.program ?? '—',
+            subject: act.subject ?? '—',
+            commitment_date: act.commitment_date,
+            days_diff: act.days_diff ?? 0,
+            status: act.status,
+            role: act.role,
+          }));
           setPanelRows(list);
+
         } else {
           setPanelRows(data.map((item, idx) => {
             const acts = item.role_activities ?? [];
