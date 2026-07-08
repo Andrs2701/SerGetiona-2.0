@@ -98,7 +98,9 @@ class ReportController extends Controller
         $totalPrograms = \App\Models\AcademicProgram::count();
 
         // Overdue and approaching
-        $allActivities = RoleActivity::whereNotNull('commitment_date')->get();
+        $allActivities = RoleActivity::whereNotNull('commitment_date')
+            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
+            ->get();
         $overdueActivities = 0;
         $approachingActivities = 0;
         foreach ($allActivities as $a) {

@@ -536,6 +536,13 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         }),
       };
     }
+    if (mode === 'create' && deliverable) {
+      return {
+        ...EMPTY_FORM,
+        project_id: String(deliverable.project_id ?? ''),
+        program_name: deliverable.program_name ?? '',
+      };
+    }
     return { ...EMPTY_FORM };
   });
   const [saving, setSaving] = useState(false);
@@ -1407,7 +1414,7 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 interface PanelState { deliverable: Deliverable; tab: PanelTab; }
-type FormMode = { mode: 'create' } | { mode: 'edit'; deliverable: Deliverable };
+type FormMode = { mode: 'create'; deliverable?: Deliverable } | { mode: 'edit'; deliverable: Deliverable };
 
 export default function EntregablesPage() {
   const searchParams = useSearchParams();
@@ -1743,9 +1750,9 @@ export default function EntregablesPage() {
                       />
                     ))}
                     {isManager && (
-                      <div className="px-5 py-3 border-t border-dashed border-gray-100 bg-gray-50/40">
-                        <button onClick={() => setFormPanel({ mode: 'create' })}
-                          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#194276] transition-colors">
+                      <div className="px-5 py-3 border-t border-dashed border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-800/20">
+                        <button onClick={() => setFormPanel({ mode: 'create', deliverable: group.items[0] })}
+                          className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium">
                           <Plus size={12} /> Agregar módulo en este programa
                         </button>
                       </div>
@@ -1894,7 +1901,7 @@ export default function EntregablesPage() {
       {formPanel && (
         <DeliverableFormPanel
           mode={formPanel.mode}
-          deliverable={formPanel.mode === 'edit' ? formPanel.deliverable : undefined}
+          deliverable={formPanel.deliverable}
           projects={projects} users={users} programs={programNames}
           onClose={() => setFormPanel(null)}
           onSave={(updated) => {
