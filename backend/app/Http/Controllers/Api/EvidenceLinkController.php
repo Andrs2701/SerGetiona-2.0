@@ -57,7 +57,7 @@ class EvidenceLinkController extends Controller
     {
         abort_unless(
             ResourceAccess::isManager($request->user())
-            || $activity->responsible_id === $request->user()->id,
+            || (int) $activity->responsible_id === (int) $request->user()->id,
             403
         );
 
@@ -133,8 +133,8 @@ class EvidenceLinkController extends Controller
     {
         $user = $request->user();
         $canDelete = in_array($user->role, ['admin', 'coordinator'])
-            || $link->user_id === $user->id
-            || $link->roleActivity?->responsible_id === $user->id;
+            || (int) $link->user_id === (int) $user->id
+            || (int) $link->roleActivity?->responsible_id === (int) $user->id;
 
         if (!$canDelete) {
             return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
