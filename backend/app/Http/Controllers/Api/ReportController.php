@@ -97,18 +97,19 @@ class ReportController extends Controller
         $activeProjects = Project::where('status', 'in_progress')->count();
         $totalPrograms = \App\Models\AcademicProgram::count();
 
-        // Overdue and approaching
-        $allActivities = RoleActivity::whereNotNull('commitment_date')
-            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
+        // Overdue: definición única en RoleActivity::scopeOverdue(), reutilizada
+        // en todo el dashboard para que las tarjetas y desgloses coincidan.
+        $overdueActivities = RoleActivity::overdue()->count();
+
+        // Approaching: mismas actividades candidatas que overdue pero con fecha
+        // de compromiso aún futura, dentro de la ventana de aproximación.
+        $approachingCandidates = RoleActivity::whereNotNull('commitment_date')
+            ->whereNull('actual_delivery_date')
+            ->whereNotIn('status', ['approved', 'not_applicable'])
             ->get();
-        $overdueActivities = 0;
         $approachingActivities = 0;
-        foreach ($allActivities as $a) {
-            $status = WorkingDayService::getStatus(
-                Carbon::parse($a->commitment_date),
-                $a->actual_delivery_date ? Carbon::parse($a->actual_delivery_date) : null
-            );
-            if ($status === 'overdue') $overdueActivities++;
+        foreach ($approachingCandidates as $a) {
+            $status = WorkingDayService::getStatus(Carbon::parse($a->commitment_date));
             if ($status === 'approaching') $approachingActivities++;
         }
 
@@ -125,10 +126,7 @@ class ReportController extends Controller
             $compliance = $total > 0 ? round(($finished / $total) * 100) : 0;
 
             $overdueCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
-                ->whereNotNull('commitment_date')
-                ->whereNull('actual_delivery_date')
-                ->where('commitment_date', '<', now()->toDateString())
-                ->whereNotIn('status', ['approved', 'not_applicable'])
+                ->overdue()
                 ->count();
 
             $activeCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
@@ -154,11 +152,23 @@ class ReportController extends Controller
                 'role',
                 DB::raw('count(*) as total'),
                 DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
-                DB::raw("sum(case when status NOT IN ('approved','not_applicable','not_started') then 1 else 0 end) as active"),
-                DB::raw("sum(case when commitment_date < CURRENT_DATE and actual_delivery_date IS NULL and status NOT IN ('approved','not_applicable') then 1 else 0 end) as overdue")
+                DB::raw("sum(case when status NOT IN ('approved','not_applicable','not_started') then 1 else 0 end) as active")
             )
             ->groupBy('role')
             ->get();
+
+        // overdue por rol usa el mismo scope que el resto del dashboard, no una
+        // condición SQL propia, para que el desglose siempre sume igual que
+        // la tarjeta "Vencidas" y que "Vencidos" por programa.
+        $overdueByRole = RoleActivity::overdue()
+            ->select('role', DB::raw('count(*) as overdue'))
+            ->groupBy('role')
+            ->pluck('overdue', 'role');
+
+        $activitiesByRoleDetail = $activitiesByRoleDetail->map(function ($row) use ($overdueByRole) {
+            $row->overdue = (int) ($overdueByRole[$row->role] ?? 0);
+            return $row;
+        });
 
         // Activities counts (for KPI cards)
         $totalActivities    = RoleActivity::count();

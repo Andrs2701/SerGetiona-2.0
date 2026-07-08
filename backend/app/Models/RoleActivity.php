@@ -33,6 +33,20 @@ class RoleActivity extends Model
         'production_not_applicable' => 'boolean',
     ];
 
+    /**
+     * Actividades vencidas: con fecha de compromiso pasada, sin entrega registrada
+     * y en un estado que aún espera acción del responsable. Una vez que
+     * actual_delivery_date queda registrado (deliver/approve), la actividad deja
+     * de contar como vencida sin importar cuánto tiempo tome la revisión posterior.
+     */
+    public function scopeOverdue($query)
+    {
+        return $query->whereNotNull('commitment_date')
+            ->where('commitment_date', '<', now()->toDateString())
+            ->whereNull('actual_delivery_date')
+            ->whereNotIn('status', ['approved', 'not_applicable']);
+    }
+
     public static function defaultChecklist(string $role): array
     {
         return match($role) {

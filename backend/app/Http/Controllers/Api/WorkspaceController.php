@@ -47,18 +47,18 @@ class WorkspaceController extends Controller
         $finishedDeliverables = Deliverable::where('global_status', 'finished')->count();
 
         $allActivities = RoleActivity::with('deliverable.subject.academicProgram.project')->get();
-        $overdue       = 0;
-        $approaching   = 0;
+
+        // Overdue: mismo scope que ReportController::dashboard() para que las
+        // cifras coincidan entre el dashboard ejecutivo y este workspace.
+        $overdue     = RoleActivity::overdue()->count();
+        $approaching = 0;
 
         $today = Carbon::today();
 
         foreach ($allActivities as $a) {
-            if (!$a->commitment_date) continue;
-            $status = WorkingDayService::getStatus(
-                Carbon::parse($a->commitment_date),
-                $a->actual_delivery_date ? Carbon::parse($a->actual_delivery_date) : null
-            );
-            if ($status === 'overdue') $overdue++;
+            if (!$a->commitment_date || $a->actual_delivery_date) continue;
+            if (in_array($a->status, ['approved', 'not_applicable'], true)) continue;
+            $status = WorkingDayService::getStatus(Carbon::parse($a->commitment_date));
             if ($status === 'approaching') $approaching++;
         }
 

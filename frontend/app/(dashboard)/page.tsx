@@ -1085,7 +1085,8 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
         .map((act) => {
           const start = parseLocalDate(act.actual_start_date) ?? parseLocalDate(item.start_date) ?? parseLocalDate(act.commitment_date);
           const end = parseLocalDate(act.actual_delivery_date) ?? parseLocalDate(act.commitment_date) ?? start;
-          const overdue = !!end && end < today && !['approved', 'not_applicable'].includes(act.status);
+          const commitmentDate = parseLocalDate(act.commitment_date);
+          const overdue = !act.actual_delivery_date && !!commitmentDate && commitmentDate < today && !['approved', 'not_applicable'].includes(act.status);
           return {
             id: `${item.id}-${act.id}-${act.role}`,
             deliverableId: item.id,

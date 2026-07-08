@@ -105,7 +105,7 @@ function getApprovableActivity(d: Deliverable): RoleActivity | undefined {
 function isOverdue(d: Deliverable): boolean {
   if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
   return (d.role_activities ?? []).some(a => {
-    if (a.status === 'not_applicable' || a.status === 'approved') return false;
+    if (a.status === 'not_applicable' || a.status === 'approved' || a.actual_delivery_date) return false;
     const days = daysUntil(a.commitment_date);
     return days !== null && days < 0;
   });
@@ -114,7 +114,7 @@ function isOverdue(d: Deliverable): boolean {
 function isApproaching(d: Deliverable): boolean {
   if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
   return (d.role_activities ?? []).some(a => {
-    if (a.status === 'not_applicable' || a.status === 'approved') return false;
+    if (a.status === 'not_applicable' || a.status === 'approved' || a.actual_delivery_date) return false;
     const days = daysUntil(a.commitment_date);
     return days !== null && days >= 0 && days <= 5;
   });
@@ -180,7 +180,7 @@ function RoleCell({ role, activity }: { role: Role; activity?: RoleActivity }) {
   const isNA = !activity || activity.status === 'not_applicable';
   const colors = ROLE_CELL_COLORS[role];
   const days = daysUntil(activity?.commitment_date);
-  const overdueDate = !isNA && activity?.status !== 'approved' && days !== null && days < 0;
+  const overdueDate = !isNA && activity?.status !== 'approved' && !activity?.actual_delivery_date && days !== null && days < 0;
 
   return (
     <div className={clsx(
@@ -1016,7 +1016,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                 const act = (deliverable.role_activities ?? []).find(a => a.role === role);
                 const isNA = act?.status === 'not_applicable';
                 const daysLeft = daysUntil(act?.commitment_date);
-                const isDelivered = act?.status === 'delivered' || act?.status === 'approved';
+                const isDelivered = !!act?.actual_delivery_date || act?.status === 'approved';
                 const isOverdue = !isDelivered && daysLeft !== null && daysLeft < 0;
                 const isApproaching = !isDelivered && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
 
@@ -1790,7 +1790,7 @@ export default function EntregablesPage() {
                           const acts = d.role_activities ?? [];
                           const active = getActiveActivity(d);
                           const days = daysUntil(active?.commitment_date);
-                          const overdue = days !== null && days < 0 && d.global_status !== 'finished';
+                          const overdue = days !== null && days < 0 && !active?.actual_delivery_date && d.global_status !== 'finished';
                           return (
                             <tr key={d.id} className={clsx(
                               'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
