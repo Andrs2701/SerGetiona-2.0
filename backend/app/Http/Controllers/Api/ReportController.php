@@ -89,7 +89,7 @@ class ReportController extends Controller
             ? round(($finishedDeliverables / $totalDeliverables) * 100, 2)
             : 0;
 
-        $activitiesByRole = RoleActivity::select('role', DB::raw('count(*) as total'),
+        $activitiesByRole = RoleActivity::whereHas('deliverable')->select('role', DB::raw('count(*) as total'),
             DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"))
             ->groupBy('role')
             ->get();
@@ -99,7 +99,7 @@ class ReportController extends Controller
 
         // Overdue: definición única en RoleActivity::scopeOverdue(), reutilizada
         // en todo el dashboard para que las tarjetas y desgloses coincidan.
-        $overdueActivities = RoleActivity::overdue()->count();
+        $overdueActivities = RoleActivity::overdue()->whereHas('deliverable')->count();
 
         // Approaching: actividades que vencen exactamente el mismo día de hoy
         // y aún no están entregadas o aprobadas.
@@ -108,6 +108,7 @@ class ReportController extends Controller
             ->where('commitment_date', $todayStr)
             ->whereNull('actual_delivery_date')
             ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
+            ->whereHas('deliverable')
             ->count();
 
         // Per-program breakdown
@@ -145,7 +146,7 @@ class ReportController extends Controller
         })->sortByDesc('overdue_count')->values();
 
         // Activities by role with more detail (for flow/bottleneck analysis)
-        $activitiesByRoleDetail = RoleActivity::select(
+        $activitiesByRoleDetail = RoleActivity::whereHas('deliverable')->select(
                 'role',
                 DB::raw('count(*) as total'),
                 DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
@@ -158,6 +159,7 @@ class ReportController extends Controller
         // condición SQL propia, para que el desglose siempre sume igual que
         // la tarjeta "Vencidas" y que "Vencidos" por programa.
         $overdueByRole = RoleActivity::overdue()
+            ->whereHas('deliverable')
             ->select('role', DB::raw('count(*) as overdue'))
             ->groupBy('role')
             ->pluck('overdue', 'role');
@@ -168,9 +170,9 @@ class ReportController extends Controller
         });
 
         // Activities counts (for KPI cards)
-        $totalActivities    = RoleActivity::count();
-        $finishedActivities = RoleActivity::where('status', 'approved')->count();
-        $activeActivities   = RoleActivity::whereNotIn('status', ['approved', 'not_applicable', 'not_started'])->count();
+        $totalActivities    = RoleActivity::whereHas('deliverable')->count();
+        $finishedActivities = RoleActivity::whereHas('deliverable')->where('status', 'approved')->count();
+        $activeActivities   = RoleActivity::whereHas('deliverable')->whereNotIn('status', ['approved', 'not_applicable', 'not_started'])->count();
 
         return response()->json([
             'active_projects'             => $activeProjects,
@@ -306,6 +308,7 @@ class ReportController extends Controller
     public function overdueList()
     {
         $activities = RoleActivity::overdue()
+            ->whereHas('deliverable')
             ->with(['deliverable.subject.academicProgram.project', 'responsible'])
             ->get();
 
@@ -322,6 +325,7 @@ class ReportController extends Controller
             ->where('commitment_date', $todayStr)
             ->whereNull('actual_delivery_date')
             ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
+            ->whereHas('deliverable')
             ->with(['deliverable.subject.academicProgram.project', 'responsible'])
             ->get();
 

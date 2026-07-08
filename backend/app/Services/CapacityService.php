@@ -56,7 +56,7 @@ final class CapacityService
      */
     private static function activeActivities(): Collection
     {
-        return RoleActivity::with('deliverable.complexityLevel')
+        return RoleActivity::whereHas('deliverable')->with('deliverable.complexityLevel')
             ->whereNotNull('responsible_id')
             ->whereNotIn('status', self::EXCLUDED_STATUSES)
             ->whereNotNull('commitment_date')

@@ -27,7 +27,7 @@ final class ExecutiveSummaryService
         $health = HealthService::portfolio();
         $capacity = CapacityService::global();
 
-        $activities = RoleActivity::whereNotNull('responsible_id')->get();
+        $activities = RoleActivity::whereNotNull('responsible_id')->whereHas('deliverable')->get();
 
         $isOverdue = fn ($a) => $a->commitment_date
             && $a->commitment_date->lt($today)
