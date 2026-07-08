@@ -34,9 +34,6 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
-  async redirects() {
-    return [{ source: '/', destination: '/login', permanent: false }];
-  },
 };
 
 export default nextConfig;
