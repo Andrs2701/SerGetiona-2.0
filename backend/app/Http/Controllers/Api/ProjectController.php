@@ -116,4 +116,77 @@ class ProjectController extends Controller
 
         return response()->json(['message' => 'Proyecto eliminado correctamente.']);
     }
+
+    public function audit(Request $request, Project $project)
+    {
+        abort_unless(ResourceAccess::canAccessProject($request->user(), $project), 403);
+
+        $programIds = $project->academicPrograms()->pluck('id');
+        $subjectIds = \App\Models\Subject::whereIn('academic_program_id', $programIds)->pluck('id');
+        $deliverableIds = \App\Models\Deliverable::whereIn('subject_id', $subjectIds)->pluck('id');
+        $activityIds = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)->pluck('id');
+
+        $logs = \App\Models\AuditLog::where(function ($query) use ($activityIds) {
+                $query->where('entity_type', 'RoleActivity')
+                      ->whereIn('entity_id', $activityIds);
+            })
+            ->orWhere(function ($query) use ($deliverableIds) {
+                $query->where('entity_type', 'Deliverable')
+                      ->whereIn('entity_id', $deliverableIds);
+            })
+            ->orWhere(function ($query) use ($project) {
+                $query->where('entity_type', 'Project')
+                      ->where('entity_id', $project->id);
+            })
+            ->with('user')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+
+        $formattedLogs = $logs->map(function ($log) {
+            $userLabel = $log->user?->name ?? 'Usuario de sistema';
+            $date = $log->created_at?->toIso8601String();
+            $actionMsg = 'realizó un cambio';
+
+            if ($log->entity_type === 'RoleActivity') {
+                $activity = \App\Models\RoleActivity::find($log->entity_id);
+                $deliverableName = $activity?->deliverable?->name ?? "entregable #{$activity?->deliverable_id}";
+                $roleLabel = \App\Http\Controllers\Api\NotificationService::translateRole($activity?->role ?? '');
+
+                if ($log->field_changed === 'status') {
+                    $oldStatusLabel = \App\Http\Controllers\Api\RoleActivityController::translateStatus($log->old_value ?? '');
+                    $newStatusLabel = \App\Http\Controllers\Api\RoleActivityController::translateStatus($log->new_value ?? '');
+                    $actionMsg = "Cambió el estado de '{$deliverableName}' ({$roleLabel}) de '{$oldStatusLabel}' a '{$newStatusLabel}'";
+                } elseif ($log->field_changed === 'responsible_id') {
+                    $newResp = $log->new_value ? \App\Models\User::find($log->new_value)?->name : 'Sin asignar';
+                    $actionMsg = "Asignó el responsable de {$roleLabel} en '{$deliverableName}' a '{$newResp}'";
+                } elseif ($log->field_changed === 'commitment_date') {
+                    $actionMsg = "Actualizó la fecha límite del rol {$roleLabel} en '{$deliverableName}' a '{$log->new_value}'";
+                }
+            } elseif ($log->entity_type === 'Deliverable') {
+                $deliverable = \App\Models\Deliverable::find($log->entity_id);
+                $delName = $deliverable?->name ?? "entregable #{$log->entity_id}";
+                if ($log->field_changed === 'global_status') {
+                    $actionMsg = "Cambió el estado global del entregable '{$delName}' a '{$log->new_value}'";
+                } else {
+                    $actionMsg = "Actualizó el entregable '{$delName}'";
+                }
+            } elseif ($log->entity_type === 'Project') {
+                if ($log->field_changed === 'status') {
+                    $actionMsg = "Cambió el estado del proyecto a '{$log->new_value}'";
+                } else {
+                    $actionMsg = "Modificó datos generales del proyecto";
+                }
+            }
+
+            return [
+                'user' => $userLabel,
+                'action' => $actionMsg,
+                'time' => $log->created_at ? $log->created_at->diffForHumans() : 'Recientemente',
+                'date' => $date
+            ];
+        });
+
+        return response()->json(['audit_logs' => $formattedLogs]);
+    }
 }

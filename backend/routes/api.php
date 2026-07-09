@@ -63,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Proyectos (admin y coordinator pueden crear/eliminar)
     Route::get('projects', [ProjectController::class, 'index']);
     Route::get('projects/{project}', [ProjectController::class, 'show']);
+    Route::get('projects/{project}/audit', [ProjectController::class, 'audit']);
     Route::post('projects', [ProjectController::class, 'store'])->middleware('role:admin,coordinator');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->middleware('role:admin,coordinator');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('role:admin,coordinator');

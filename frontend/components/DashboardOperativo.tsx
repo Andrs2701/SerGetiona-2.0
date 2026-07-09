@@ -141,7 +141,7 @@ function useCountdown(targetDate: string | undefined) {
 function CountdownBanner({ activities }: { activities: WorkspaceActivity[] }) {
   const router = useRouter();
   const next = [...activities]
-    .filter((a) => a.status !== 'approved' && a.commitment_date)
+    .filter((a) => !['approved', 'delivered', 'in_review'].includes(a.status) && a.commitment_date)
     .filter((a) => {
       const d = daysDiff(a.commitment_date!);
       return d >= 0 && d <= 30;
@@ -315,15 +315,15 @@ export default function DashboardOperativo() {
 
   // KPIs
   const total     = activities.length;
-  const pending   = activities.filter((a) => ['not_started', 'pending'].includes(a.status)).length;
-  const overdue   = activities.filter((a) => a.date_status === 'overdue' && a.status !== 'approved').length;
-  const completed = activities.filter((a) => a.status === 'approved').length;
+  const pending   = activities.filter((a) => !['approved', 'delivered', 'in_review', 'not_applicable'].includes(a.status)).length;
+  const overdue   = activities.filter((a) => a.date_status === 'overdue' && !['approved', 'delivered', 'in_review'].includes(a.status)).length;
+  const completed = activities.filter((a) => ['approved', 'delivered', 'in_review'].includes(a.status)).length;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const weekly    = computeWeeklyProgress(activities);
 
   // Priority activities
   const priorityActivities = [...activities]
-    .filter((a) => a.status !== 'approved')
+    .filter((a) => !['approved', 'delivered', 'in_review'].includes(a.status))
     .sort((a, b) => {
       const diff = urgencyOrder(a) - urgencyOrder(b);
       if (diff !== 0) return diff;

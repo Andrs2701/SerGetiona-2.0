@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useCallback, use } from 'react';
 import { clsx } from 'clsx';
-import { Search, ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Download, Upload, Clock } from 'lucide-react';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType, RoleStatus } from '@/lib/types';
 import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
@@ -112,6 +112,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [sidePanelTab, setSidePanelTab] = useState<'info' | 'flow' | 'evidence' | 'comments'>('info');
   const [loadError, setLoadError] = useState(false);
   const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
+  const [auditLogs, setAuditLogs] = useState<{ user: string; action: string; time: string; date: string }[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const loadAuditLogs = useCallback(() => {
+    setLoadingAudit(true);
+    api.get<{ audit_logs: any[] }>(`/projects/${projectId}/audit`)
+      .then(res => setAuditLogs(res.audit_logs ?? []))
+      .catch(() => setAuditLogs([]))
+      .finally(() => setLoadingAudit(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      loadAuditLogs();
+    }
+  }, [activeTab, loadAuditLogs]);
 
   useEffect(() => {
     api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
@@ -494,25 +510,30 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div className="px-5 py-4 border-b border-gray-200">
             <h3 className="font-semibold text-gray-900">Historial de cambios</h3>
           </div>
-          <div className="divide-y divide-gray-50">
-            {[
-              { user: 'Ana Rodríguez', action: 'Cambió estado de "Semana 0" a En Revisión', time: 'Hace 2 horas' },
-              { user: 'Carlos Méndez', action: 'Asignó responsable de Experto a Laura Torres', time: 'Hace 5 horas' },
-              { user: 'Laura Torres', action: 'Actualizó fecha compromiso del rol Experto', time: 'Hace 1 día' },
-              { user: 'Ana Rodríguez', action: 'Creó el entregable "Módulo 1 - Bases Teóricas"', time: 'Hace 2 días' },
-              { user: 'Administrador', action: 'Cambió estado del proyecto a En Ejecución', time: 'Hace 3 días' },
-            ].map((item, i) => (
-              <div key={i} className="px-5 py-3 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                  {item.user[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium text-gray-800 text-sm">{item.user}</span>
-                  <span className="text-gray-500 text-sm ml-1">{item.action}</span>
-                </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">{item.time}</span>
+          <div className="divide-y divide-gray-50 dark:divide-gray-700/50 bg-white dark:bg-gray-800 rounded-b-lg">
+            {loadingAudit ? (
+              <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-500" />
+                Cargando historial de cambios...
               </div>
-            ))}
+            ) : auditLogs.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                No hay cambios registrados en este proyecto.
+              </div>
+            ) : (
+              auditLogs.map((item, i) => (
+                <div key={i} className="px-5 py-3 flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                    {item.user ? item.user[0].toUpperCase() : 'U'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{item.user}</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-sm ml-1">{item.action}</span>
+                  </div>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">{item.time}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
