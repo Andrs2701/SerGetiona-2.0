@@ -52,7 +52,16 @@ async function request<T>(
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
 
-  return res.json() as Promise<T>;
+  if (res.status === 204) {
+    return null as unknown as T;
+  }
+
+  const text = await res.text();
+  if (!text) {
+    return null as unknown as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 async function requestForm<T>(method: string, path: string, body: FormData): Promise<T> {
@@ -68,7 +77,16 @@ async function requestForm<T>(method: string, path: string, body: FormData): Pro
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
 
-  return res.json() as Promise<T>;
+  if (res.status === 204) {
+    return null as unknown as T;
+  }
+
+  const text = await res.text();
+  if (!text) {
+    return null as unknown as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 // Unwrap Laravel's { data: [...] } envelope when present

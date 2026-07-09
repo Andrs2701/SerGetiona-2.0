@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->enum('type', ['file', 'url', 'drive', 'onedrive', 'sharepoint', 'repository'])->default('url');
             $table->string('title');
-            $table->string('url')->nullable();
+            $table->text('url')->nullable();
             $table->string('filename')->nullable();
             $table->timestamp('created_at')->useCurrent();
         });
