@@ -203,6 +203,8 @@ class RoleActivityController extends Controller
             ])],
             'notes'                      => 'nullable|string',
             'production_not_applicable'  => 'sometimes|boolean',
+            'adjust_roles'               => 'nullable|array',
+            'adjust_roles.*'             => 'string',
         ]);
 
         if (!$isManager) {
@@ -243,6 +245,62 @@ class RoleActivityController extends Controller
 
         $activity->loadMissing('deliverable.subject.academicProgram');
         $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+
+        if (isset($dirty['status'])) {
+            // Caso A: QA aprueba la actividad -> Aprobar entregable completo y roles hermanos
+            if ($activity->role === 'qa' && $activity->status === 'approved') {
+                $deliverable = $activity->deliverable;
+                if ($deliverable) {
+                    $deliverable->global_status = 'finished';
+                    $deliverable->save();
+
+                    $deliverable->roleActivities()
+                        ->whereIn('status', ['delivered', 'in_review'])
+                        ->update(['status' => 'approved']);
+                }
+            }
+
+            // Caso B: QA o Admin devuelven actividades específicas a ajustes
+            if ($activity->role === 'qa' && in_array($activity->status, ['adjustments_requested', 'with_findings'], true)) {
+                $adjustRoles = $request->input('adjust_roles', []);
+                if (!empty($adjustRoles) && $activity->deliverable) {
+                    $siblingActivities = $activity->deliverable->roleActivities()
+                        ->whereIn('role', $adjustRoles)
+                        ->where('status', '!=', 'not_applicable')
+                        ->get();
+
+                    foreach ($siblingActivities as $sibling) {
+                        $oldSiblingStatus = $sibling->status;
+                        $sibling->status = 'adjustments_requested';
+                        $sibling->actual_delivery_date = null; // resetear fecha
+                        $sibling->save();
+
+                        \App\Models\AuditLog::create([
+                            'user_id'       => Auth::id() ?? 1,
+                            'action'        => 'updated',
+                            'entity_type'   => 'RoleActivity',
+                            'entity_id'     => $sibling->id,
+                            'field_changed' => 'status',
+                            'old_value'     => $oldSiblingStatus,
+                            'new_value'     => 'adjustments_requested',
+                            'ip_address'    => $request->ip(),
+                            'created_at'    => now(),
+                        ]);
+
+                        if ($sibling->responsible) {
+                            $roleLabel = NotificationService::translateRole($sibling->role);
+                            NotificationService::notify(
+                                $sibling->responsible,
+                                'status_changed',
+                                "Tu actividad requiere ajustes: {$deliverableName}",
+                                "Tu actividad de '{$roleLabel}' fue devuelta a Ajustes Solicitados por Calidad (QA). Observaciones de QA: " . ($activity->notes ?? 'Sin observaciones específicas.'),
+                                ['entity_type' => 'RoleActivity', 'entity_id' => $sibling->id]
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         // Notification: task assigned (new responsible)
         if (isset($dirty['responsible_id']) && $activity->responsible_id) {

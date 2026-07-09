@@ -482,6 +482,25 @@ export default function ActivityDetailPanel({
   const [existingLinksCount, setExistingLinksCount] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const [flowData, setFlowData] = useState<DeliverableFlow | null>(null);
+  const [selectedRolesToAdjust, setSelectedRolesToAdjust] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (activity.role === 'qa' && ['adjustments_requested', 'with_findings'].includes(status)) {
+      api.get<DeliverableFlow>(ENDPOINTS.DELIVERABLE_FLOW(deliverable.id))
+        .then(res => setFlowData(res))
+        .catch(() => setFlowData(null));
+    } else {
+      setFlowData(null);
+      setSelectedRolesToAdjust([]);
+    }
+  }, [activity.role, status, deliverable.id]);
+
+  const adjustableRoles = useMemo(() => {
+    if (!flowData) return [];
+    return flowData.roles.filter(r => r.role !== 'qa' && r.status !== 'not_applicable' && r.responsible);
+  }, [flowData]);
+
   useEffect(() => {
     setStatus(activity.status);
     setNotes(activity.notes ?? '');
@@ -496,6 +515,8 @@ export default function ActivityDetailPanel({
     setExistingLogsCount(0);
     setExistingLinksCount(0);
     setRefreshKey(k => k + 1);
+    setSelectedRolesToAdjust([]);
+    setFlowData(null);
   }, [activity.id]);
 
   const allStates = useMemo(() => {
@@ -547,7 +568,12 @@ export default function ActivityDetailPanel({
     }
 
     try {
-      await api.put(ENDPOINTS.ROLE_ACTIVITY(activity.id), { status, notes, production_not_applicable: allProductionNA });
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(activity.id), {
+        status,
+        notes,
+        production_not_applicable: allProductionNA,
+        adjust_roles: selectedRolesToAdjust
+      });
 
       if (toPost.length > 0) {
         await Promise.all(toPost.map(item =>
@@ -661,6 +687,32 @@ export default function ActivityDetailPanel({
                     {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
                   </select>
                 </div>
+
+                {activity.role === 'qa' && ['adjustments_requested', 'with_findings'].includes(status) && adjustableRoles.length > 0 && (
+                  <div className="mt-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-semibold text-orange-800 dark:text-orange-300">Selecciona los roles que requieren realizar ajustes:</p>
+                    <div className="space-y-1.5">
+                      {adjustableRoles.map(r => {
+                        const isChecked = selectedRolesToAdjust.includes(r.role);
+                        return (
+                          <label key={r.role} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setSelectedRolesToAdjust(prev =>
+                                  isChecked ? prev.filter(x => x !== r.role) : [...prev, r.role]
+                                );
+                              }}
+                              className="rounded border-gray-300 dark:border-gray-600 text-orange-600 focus:ring-orange-500"
+                            />
+                            <span>{ROLE_LABELS[r.role as Role] ?? r.role} {r.responsible ? `(${r.responsible.name})` : ''}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>

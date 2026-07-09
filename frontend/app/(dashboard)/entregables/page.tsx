@@ -309,18 +309,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 ml-auto shrink-0">
-          {canApprove && (
-            <button title="Aprobar" onClick={() => onQuickAction('approve')}
-              className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors">
-              <CheckCircle2 size={14} />
-            </button>
-          )}
-          {canAdjust && (
-            <button title="Solicitar ajustes" onClick={() => onQuickAction('request_adjustments')}
-              className="p-1.5 rounded-md text-orange-500 hover:bg-orange-50 transition-colors">
-              <RotateCcw size={14} />
-            </button>
-          )}
+          {/* Aprobación manual deshabilitada: Calidad (QA) la realiza automáticamente */}
           <span className="w-px h-4 bg-gray-200 mx-0.5" />
           <button title="Ver detalle" onClick={onView}
             className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors">
@@ -1876,10 +1865,7 @@ export default function EntregablesPage() {
                                         className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                                     </>
                                   )}
-                                  {!!getApprovableActivity(d) && (
-                                    <button title="Aprobar" onClick={() => handleQuickAction(d, 'approve')}
-                                      className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"><CheckCircle2 size={13} /></button>
-                                  )}
+                                  {/* Aprobación manual deshabilitada: Calidad (QA) la realiza automáticamente */}
                                 </div>
                               </td>
                             </tr>

@@ -634,7 +634,7 @@ export default function MiEspacioPage() {
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && filterStatus !== 'completed'
-      ? activities.filter(a => a.status === 'approved').length
+      ? activities.filter(a => ['approved', 'delivered', 'in_review'].includes(a.status)).length
       : 0,
     [activities, showCompleted, filterStatus]
   );
@@ -642,16 +642,16 @@ export default function MiEspacioPage() {
   // Filter activities
   const filtered = useMemo(() => activities
     .filter(a => {
-      // Hide approved unless user toggled showCompleted or explicitly filtered for completed
-      if (!showCompleted && filterStatus !== 'completed' && a.status === 'approved') return false;
+      // Hide approved, delivered, or in_review unless user toggled showCompleted or explicitly filtered for completed
+      if (!showCompleted && filterStatus !== 'completed' && ['approved', 'delivered', 'in_review'].includes(a.status)) return false;
       if (search && ![a.deliverable?.name ?? '', a.subject?.name ?? '', a.program?.name ?? ''].some(s => s.toLowerCase().includes(search.toLowerCase()))) return false;
       if (filterProgram && (a.program?.name ?? '') !== filterProgram) return false;
       if (filterSubject && (a.subject?.name ?? '') !== filterSubject) return false;
       if (filterStatus === 'pending')    return ['not_started','pending'].includes(a.status);
       if (filterStatus === 'overdue')    return a.date_status === 'overdue';
       if (filterStatus === 'approaching')return a.date_status === 'approaching';
-      if (filterStatus === 'in_process') return ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting'].includes(a.status);
-      if (filterStatus === 'completed')  return a.status === 'approved';
+      if (filterStatus === 'in_process') return ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting','adjustments_requested','with_findings'].includes(a.status);
+      if (filterStatus === 'completed')  return ['approved', 'delivered', 'in_review'].includes(a.status);
       return true;
     })
     .sort((a, b) => {
