@@ -76,12 +76,14 @@ class ProductionLogController extends Controller
     {
         $user = $request->user();
         $isManager = in_array($user->role, ['admin', 'coordinator'], true);
+        $activity = $productionLog->roleActivity;
 
-        if (!$isManager && (int) $productionLog->logged_by !== (int) $user->id) {
+        if (!$isManager 
+            && (int) $productionLog->logged_by !== (int) $user->id
+            && (!$activity || (int) $activity->responsible_id !== (int) $user->id)
+        ) {
             return response()->json(['message' => 'No tienes permiso para eliminar este registro.'], 403);
         }
-
-        $activity = $productionLog->roleActivity;
         if ($activity && $activity->status === 'delivered') {
             return response()->json([
                 'message' => 'No se puede eliminar un registro de producción de una actividad ya entregada.'

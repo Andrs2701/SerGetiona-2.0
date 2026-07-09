@@ -427,7 +427,27 @@ function QuickProductionGrid({
         return updated;
       });
     } catch (e) {
-      alert(e instanceof Error && e.message.includes('409') ? 'No se puede eliminar: la actividad ya fue entregada.' : 'Error al eliminar.');
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.includes('409')) {
+        alert('No se puede eliminar: la actividad ya fue entregada.');
+      } else {
+        // Intentar parsear mensaje JSON del backend
+        let friendlyMessage = 'Error al eliminar.';
+        try {
+          const jsonStart = msg.indexOf('{');
+          if (jsonStart !== -1) {
+            const errorJson = JSON.parse(msg.substring(jsonStart));
+            if (errorJson.message) {
+              friendlyMessage = errorJson.message;
+            }
+          } else if (msg) {
+            friendlyMessage = msg;
+          }
+        } catch (parseError) {
+          if (msg) friendlyMessage = msg;
+        }
+        alert(friendlyMessage);
+      }
     }
   }
 
@@ -608,14 +628,20 @@ function DetailPanel({
     }
 
     try {
-      // 1. POST production quantities in parallel
+      // 1. PUT status + notes + production_not_applicable (true only when ALL resources are N/A'd)
+      // Se ejecuta primero porque es la acción de negocio y la validación principal de permisos.
+      // Si el PUT falla (ej: sin permisos, ya aprobado, etc.), la ejecución se interrumpe y se evita la acumulación de producción.
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes, production_not_applicable: allProductionNA });
+
+      // 2. POST production quantities in parallel
       if (toPost.length > 0) {
         await Promise.all(toPost.map(item =>
           api.post(ENDPOINTS.ACTIVITY_PRODUCTION(act.id), { ...item, produced_at: prodDate })
         ));
         setQuantities({});
       }
-      // 2. POST pending evidence link
+
+      // 3. POST pending evidence link
       if (hasPendingLink) {
         await api.post(ENDPOINTS.ACTIVITY_EVIDENCE(act.id), {
           type: 'url', title: pendingTitle.trim(), url: pendingUrl.trim(),
@@ -623,8 +649,7 @@ function DetailPanel({
         setPendingUrl('');
         setPendingTitle('');
       }
-      // 3. PUT status + notes + production_not_applicable (true only when ALL resources are N/A'd)
-      await api.put(ENDPOINTS.ROLE_ACTIVITY(act.id), { status, notes, production_not_applicable: allProductionNA });
+
       onStatusChange(act.id, status);
       setSaved(true);
       setRefreshKey(k => k + 1);
@@ -636,7 +661,22 @@ function DetailPanel({
       if (msg.includes('requires_production') || msg.includes('registrar al menos un recurso')) {
         setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado.`);
       } else {
-        setSaveError('No se pudo guardar. Verifica tus permisos e intenta de nuevo.');
+        // Intentar parsear el mensaje de error devuelto por el servidor en formato JSON
+        let friendlyMessage = 'No se pudo guardar. Verifica tus permisos e intenta de nuevo.';
+        try {
+          const jsonStart = msg.indexOf('{');
+          if (jsonStart !== -1) {
+            const errorJson = JSON.parse(msg.substring(jsonStart));
+            if (errorJson.message) {
+              friendlyMessage = errorJson.message;
+            }
+          } else if (msg) {
+            friendlyMessage = msg;
+          }
+        } catch (parseError) {
+          if (msg) friendlyMessage = msg;
+        }
+        setSaveError(friendlyMessage);
       }
       setTimeout(() => setSaveError(null), 6000);
     }
