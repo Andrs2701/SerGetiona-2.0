@@ -392,6 +392,10 @@ class RoleActivityController extends Controller
             }
         }
 
+        if ($activity->deliverable) {
+            self::recalculateGlobalStatus($activity->deliverable);
+        }
+
         return response()->json($activity->load('responsible', 'assignedBy'));
     }
 
@@ -534,6 +538,10 @@ class RoleActivityController extends Controller
         $nextResponsible    = $nextActivity?->responsible?->name;
         $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
 
+        if ($activity->deliverable) {
+            self::recalculateGlobalStatus($activity->deliverable);
+        }
+
         $activity->load('responsible', 'assignedBy', 'deliverable');
 
         return response()->json([
@@ -647,5 +655,53 @@ class RoleActivityController extends Controller
         usort($events, fn($a, $b) => strcmp($a['date'] ?? '', $b['date'] ?? ''));
 
         return response()->json(['events' => $events]);
+    }
+
+    public static function recalculateGlobalStatus($deliverable)
+    {
+        if (!$deliverable) return;
+
+        $activities = $deliverable->roleActivities()
+            ->where('status', '!=', 'not_applicable')
+            ->get();
+
+        if ($activities->isEmpty()) return;
+
+        // 1. Si la actividad de QA está aprobada, el entregable está terminado
+        $qaActivity = $activities->firstWhere('role', 'qa');
+        if ($qaActivity && $qaActivity->status === 'approved') {
+            $deliverable->global_status = 'finished';
+            $deliverable->save();
+            return;
+        }
+
+        // 2. Si todos los roles aplicables están aprobados
+        $total = $activities->count();
+        $approvedCount = $activities->where('status', 'approved')->count();
+        if ($approvedCount === $total) {
+            $deliverable->global_status = 'finished';
+            $deliverable->save();
+            return;
+        }
+
+        // 3. Si hay al menos una actividad en revisión/entregada (pero no aprobada por QA)
+        $hasInReview = $activities->contains(function ($a) {
+            return in_array($a->status, ['delivered', 'in_review'], true);
+        });
+
+        // 4. Si hay actividades en progreso, sin iniciar o devueltas a ajustes
+        $hasActive = $activities->contains(function ($a) {
+            return in_array($a->status, ['not_started', 'in_progress', 'adjustments_requested', 'with_findings'], true);
+        });
+
+        if ($hasActive) {
+            $deliverable->global_status = 'in_progress';
+        } elseif ($hasInReview) {
+            $deliverable->global_status = 'in_review';
+        } else {
+            $deliverable->global_status = 'unpublished';
+        }
+
+        $deliverable->save();
     }
 }

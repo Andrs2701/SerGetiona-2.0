@@ -85,8 +85,14 @@ class ReportController extends Controller
         $totalDeliverables = Deliverable::count();
         $finishedDeliverables = Deliverable::where('global_status', 'finished')->count();
         $withObservations = Deliverable::where('global_status', 'with_observations')->count();
-        $globalCompliance = $totalDeliverables > 0
-            ? round(($finishedDeliverables / $totalDeliverables) * 100, 2)
+        $totalActivities = RoleActivity::whereHas('deliverable')
+            ->where('status', '!=', 'not_applicable')
+            ->count();
+        $completedActivities = RoleActivity::whereHas('deliverable')
+            ->whereIn('status', ['approved', 'delivered', 'in_review'])
+            ->count();
+        $globalCompliance = $totalActivities > 0
+            ? round(($completedActivities / $totalActivities) * 100, 2)
             : 0;
 
         $activitiesByRole = RoleActivity::whereHas('deliverable')->select('role', DB::raw('count(*) as total'),
@@ -121,7 +127,13 @@ class ReportController extends Controller
             $total = $deliverableIds->count();
             $finished = \App\Models\Deliverable::whereIn('id', $deliverableIds)
                 ->where('global_status', 'finished')->count();
-            $compliance = $total > 0 ? round(($finished / $total) * 100) : 0;
+            $totalActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->where('status', '!=', 'not_applicable')
+                ->count();
+            $completedActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
+                ->whereIn('status', ['approved', 'delivered', 'in_review'])
+                ->count();
+            $compliance = $totalActs > 0 ? round(($completedActs / $totalActs) * 100) : 0;
 
             $overdueCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
                 ->overdue()
@@ -213,9 +225,13 @@ class ReportController extends Controller
 
         $deliverables = $query->with('roleActivities')->get();
 
-        $total = $deliverables->count();
-        $finished = $deliverables->where('global_status', 'finished')->count();
-        $compliance = $total > 0 ? round(($finished / $total) * 100, 2) : 0;
+        $totalActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
+            ->where('status', '!=', 'not_applicable')
+            ->count();
+        $completedActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
+            ->whereIn('status', ['approved', 'delivered', 'in_review'])
+            ->count();
+        $compliance = $totalActs > 0 ? round(($completedActs / $totalActs) * 100, 2) : 0;
 
         // Compliance by role
         $roles = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
@@ -258,6 +274,14 @@ class ReportController extends Controller
             ->map(function ($p) {
                 $deliverables = Deliverable::whereHas('subject.academicProgram', fn($q) => $q->where('project_id', $p->id))->get();
                 $pTotal = $deliverables->count();
+
+                $pTotalActs = RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
+                    ->where('status', '!=', 'not_applicable')
+                    ->count();
+                $pCompletedActs = RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
+                    ->whereIn('status', ['approved', 'delivered', 'in_review'])
+                    ->count();
+
                 $pApproved = $deliverables->where('global_status', 'finished')->count();
                 $pDelayed = RoleActivity::whereHas('deliverable.subject.academicProgram', fn($q) => $q->where('project_id', $p->id))
                     ->whereNotNull('actual_delivery_date')->whereNotNull('commitment_date')
@@ -265,7 +289,7 @@ class ReportController extends Controller
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
-                    'compliance' => $pTotal > 0 ? round(($pApproved / $pTotal) * 100) : 0,
+                    'compliance' => $pTotalActs > 0 ? round(($pCompletedActs / $pTotalActs) * 100) : 0,
                     'total' => $pTotal,
                     'approved' => $pApproved,
                     'delayed' => $pDelayed,
