@@ -240,6 +240,10 @@ class RoleActivityController extends Controller
             }
         }
 
+        // Extraer adjust_roles antes de actualizar el modelo (no es columna de la tabla)
+        $adjustRoles = $data['adjust_roles'] ?? [];
+        unset($data['adjust_roles']);
+
         $activity->update($data);
         $dirty = $activity->getChanges();
 
@@ -262,7 +266,6 @@ class RoleActivityController extends Controller
 
             // Caso B: QA o Admin devuelven actividades específicas a ajustes
             if ($activity->role === 'qa' && in_array($activity->status, ['adjustments_requested', 'with_findings'], true)) {
-                $adjustRoles = $request->input('adjust_roles', []);
                 if (!empty($adjustRoles) && $activity->deliverable) {
                     $siblingActivities = $activity->deliverable->roleActivities()
                         ->whereIn('role', $adjustRoles)
