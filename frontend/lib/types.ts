@@ -335,6 +335,11 @@ export interface WorkspaceStats {
   completed: number;
   history?: number[];
   compliance_percentage?: number;
+  resources_total?: number;
+  resources_weekly?: number;
+  weekly_compliance?: number | null;
+  weekly_done?: number;
+  weekly_total?: number;
 }
 
 export interface Workspace {

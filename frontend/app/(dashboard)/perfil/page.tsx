@@ -92,6 +92,7 @@ export default function PerfilPage() {
   // ── Stats ──
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statsTab, setStatsTab] = useState<'deliveries' | 'resources'>('deliveries');
 
   // ── Email notification preferences ──
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
@@ -503,80 +504,156 @@ export default function PerfilPage() {
 
           {/* Stats */}
           <div className={`${cardCls} p-5`}>
-            <h2 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <TrendingUp size={16} className="text-indigo-500" />
-              Mis Estadísticas
-            </h2>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <TrendingUp size={16} className="text-indigo-500" />
+                Mis Estadísticas
+              </h2>
+              <div className="flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setStatsTab('deliveries')}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-md font-medium transition-colors',
+                    statsTab === 'deliveries' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  Entregas
+                </button>
+                <button
+                  onClick={() => setStatsTab('resources')}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-md font-medium transition-colors',
+                    statsTab === 'resources' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  Recursos
+                </button>
+              </div>
+            </div>
+
             {statsLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
               </div>
             ) : stats ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 text-center">
-                    <CheckCheck size={18} className="text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{stats.completed}</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Completadas</p>
-                  </div>
-                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-                    <AlertTriangle size={18} className="text-red-500 dark:text-red-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-red-600 dark:text-red-400">{stats.overdue}</p>
-                    <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">Vencidas</p>
-                  </div>
-                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
-                    <AlertCircle size={18} className="text-amber-500 dark:text-amber-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.approaching}</p>
-                    <p className="text-xs text-amber-500 dark:text-amber-400 mt-0.5">Por vencer</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
-                    <Shield size={18} className="text-gray-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-gray-700 dark:text-gray-300">{stats.pending}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pendientes</p>
-                  </div>
-                </div>
+                {statsTab === 'deliveries' ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                      <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 text-center">
+                        <CheckCheck size={18} className="text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{stats.completed}</p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Completadas</p>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+                        <AlertTriangle size={18} className="text-red-500 dark:text-red-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-red-600 dark:text-red-400">{stats.overdue}</p>
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">Vencidas</p>
+                      </div>
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <AlertCircle size={18} className="text-amber-500 dark:text-amber-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.approaching}</p>
+                        <p className="text-xs text-amber-500 dark:text-amber-400 mt-0.5">Por vencer</p>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                        <Shield size={18} className="text-gray-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-gray-700 dark:text-gray-300">{stats.pending}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pendientes</p>
+                      </div>
+                    </div>
 
-                {/* Compliance bar */}
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">% Cumplimiento personal</span>
-                    <span className={clsx(
-                      'text-sm font-bold',
-                      compliance >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-                        : compliance >= 50 ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-red-500 dark:text-red-400'
-                    )}>{compliance}%</span>
-                  </div>
-                  <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className={clsx(
-                        'h-full rounded-full transition-all',
-                        compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
-                      )}
-                      style={{ width: `${compliance}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Compliance history */}
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Historial de cumplimiento (últimos 6 meses)</p>
-                  <div className="flex items-end gap-2 h-16">
-                    {history.map((val, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    {/* Compliance bar */}
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">% Cumplimiento personal</span>
+                        <span className={clsx(
+                          'text-sm font-bold',
+                          compliance >= 80 ? 'text-emerald-600 dark:text-emerald-400'
+                            : compliance >= 50 ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-red-500 dark:text-red-400'
+                        )}>{compliance}%</span>
+                      </div>
+                      <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div
                           className={clsx(
-                            'w-full rounded-t transition-all',
-                            val >= 80 ? 'bg-emerald-400' : val >= 60 ? 'bg-amber-400' : 'bg-red-400'
+                            'h-full rounded-full transition-all',
+                            compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
                           )}
-                          style={{ height: `${(val / maxBar) * 52}px` }}
-                          title={`${val}%`}
+                          style={{ width: `${compliance}%` }}
                         />
-                        <span className="text-[9px] text-gray-400 dark:text-gray-500">{monthLabels[i]}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+
+                    {/* Compliance history */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Historial de cumplimiento (últimos 6 meses)</p>
+                      <div className="flex items-end gap-2 h-16">
+                        {history.map((val, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div
+                              className={clsx(
+                                'w-full rounded-t transition-all',
+                                val >= 80 ? 'bg-emerald-400' : val >= 60 ? 'bg-amber-400' : 'bg-red-400'
+                              )}
+                              style={{ height: `${(val / maxBar) * 52}px` }}
+                              title={`${val}%`}
+                            />
+                            <span className="text-[9px] text-gray-400 dark:text-gray-500">{monthLabels[i]}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                      <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 text-center">
+                        <ClipboardList size={18} className="text-indigo-600 dark:text-indigo-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-indigo-700 dark:text-indigo-400">{stats.resources_total ?? 0}</p>
+                        <p className="text-xs text-indigo-600 dark:text-indigo-500 mt-0.5">Recursos Totales</p>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                        <Save size={18} className="text-blue-600 dark:text-blue-400 mx-auto mb-1" />
+                        <p className="text-xl font-bold text-blue-700 dark:text-blue-400">{stats.resources_weekly ?? 0}</p>
+                        <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">Recursos Semanales</p>
+                      </div>
+                    </div>
+
+                    {/* Weekly compliance progress */}
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">% Cumplimiento semanal</span>
+                        {stats.weekly_compliance !== null ? (
+                          <span className={clsx(
+                            'text-sm font-bold',
+                            stats.weekly_compliance! >= 80 ? 'text-emerald-600 dark:text-emerald-400'
+                              : stats.weekly_compliance! >= 50 ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-red-500 dark:text-red-400'
+                          )}>{stats.weekly_compliance}%</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">Sin entregas programadas</span>
+                        )}
+                      </div>
+                      {stats.weekly_compliance !== null && (
+                        <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={clsx(
+                              'h-full rounded-full transition-all',
+                              stats.weekly_compliance! >= 80 ? 'bg-emerald-500' : stats.weekly_compliance! >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                            )}
+                            style={{ width: `${stats.weekly_compliance}%` }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+                        <span>Entregas completadas esta semana</span>
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">
+                          {stats.weekly_done ?? 0} / {stats.weekly_total ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No disponible para tu rol</p>

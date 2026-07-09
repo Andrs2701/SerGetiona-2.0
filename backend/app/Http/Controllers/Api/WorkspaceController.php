@@ -223,14 +223,40 @@ class WorkspaceController extends Controller
             return $d->between($now, $in30Days);
         })->values();
 
+        // Calcular recursos producidos e información semanal
+        $startOfWeek = Carbon::now()->startOfWeek();
+        $endOfWeek = Carbon::now()->endOfWeek();
+
+        $resourcesTotal = \App\Models\ProductionLog::where('produced_by', $user->id)->sum('quantity');
+        $resourcesWeekly = \App\Models\ProductionLog::where('produced_by', $user->id)
+            ->whereBetween('produced_at', [$startOfWeek->toDateString(), $endOfWeek->toDateString()])
+            ->sum('quantity');
+
+        $weeklyActivities = $activities->filter(function ($a) use ($startOfWeek, $endOfWeek) {
+            if (!$a->commitment_date) return false;
+            $d = Carbon::parse($a->commitment_date);
+            return $d->between($startOfWeek, $endOfWeek);
+        });
+        $weeklyTotal = $weeklyActivities->count();
+        $weeklyDone = $weeklyActivities->filter(function ($a) {
+            return in_array($a->status, ['approved', 'delivered', 'in_review'], true);
+        })->count();
+        $weeklyCompliance = $weeklyTotal > 0 ? (int) round(($weeklyDone / $weeklyTotal) * 100) : null;
+
         // Claves de compatibilidad para el perfil del usuario
-        $stats['completed'] = $stats['approved'];
-        $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['in_review'] + $stats['returned'];
+        $stats['completed'] = $stats['approved'] + $stats['in_review'];
+        $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['returned'];
 
         $totalActivities = $activities->count();
         $stats['compliance_percentage'] = $totalActivities > 0
-            ? (int) round(($stats['approved'] / $totalActivities) * 100)
+            ? (int) round((($stats['approved'] + $stats['in_review']) / $totalActivities) * 100)
             : 0;
+
+        $stats['resources_total'] = (int) $resourcesTotal;
+        $stats['resources_weekly'] = (int) $resourcesWeekly;
+        $stats['weekly_compliance'] = $weeklyCompliance;
+        $stats['weekly_done'] = $weeklyDone;
+        $stats['weekly_total'] = $weeklyTotal;
 
         // Historial de cumplimiento individual de los últimos 6 meses
         $months = [];
