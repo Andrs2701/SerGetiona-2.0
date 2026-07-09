@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow } from '@/lib/types';
+import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus } from '@/lib/types';
 import {
   GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
 } from '@/lib/types';
@@ -18,6 +18,7 @@ import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
+import ActivityDetailPanel from '@/components/ActivityDetailPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -176,17 +177,21 @@ function ProgressExcNA({ activities, compact }: { activities: RoleActivity[]; co
 
 // ─── Role cell ─────────────────────────────────────────────────────────────────
 
-function RoleCell({ role, activity }: { role: Role; activity?: RoleActivity }) {
+function RoleCell({ role, activity, onSelect }: { role: Role; activity?: RoleActivity; onSelect?: () => void }) {
   const isNA = !activity || activity.status === 'not_applicable';
   const colors = ROLE_CELL_COLORS[role];
   const days = daysUntil(activity?.commitment_date);
   const overdueDate = !isNA && activity?.status !== 'approved' && !activity?.actual_delivery_date && days !== null && days < 0;
 
   return (
-    <div className={clsx(
-      'rounded-xl border p-3 flex flex-col gap-1.5',
-      isNA ? 'bg-gray-50 border-gray-100 opacity-40' : clsx(colors.bg, colors.border)
-    )}>
+    <div
+      onClick={!isNA ? onSelect : undefined}
+      className={clsx(
+        'rounded-xl border p-3 flex flex-col gap-1.5 transition-all',
+        isNA ? 'bg-gray-50 border-gray-100 opacity-40' : clsx(colors.bg, colors.border),
+        onSelect && !isNA && 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
+      )}
+    >
       {/* Role label */}
       <div className="flex items-center gap-1.5">
         <span className={clsx('text-[9px] font-black px-1.5 py-0.5 rounded text-white tracking-wider shrink-0', ROLE_BADGE_BG[role])}>
@@ -241,9 +246,10 @@ interface RowProps {
   onEdit: () => void;
   onDelete: () => void;
   onQuickAction: (a: QuickAction) => void;
+  onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void;
 }
 
-function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, onQuickAction }: RowProps) {
+function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, onQuickAction, onSelectActivity }: RowProps) {
   const acts = d.role_activities ?? [];
   const byRole: Partial<Record<Role, RoleActivity>> = {};
   acts.forEach(a => { byRole[a.role] = a; });
@@ -338,7 +344,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
       {/* ── Role grid: 2 cols mobile · 3 cols sm · 6 cols lg ─────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:grid-cols-6">
         {ROLES.map(role => (
-          <RoleCell key={role} role={role} activity={byRole[role]} />
+          <RoleCell key={role} role={role} activity={byRole[role]} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
         ))}
       </div>
 
@@ -834,7 +840,7 @@ function InfoField({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void }) {
+function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void; onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
   const [flow, setFlow] = useState<DeliverableFlow | null>(null);
   const [loadingFlow, setLoadingFlow] = useState(false);
@@ -1048,14 +1054,17 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose }: { deliverable:
                 })();
 
                 return (
-                  <div key={role} className={clsx('rounded-lg border p-3',
-                    isNA ? 'border-gray-100 bg-gray-50 opacity-50' :
-                    act?.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
-                    isOverdue ? 'border-red-100 bg-red-50' :
-                    isApproaching ? 'border-amber-100 bg-amber-50' :
-                    !act || act.status === 'not_started' ? 'border-gray-100 bg-gray-50' :
-                    'border-blue-100 bg-blue-50'
-                  )}>
+                  <div key={role}
+                    onClick={!isNA && onSelectActivity && act ? () => onSelectActivity(act, deliverable) : undefined}
+                    className={clsx('rounded-lg border p-3 transition-all',
+                      isNA ? 'border-gray-100 bg-gray-50 opacity-50' :
+                      act?.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
+                      isOverdue ? 'border-red-100 bg-red-50' :
+                      isApproaching ? 'border-amber-100 bg-amber-50' :
+                      !act || act.status === 'not_started' ? 'border-gray-100 bg-gray-50' :
+                      'border-blue-100 bg-blue-50',
+                      !isNA && onSelectActivity && act && 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
+                    )}>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-1.5">
                         <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[role])}>{ROLE_ABBR[role]}</span>
@@ -1427,6 +1436,9 @@ export default function EntregablesPage() {
   const [showImport, setShowImport]   = useState(false);
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
   const [users, setUsers]       = useState<User[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<RoleActivity | null>(null);
+  const [selectedActivityDeliverable, setSelectedActivityDeliverable] = useState<Deliverable | null>(null);
+  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
   const autoOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -1434,6 +1446,9 @@ export default function EntregablesPage() {
       .then(r => setProjects(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<User[]>(ENDPOINTS.USERS)
       .then(r => setUsers(Array.isArray(r) ? r : [])).catch(() => {});
+    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
+      .then(res => setRoleStatuses(res.role_statuses ?? []))
+      .catch(() => setRoleStatuses([]));
   }, []);
 
   useEffect(() => {
@@ -1469,6 +1484,24 @@ export default function EntregablesPage() {
       .catch(() => setData([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleSelectActivity = (activity: RoleActivity, deliverable: Deliverable) => {
+    setSelectedActivity(activity);
+    setSelectedActivityDeliverable(deliverable);
+  };
+
+  const handleActivitySaved = () => {
+    api.get<Deliverable[]>(ENDPOINTS.DELIVERABLES)
+      .then(list => {
+        setData(list);
+        if (panel) {
+          const updated = list.find(d => d.id === panel.deliverable.id);
+          if (updated) {
+            setPanel({ ...panel, deliverable: updated });
+          }
+        }
+      });
+  };
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1727,6 +1760,7 @@ export default function EntregablesPage() {
                         onEdit={() => setFormPanel({ mode: 'edit', deliverable: d })}
                         onDelete={() => setDeleteTarget(d)}
                         onQuickAction={action => handleQuickAction(d, action)}
+                        onSelectActivity={handleSelectActivity}
                       />
                     ))}
                     {isManager && (
@@ -1872,7 +1906,22 @@ export default function EntregablesPage() {
       )}
 
       {/* ── Panels & Modals ───────────────────────────────────────────────── */}
-      {panel && <SidePanel deliverable={panel.deliverable} defaultTab={panel.tab} onClose={() => setPanel(null)} />}
+      {panel && <SidePanel deliverable={panel.deliverable} defaultTab={panel.tab} onClose={() => setPanel(null)} onSelectActivity={handleSelectActivity} />}
+
+      {selectedActivity && selectedActivityDeliverable && (
+        <ActivityDetailPanel
+          activity={selectedActivity}
+          deliverable={selectedActivityDeliverable}
+          onClose={() => {
+            setSelectedActivity(null);
+            setSelectedActivityDeliverable(null);
+          }}
+          onStatusChange={() => {}}
+          isManager={isManager}
+          onSaved={handleActivitySaved}
+          roleStatuses={roleStatuses}
+        />
+      )}
 
       {formPanel && (
         <DeliverableFormPanel
