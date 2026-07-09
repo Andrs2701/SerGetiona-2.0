@@ -33,6 +33,12 @@ class ProductionLogController extends Controller
             return response()->json(['message' => 'No tienes permiso para registrar producción en esta actividad.'], 403);
         }
 
+        abort_if(
+            !$isManager && in_array($activity->status, ['delivered', 'approved'], true),
+            403,
+            'No se puede registrar producción en una actividad ya entregada o aprobada.'
+        );
+
         $data = $request->validate([
             'resource_type_id' => 'required|exists:resource_types,id',
             'quantity'         => 'required|integer|min:1',
@@ -84,10 +90,10 @@ class ProductionLogController extends Controller
         ) {
             return response()->json(['message' => 'No tienes permiso para eliminar este registro.'], 403);
         }
-        if ($activity && $activity->status === 'delivered') {
+        if (!$isManager && $activity && in_array($activity->status, ['delivered', 'approved'], true)) {
             return response()->json([
-                'message' => 'No se puede eliminar un registro de producción de una actividad ya entregada.'
-            ], 409);
+                'message' => 'No se puede eliminar un registro de producción de una actividad ya entregada o aprobada.'
+            ], 403);
         }
 
         AuditLog::create([

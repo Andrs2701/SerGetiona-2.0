@@ -207,9 +207,9 @@ class RoleActivityController extends Controller
 
         if (!$isManager) {
             abort_if(
-                $activity->status === 'approved',
+                in_array($activity->status, ['delivered', 'approved'], true),
                 403,
-                'Esta actividad ya ha sido aprobada y no puede ser modificada.'
+                'Esta actividad ya ha sido entregada o aprobada y no puede ser modificada.'
             );
 
             $forbiddenFields = array_intersect(

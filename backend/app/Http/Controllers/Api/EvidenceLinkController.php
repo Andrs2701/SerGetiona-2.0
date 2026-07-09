@@ -55,10 +55,17 @@ class EvidenceLinkController extends Controller
      */
     public function store(Request $request, RoleActivity $activity)
     {
+        $isManager = ResourceAccess::isManager($request->user());
+
         abort_unless(
-            ResourceAccess::isManager($request->user())
-            || (int) $activity->responsible_id === (int) $request->user()->id,
+            $isManager || (int) $activity->responsible_id === (int) $request->user()->id,
             403
+        );
+
+        abort_if(
+            !$isManager && in_array($activity->status, ['delivered', 'approved'], true),
+            403,
+            'No se pueden agregar evidencias a una actividad ya entregada o aprobada.'
         );
 
         $data = $request->validate([
@@ -132,13 +139,21 @@ class EvidenceLinkController extends Controller
     public function destroy(Request $request, EvidenceLink $link)
     {
         $user = $request->user();
-        $canDelete = in_array($user->role, ['admin', 'coordinator'])
+        $isManager = in_array($user->role, ['admin', 'coordinator'], true);
+        $canDelete = $isManager
             || (int) $link->user_id === (int) $user->id
             || (int) $link->roleActivity?->responsible_id === (int) $user->id;
 
         if (!$canDelete) {
             return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
         }
+
+        $activity = $link->roleActivity;
+        abort_if(
+            !$isManager && $activity && in_array($activity->status, ['delivered', 'approved'], true),
+            403,
+            'No se pueden eliminar evidencias de una actividad ya entregada o aprobada.'
+        );
 
         AuditLog::create([
             'user_id'       => $user->id,
