@@ -689,9 +689,9 @@ class RoleActivityController extends Controller
             return in_array($a->status, ['delivered', 'in_review'], true);
         });
 
-        // 4. Si hay actividades en progreso, sin iniciar o devueltas a ajustes
+        // 4. Si hay actividades activas (cualquier estado diferente a aprobado o entregado/revisión)
         $hasActive = $activities->contains(function ($a) {
-            return in_array($a->status, ['not_started', 'in_progress', 'adjustments_requested', 'with_findings'], true);
+            return !in_array($a->status, ['approved', 'delivered', 'in_review'], true);
         });
 
         if ($hasActive) {
