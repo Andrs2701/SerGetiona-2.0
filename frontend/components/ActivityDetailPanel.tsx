@@ -529,15 +529,17 @@ export default function ActivityDetailPanel({
   const roleStates = useMemo(() => {
     let states = isManager
       ? allStates
-      : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
+      : activity.role === 'qa'
+        ? allStates.filter(s => s !== 'delivered') // QA no "entrega", aprueba directamente
+        : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
     
     if (!states.includes(activity.status)) {
       states = [...states, activity.status];
     }
     return states;
-  }, [allStates, isManager, activity.status]);
+  }, [allStates, isManager, activity.status, activity.role]);
 
-  const isReadOnly = !isManager && ['delivered', 'approved'].includes(activity.status);
+  const isReadOnly = !isManager && activity.role !== 'qa' && ['delivered', 'approved'].includes(activity.status);
   const isProdRole = PRODUCTION_ROLES.has(activity.role);
   const toPost = Object.entries(quantities)
     .filter(([rtId, qty]) => qty > 0 && !naResources.has(Number(rtId)))

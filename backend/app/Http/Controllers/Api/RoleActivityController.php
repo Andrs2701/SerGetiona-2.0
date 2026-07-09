@@ -208,11 +208,16 @@ class RoleActivityController extends Controller
         ]);
 
         if (!$isManager) {
-            abort_if(
-                in_array($activity->status, ['delivered', 'approved'], true),
-                403,
-                'Esta actividad ya ha sido entregada o aprobada y no puede ser modificada.'
-            );
+            // QA puede aprobar directamente (es su función), los demás roles no
+            $isQaRole = $activity->role === 'qa';
+
+            if (!$isQaRole) {
+                abort_if(
+                    in_array($activity->status, ['delivered', 'approved'], true),
+                    403,
+                    'Esta actividad ya ha sido entregada o aprobada y no puede ser modificada.'
+                );
+            }
 
             $forbiddenFields = array_intersect(
                 array_keys($data),
@@ -224,7 +229,7 @@ class RoleActivityController extends Controller
                 'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
             );
             abort_if(
-                ($data['status'] ?? null) === 'approved',
+                ($data['status'] ?? null) === 'approved' && !$isQaRole,
                 403,
                 'No puedes aprobar tu propia actividad.'
             );
