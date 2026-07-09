@@ -554,7 +554,10 @@ export default function ActivityDetailPanel({
     setSaving(true);
     setSaveError(null);
 
-    if (status === 'delivered' && isProdRole && !allProductionNA) {
+    // Solo exigir producción si el rol tiene tipos de recurso configurados y no todos están marcados como N/A
+    const requiresProduction = isProdRole && totalResourceTypes > 0 && !allProductionNA;
+
+    if (status === 'delivered' && requiresProduction) {
       if (!hasProduction) {
         setSaveError(`Completa la sección ${prodStep} – Producción antes de marcar como Entregado.`);
         setSaving(false);
@@ -565,6 +568,13 @@ export default function ActivityDetailPanel({
         setSaving(false);
         return;
       }
+    }
+
+    // Si el rol no tiene producción pero sí requiere enlace (ej: QA), validar enlace
+    if (status === 'delivered' && isProdRole && totalResourceTypes === 0 && !hasLink) {
+      setSaveError(`Completa la sección de Enlace de entrega antes de marcar como Entregado.`);
+      setSaving(false);
+      return;
     }
 
     try {
