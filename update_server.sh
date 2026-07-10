@@ -27,13 +27,23 @@ BACKUP_DIR="$APP_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="$BACKUP_DIR/mysql_$TIMESTAMP.sql"
 
-# Credenciales de MySQL leídas del .env real (nunca hardcodeadas en el script)
+# Credenciales de MySQL leídas del .env real (nunca hardcodeadas en el script).
+# Laravel acepta valores entre comillas en .env (p.ej. DB_PASSWORD="algo") y las
+# quita solo, pero un simple "cut" no lo hace — sin strip_quotes, una contraseña
+# entre comillas se pasaría literal (con comillas y todo) a mysqldump y fallaría
+# con "Access denied" aunque la app conecte perfectamente bien.
 ENV_FILE="$BACKEND_DIR/.env"
-DB_DATABASE=$(grep -E '^DB_DATABASE=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
-DB_USERNAME=$(grep -E '^DB_USERNAME=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
-DB_PASSWORD=$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
-DB_HOST=$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
-DB_PORT=$(grep -E '^DB_PORT=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+strip_quotes() {
+    local val="$1"
+    val="${val%\"}"; val="${val#\"}"
+    val="${val%\'}"; val="${val#\'}"
+    echo "$val"
+}
+DB_DATABASE=$(strip_quotes "$(grep -E '^DB_DATABASE=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)")
+DB_USERNAME=$(strip_quotes "$(grep -E '^DB_USERNAME=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)")
+DB_PASSWORD=$(strip_quotes "$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)")
+DB_HOST=$(strip_quotes "$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)")
+DB_PORT=$(strip_quotes "$(grep -E '^DB_PORT=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)")
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
 
