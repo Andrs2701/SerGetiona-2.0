@@ -15,28 +15,49 @@ class ChannelController extends Controller
         $user = $request->user();
         $isManager = in_array($user->role, ['admin', 'coordinator'], true);
 
+        // Antes hacía 2-3 consultas extra POR canal dentro de un map() (N+1):
+        // la membresía propia, el conteo de mensajes no leídos, y el conteo
+        // de miembros. Ahora: member_count viene de withCount() en la consulta
+        // base; la membresía propia se precarga con el resto de canales
+        // (with(members) filtrado al usuario actual, sin query por canal); y
+        // los no leídos se calculan en una sola consulta agregada, agrupada
+        // por canal, en vez de una por canal.
         $channels = Channel::with(['project:id,name', 'program:id,name'])
+            ->withCount('members')
+            ->with(['members' => fn ($q) => $q->where('user_id', $user->id)])
             ->where('is_archived', false)
             // Canales privados: visibles solo para miembros (los gerenciales ven todos)
             ->when(!$isManager, fn ($q) => $q->where(fn ($q2) => $q2
                 ->where('is_private', false)
                 ->orWhereHas('members', fn ($m) => $m->where('user_id', $user->id))))
             ->orderByDesc('last_message_at')
-            ->get()
-            ->map(function (Channel $ch) use ($user) {
-                $member = $ch->members()->where('user_id', $user->id)->first();
-                $unread = $member
-                    ? $ch->messages()
-                        ->when($member->pivot->last_read_at, fn ($q) =>
-                            $q->where('created_at', '>', $member->pivot->last_read_at))
-                        ->count()
-                    : 0;
+            ->get();
 
-                return array_merge($ch->toArray(), [
-                    'unread_count' => $unread,
-                    'member_count' => $ch->members()->count(),
-                ]);
-            });
+        $unreadByChannel = \Illuminate\Support\Facades\DB::table('channel_messages as cm')
+            ->join('channel_members as cmem', function ($join) use ($user) {
+                $join->on('cmem.channel_id', '=', 'cm.channel_id')
+                    ->where('cmem.user_id', $user->id);
+            })
+            ->where(function ($q) {
+                $q->whereNull('cmem.last_read_at')
+                    ->orWhereColumn('cm.created_at', '>', 'cmem.last_read_at');
+            })
+            ->select('cm.channel_id', \Illuminate\Support\Facades\DB::raw('count(*) as unread'))
+            ->groupBy('cm.channel_id')
+            ->pluck('unread', 'channel_id');
+
+        $channels = $channels->map(function (Channel $ch) use ($unreadByChannel) {
+            $isMember = $ch->members->isNotEmpty();
+
+            // members solo se precargó para detectar membresía propia sin
+            // consulta por canal — no debe filtrarse a la respuesta.
+            $data = \Illuminate\Support\Arr::except($ch->toArray(), ['members']);
+
+            return array_merge($data, [
+                'unread_count' => $isMember ? (int) ($unreadByChannel->get($ch->id) ?? 0) : 0,
+                'member_count' => $ch->members_count,
+            ]);
+        });
 
         return response()->json(['channels' => $channels]);
     }
