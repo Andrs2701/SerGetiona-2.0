@@ -10,18 +10,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Definir los roles de producción
+        // 1. Definir los roles y mapeos exactos basados en el catálogo original
         $allProductionRoles = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
         $operationalRoles = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering'];
 
-        // 2. Mapeo de estados existentes que actualizaremos
+        // Mapeo de estados existentes con sus roles exactos
         $existingUpdates = [
-            'not_started'           => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
-            'pending'               => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
-            'in_progress'           => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
-            'in_review'             => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
+            'not_started'           => ['allowed_roles' => $operationalRoles,    'is_manager_only' => false],
+            'pending'               => ['allowed_roles' => ['qa'],               'is_manager_only' => false],
+            'in_progress'           => ['allowed_roles' => ['pedagogy'],         'is_manager_only' => false],
+            'in_review'             => ['allowed_roles' => ['pedagogy'],         'is_manager_only' => false],
             'delivered'             => ['allowed_roles' => $operationalRoles,    'is_manager_only' => false],
-            'adjustments_requested' => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
+            'adjustments_requested' => ['allowed_roles' => ['expert'],           'is_manager_only' => false],
             'approved'              => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => true],
             'not_applicable'        => ['allowed_roles' => $allProductionRoles, 'is_manager_only' => false],
         ];
@@ -35,7 +35,7 @@ return new class extends Migration
                 ]);
         }
 
-        // 3. Crear los estados específicos adicionales
+        // 2. Crear los estados específicos adicionales con sus roles exactos
         $newStatuses = [
             [
                 'slug' => 'draft',
@@ -105,7 +105,7 @@ return new class extends Migration
                 'label' => 'En Ajustes',
                 'color' => 'bg-orange-400',
                 'description' => 'Corrección de observaciones de calidad.',
-                'allowed_roles' => ['qa'],
+                'allowed_roles' => ['pedagogy', 'design'],
             ],
         ];
 
