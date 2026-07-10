@@ -55,6 +55,11 @@ class WorkspaceController extends Controller
 
         $today = Carbon::today();
 
+        // Ventana de "por vencer" de 3 días hábiles: INTENCIONAL para esta
+        // vista de administración/coordinación (audiencia gerencial, necesita
+        // ver más adelante). Distinta a propósito de la de Mi Espacio (5 días
+        // calendario) y la del dashboard ejecutivo/resumen (vence hoy mismo)
+        // — no unificar, cada una sirve a una audiencia distinta.
         foreach ($allActivities as $a) {
             if (!$a->commitment_date || $a->actual_delivery_date) continue;
             if (in_array($a->status, ['approved', 'not_applicable'], true)) continue;
@@ -67,31 +72,25 @@ class WorkspaceController extends Controller
             ->limit(10)
             ->get();
 
-        // Historial de cumplimiento global de los últimos 6 meses
+        // Historial de cumplimiento global de los últimos 6 meses — un solo
+        // groupBy sobre la colección ya cargada en vez de recorrerla 6 veces
+        // (una por mes), y usando la definición canónica de "completado".
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
             $months[] = Carbon::today()->subMonths($i)->format('Y-m');
         }
 
-        $history = [];
-        foreach ($months as $month) {
-            $totalInMonth = 0;
-            $completedInMonth = 0;
+        $activitiesByMonth = $allActivities
+            ->filter(fn ($a) => $a->commitment_date)
+            ->groupBy(fn ($a) => Carbon::parse($a->commitment_date)->format('Y-m'));
 
-            foreach ($allActivities as $a) {
-                if (!$a->commitment_date) continue;
-                $activityMonth = Carbon::parse($a->commitment_date)->format('Y-m');
-
-                if ($activityMonth === $month) {
-                    $totalInMonth++;
-                    if ($a->status === 'approved' || $a->actual_delivery_date) {
-                        $completedInMonth++;
-                    }
-                }
-            }
-
-            $history[] = $totalInMonth > 0 ? (int) round(($completedInMonth / $totalInMonth) * 100) : 100;
-        }
+        $history = collect($months)->map(function ($month) use ($activitiesByMonth) {
+            $inMonth = $activitiesByMonth->get($month, collect());
+            $total = $inMonth->count();
+            if ($total === 0) return 100;
+            $completed = $inMonth->whereIn('status', RoleActivity::COMPLETED_STATUSES)->count();
+            return (int) round(($completed / $total) * 100);
+        })->all();
 
         return response()->json([
             'user'  => new UserResource($user),
@@ -102,13 +101,19 @@ class WorkspaceController extends Controller
                 'finished_deliverables'  => $finishedDeliverables,
                 'overdue_activities'     => $overdue,
                 'approaching_activities' => $approaching,
-                
+
                 // Claves de compatibilidad para el perfil del usuario
                 'completed'              => $finishedDeliverables,
                 'overdue'                => $overdue,
                 'approaching'            => $approaching,
                 'pending'                => max(0, $totalDeliverables - $finishedDeliverables),
                 'history'                => $history,
+                // % de entregables terminados (distinto de la "compliance" por
+                // actividades que se usa en otros reportes — mide una cosa
+                // distinta a propósito, ver Fase B del plan de consistencia).
+                'deliverable_completion_percentage' => $totalDeliverables > 0
+                    ? (int) round(($finishedDeliverables / $totalDeliverables) * 100)
+                    : 0,
                 'compliance_percentage'  => $totalDeliverables > 0
                     ? (int) round(($finishedDeliverables / $totalDeliverables) * 100)
                     : 0,
@@ -122,7 +127,10 @@ class WorkspaceController extends Controller
     {
         $today = Carbon::today();
 
-        // 3 días hábiles aproximados = 4-5 días calendario
+        // Ventana de "por vencer" de 5 días calendario: INTENCIONAL para Mi
+        // Espacio (audiencia operativa, ve su propia carga inmediata). Distinta
+        // a propósito de la de 3 días hábiles del workspace de admin y la de
+        // "vence hoy" del dashboard ejecutivo — no unificar.
         $approachingLimit = $today->copy()->addDays(5);
 
         $activities = RoleActivity::where('responsible_id', $user->id)
@@ -164,7 +172,10 @@ class WorkspaceController extends Controller
             $isOverdue    = false;
             $isApproaching = false;
 
-            if ($activity->commitment_date && !in_array($status, self::STATUS_APPROVED)) {
+            // Exclusión igual a RoleActivity::scopeOverdue() (antes solo excluía
+            // 'approved', dejando 'delivered'/'not_applicable' contar como
+            // vencidas incorrectamente).
+            if ($activity->commitment_date && !in_array($status, RoleActivity::NOT_OVERDUE_STATUSES, true)) {
                 $commitDate = Carbon::parse($activity->commitment_date);
                 if (is_null($activity->actual_delivery_date) && $commitDate->lt($today)) {
                     $isOverdue = true;
@@ -238,18 +249,21 @@ class WorkspaceController extends Controller
             return $d->between($startOfWeek, $endOfWeek);
         });
         $weeklyTotal = $weeklyActivities->count();
-        $weeklyDone = $weeklyActivities->filter(function ($a) {
-            return in_array($a->status, ['approved', 'delivered', 'in_review'], true);
-        })->count();
+        $weeklyDone = $weeklyActivities->whereIn('status', RoleActivity::COMPLETED_STATUSES)->count();
         $weeklyCompliance = $weeklyTotal > 0 ? (int) round(($weeklyDone / $weeklyTotal) * 100) : null;
 
-        // Claves de compatibilidad para el perfil del usuario
-        $stats['completed'] = $stats['approved'] + $stats['in_review'];
+        // Claves de compatibilidad para el perfil del usuario.
+        // Antes contaba 'approved' + el bucket completo de STATUS_IN_REVIEW
+        // (que también incluye in_testing/validating/editing/adjusting —
+        // estados que claramente siguen en curso, no completados). Ahora usa
+        // la definición canónica de "completado" en vez de ese bucket de UI.
+        $completedCount = $activities->whereIn('status', RoleActivity::COMPLETED_STATUSES)->count();
+        $stats['completed'] = $completedCount;
         $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['returned'];
 
         $totalActivities = $activities->count();
         $stats['compliance_percentage'] = $totalActivities > 0
-            ? (int) round((($stats['approved'] + $stats['in_review']) / $totalActivities) * 100)
+            ? (int) round(($completedCount / $totalActivities) * 100)
             : 0;
 
         $stats['resources_total'] = (int) $resourcesTotal;
@@ -258,7 +272,9 @@ class WorkspaceController extends Controller
         $stats['weekly_done'] = $weeklyDone;
         $stats['weekly_total'] = $weeklyTotal;
 
-        // Historial de cumplimiento individual de los últimos 6 meses
+        // Historial de cumplimiento individual de los últimos 6 meses — un
+        // solo groupBy sobre la colección ya cargada en vez de recorrerla 6
+        // veces, usando la definición canónica de "completado".
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
             $months[] = Carbon::today()->subMonths($i)->format('Y-m');
@@ -275,7 +291,7 @@ class WorkspaceController extends Controller
 
                 if ($activityMonth === $month) {
                     $totalInMonth++;
-                    if ($a->status === 'approved' || $a->actual_delivery_date) {
+                    if (in_array($a->status, RoleActivity::COMPLETED_STATUSES, true)) {
                         $completedInMonth++;
                     }
                 }

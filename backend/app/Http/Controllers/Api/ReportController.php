@@ -29,19 +29,25 @@ class ReportController extends Controller
 
         $activities = RoleActivity::whereNotNull('responsible_id')->get();
 
+        // Precargar todos los responsables de una sola consulta en vez de un
+        // User::find() por cada uno dentro del map() (N+1).
+        $usersById = User::whereIn('id', $activities->pluck('responsible_id')->unique())
+            ->get()
+            ->keyBy('id');
+
         $grouped = $activities->groupBy('responsible_id');
 
-        $workload = $grouped->map(function ($items, $responsibleId) use ($pendingStatuses, $inReviewStatuses, $today) {
-            $user = User::find($responsibleId);
+        $workload = $grouped->map(function ($items, $responsibleId) use ($pendingStatuses, $inReviewStatuses, $today, $usersById) {
+            $user = $usersById->get($responsibleId);
 
             $pending  = $items->whereIn('status', $pendingStatuses)->count();
             $inReview = $items->whereIn('status', $inReviewStatuses)->count();
-            $completed = $items->where('status', 'approved')->count();
+            $completed = $items->whereIn('status', RoleActivity::COMPLETED_STATUSES)->count();
             $overdue  = $items->filter(function ($a) use ($today) {
                 return $a->commitment_date
                     && $a->commitment_date->toDateString() < $today
                     && is_null($a->actual_delivery_date)
-                    && !in_array($a->status, ['approved', 'not_applicable']);
+                    && !in_array($a->status, RoleActivity::NOT_OVERDUE_STATUSES, true);
             })->count();
 
             return [
@@ -89,7 +95,7 @@ class ReportController extends Controller
             ->where('status', '!=', 'not_applicable')
             ->count();
         $completedActivities = RoleActivity::whereHas('deliverable')
-            ->whereIn('status', ['approved', 'delivered', 'in_review'])
+            ->completed()
             ->count();
         $globalCompliance = $totalActivities > 0
             ? round(($completedActivities / $totalActivities) * 100, 2)
@@ -117,52 +123,68 @@ class ReportController extends Controller
             ->whereHas('deliverable')
             ->count();
 
-        // Per-program breakdown
+        // Per-program breakdown — antes hacía ~5 consultas POR programa dentro
+        // de un map() (N+1). Ahora se agrega una sola vez por cada métrica,
+        // agrupada por programa, y el map() solo lee de esos totales ya
+        // calculados sin disparar consultas nuevas.
         $programs = \App\Models\AcademicProgram::with('project')->get();
-        $programsBreakdown = $programs->map(function ($prog) {
-            $deliverableIds = \App\Models\Subject::where('academic_program_id', $prog->id)
-                ->pluck('id')
-                ->pipe(fn($subjectIds) => \App\Models\Deliverable::whereIn('subject_id', $subjectIds)->pluck('id'));
 
-            $total = $deliverableIds->count();
-            $finished = \App\Models\Deliverable::whereIn('id', $deliverableIds)
-                ->where('global_status', 'finished')->count();
-            $totalActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
-                ->where('status', '!=', 'not_applicable')
-                ->count();
-            $completedActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
-                ->whereIn('status', ['approved', 'delivered', 'in_review'])
-                ->count();
+        $deliverablesByProgram = \App\Models\Deliverable::join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+            ->select('subjects.academic_program_id', 'deliverables.global_status')
+            ->get()
+            ->groupBy('academic_program_id');
+
+        $countByProgram = function ($query) {
+            return $query
+                ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+                ->select('subjects.academic_program_id', DB::raw('count(*) as total'))
+                ->groupBy('subjects.academic_program_id')
+                ->pluck('total', 'academic_program_id');
+        };
+
+        $totalActsByProgram = $countByProgram(
+            RoleActivity::where('role_activities.status', '!=', 'not_applicable')
+        );
+        $completedActsByProgram = $countByProgram(RoleActivity::completed());
+        $overdueByProgram = $countByProgram(RoleActivity::overdue());
+        $activeByProgram = $countByProgram(RoleActivity::active());
+
+        $programsBreakdown = $programs->map(function ($prog) use (
+            $deliverablesByProgram, $totalActsByProgram, $completedActsByProgram, $overdueByProgram, $activeByProgram
+        ) {
+            $progDeliverables = $deliverablesByProgram->get($prog->id, collect());
+            $total = $progDeliverables->count();
+            $finished = $progDeliverables->where('global_status', 'finished')->count();
+
+            $totalActs = $totalActsByProgram->get($prog->id, 0);
+            $completedActs = $completedActsByProgram->get($prog->id, 0);
             $compliance = $totalActs > 0 ? round(($completedActs / $totalActs) * 100) : 0;
 
-            $overdueCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
-                ->overdue()
-                ->count();
-
-            $activeCount = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverableIds)
-                ->whereNotIn('status', ['approved', 'not_applicable', 'not_started'])
-                ->count();
-
             return [
-                'id'                    => $prog->id,
-                'name'                  => $prog->name,
-                'project_id'            => $prog->project_id,
-                'project_name'          => $prog->project->name ?? '',
-                'total'                 => $total,
-                'finished'              => $finished,
-                'compliance_percentage' => $compliance,
-                'overdue_count'         => $overdueCount,
-                'active_count'          => $activeCount,
-                'pending_count'         => max(0, $total - $finished),
+                'id'                                  => $prog->id,
+                'name'                                => $prog->name,
+                'project_id'                          => $prog->project_id,
+                'project_name'                        => $prog->project->name ?? '',
+                'total'                               => $total,
+                'finished'                            => $finished,
+                // % de entregables marcados como terminados (distinto de compliance_percentage,
+                // que mide actividades completadas — pueden diferir legítimamente).
+                'deliverable_completion_percentage'   => $total > 0 ? round(($finished / $total) * 100) : 0,
+                'compliance_percentage'               => $compliance,
+                'overdue_count'                       => $overdueByProgram->get($prog->id, 0),
+                'active_count'                        => $activeByProgram->get($prog->id, 0),
+                'pending_count'                       => max(0, $total - $finished),
             ];
         })->sortByDesc('overdue_count')->values();
 
         // Activities by role with more detail (for flow/bottleneck analysis)
+        $inactiveList = implode("','", RoleActivity::INACTIVE_STATUSES);
         $activitiesByRoleDetail = RoleActivity::whereHas('deliverable')->select(
                 'role',
                 DB::raw('count(*) as total'),
                 DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
-                DB::raw("sum(case when status NOT IN ('approved','not_applicable','not_started') then 1 else 0 end) as active")
+                DB::raw("sum(case when status NOT IN ('$inactiveList') then 1 else 0 end) as active")
             )
             ->groupBy('role')
             ->get();
@@ -184,7 +206,7 @@ class ReportController extends Controller
         // Activities counts (for KPI cards)
         $totalActivities    = RoleActivity::whereHas('deliverable')->count();
         $finishedActivities = RoleActivity::whereHas('deliverable')->where('status', 'approved')->count();
-        $activeActivities   = RoleActivity::whereHas('deliverable')->whereNotIn('status', ['approved', 'not_applicable', 'not_started'])->count();
+        $activeActivities   = RoleActivity::whereHas('deliverable')->active()->count();
 
         return response()->json([
             'active_projects'             => $activeProjects,
@@ -229,63 +251,87 @@ class ReportController extends Controller
             ->where('status', '!=', 'not_applicable')
             ->count();
         $completedActs = \App\Models\RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
-            ->whereIn('status', ['approved', 'delivered', 'in_review'])
+            ->completed()
             ->count();
         $compliance = $totalActs > 0 ? round(($completedActs / $totalActs) * 100, 2) : 0;
 
-        // Compliance by role
+        // Compliance by role — antes disparaba 1 consulta POR rol (6 en total)
+        // y calculaba "compliance_percentage" solo con status='approved',
+        // divergiendo del resto del dashboard (que cuenta approved+delivered+
+        // in_review como completado). Ahora es una sola consulta agrupada por
+        // rol, usando la misma definición canónica de "completado".
         $roles = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+        $completedList = implode("','", RoleActivity::COMPLETED_STATUSES);
+
+        $roleStats = RoleActivity::where('status', '!=', 'not_applicable')
+            ->when($request->filled('project_id'), function ($q) use ($request) {
+                $q->whereHas('deliverable.subject.academicProgram', function ($q2) use ($request) {
+                    $q2->where('project_id', $request->project_id);
+                });
+            })
+            ->select(
+                'role',
+                DB::raw('count(*) as total'),
+                DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved_count"),
+                DB::raw("sum(case when status in ('$completedList') then 1 else 0 end) as completed_count"),
+                DB::raw('sum(case when actual_delivery_date is not null and commitment_date is not null and actual_delivery_date <= commitment_date then 1 else 0 end) as on_time'),
+                DB::raw('sum(case when actual_delivery_date is not null and commitment_date is not null and actual_delivery_date > commitment_date then 1 else 0 end) as late')
+            )
+            ->groupBy('role')
+            ->get()
+            ->keyBy('role');
+
         $byRole = [];
         foreach ($roles as $role) {
-            $activities = RoleActivity::where('role', $role)
-                ->when($request->filled('project_id'), function ($q) use ($request) {
-                    $q->whereHas('deliverable.subject.academicProgram', function ($q2) use ($request) {
-                        $q2->where('project_id', $request->project_id);
-                    });
-                })
-                ->get();
-
-            $roleTotal = $activities->count();
-            $roleApproved = $activities->where('status', 'approved')->count();
-
-            // On time vs late
-            $onTime = $activities->filter(function ($a) {
-                return $a->actual_delivery_date && $a->commitment_date
-                    && $a->actual_delivery_date <= $a->commitment_date;
-            })->count();
-
-            $late = $activities->filter(function ($a) {
-                return $a->actual_delivery_date && $a->commitment_date
-                    && $a->actual_delivery_date > $a->commitment_date;
-            })->count();
+            $stats = $roleStats->get($role);
+            $roleTotal = (int) ($stats->total ?? 0);
+            $completedCount = (int) ($stats->completed_count ?? 0);
 
             $byRole[$role] = [
                 'total' => $roleTotal,
-                'approved' => $roleApproved,
-                'on_time' => $onTime,
-                'late' => $late,
-                'compliance_percentage' => $roleTotal > 0 ? round(($roleApproved / $roleTotal) * 100, 2) : 0,
+                'approved' => (int) ($stats->approved_count ?? 0),
+                'on_time' => (int) ($stats->on_time ?? 0),
+                'late' => (int) ($stats->late ?? 0),
+                'compliance_percentage' => $roleTotal > 0 ? round(($completedCount / $roleTotal) * 100, 2) : 0,
             ];
         }
 
-        // Projects compliance
+        // Projects compliance — antes hacía 4 consultas extra POR proyecto
+        // dentro de un map() (N+1); ahora se agrega una sola vez por proyecto.
+        $deliverablesByProject = Deliverable::join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+            ->join('academic_programs', 'subjects.academic_program_id', '=', 'academic_programs.id')
+            ->select('academic_programs.project_id', 'deliverables.global_status')
+            ->get()
+            ->groupBy('project_id');
+
+        $projectActCount = function ($query) {
+            return $query
+                ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+                ->join('academic_programs', 'subjects.academic_program_id', '=', 'academic_programs.id')
+                ->select('academic_programs.project_id', DB::raw('count(*) as total'))
+                ->groupBy('academic_programs.project_id')
+                ->pluck('total', 'project_id');
+        };
+
+        $totalActsByProject = $projectActCount(RoleActivity::where('role_activities.status', '!=', 'not_applicable'));
+        $completedActsByProject = $projectActCount(RoleActivity::completed());
+        $delayedActsByProject = $projectActCount(
+            RoleActivity::whereNotNull('actual_delivery_date')
+                ->whereNotNull('commitment_date')
+                ->whereColumn('actual_delivery_date', '>', 'commitment_date')
+        );
+
         $projects = Project::withCount(['academicPrograms as programs_count'])
             ->get()
-            ->map(function ($p) {
-                $deliverables = Deliverable::whereHas('subject.academicProgram', fn($q) => $q->where('project_id', $p->id))->get();
-                $pTotal = $deliverables->count();
+            ->map(function ($p) use ($deliverablesByProject, $totalActsByProject, $completedActsByProject, $delayedActsByProject) {
+                $pDeliverables = $deliverablesByProject->get($p->id, collect());
+                $pTotal = $pDeliverables->count();
+                $pTotalActs = $totalActsByProject->get($p->id, 0);
+                $pCompletedActs = $completedActsByProject->get($p->id, 0);
+                $pApproved = $pDeliverables->where('global_status', 'finished')->count();
+                $pDelayed = $delayedActsByProject->get($p->id, 0);
 
-                $pTotalActs = RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
-                    ->where('status', '!=', 'not_applicable')
-                    ->count();
-                $pCompletedActs = RoleActivity::whereIn('deliverable_id', $deliverables->pluck('id'))
-                    ->whereIn('status', ['approved', 'delivered', 'in_review'])
-                    ->count();
-
-                $pApproved = $deliverables->where('global_status', 'finished')->count();
-                $pDelayed = RoleActivity::whereHas('deliverable.subject.academicProgram', fn($q) => $q->where('project_id', $p->id))
-                    ->whereNotNull('actual_delivery_date')->whereNotNull('commitment_date')
-                    ->get()->filter(fn($a) => $a->actual_delivery_date > $a->commitment_date)->count();
                 return [
                     'id' => $p->id,
                     'name' => $p->name,

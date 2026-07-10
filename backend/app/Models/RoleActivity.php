@@ -34,6 +34,30 @@ class RoleActivity extends Model
     ];
 
     /**
+     * Estados que cuentan como "completado" para % de cumplimiento/avance: se
+     * considera terminado el trabajo del responsable en cuanto entrega o pasa
+     * a revisión, sin esperar a que un gestor la apruebe formalmente. Fuente
+     * única reutilizada en dashboards, reportes y resumen ejecutivo — antes
+     * existían al menos 8 variantes de este mismo cálculo divergiendo entre sí.
+     * Constante (no solo scope) para poder reutilizarla también al filtrar
+     * colecciones ya cargadas en memoria, no solo en el query builder.
+     */
+    public const COMPLETED_STATUSES = ['approved', 'delivered', 'in_review'];
+
+    /**
+     * Estados que NO cuentan como "activo"/en curso: ni las que aún no
+     * arrancan (not_started) ni las que ya se entregaron/aprobaron/no aplican.
+     */
+    public const INACTIVE_STATUSES = ['approved', 'delivered', 'not_applicable', 'not_started'];
+
+    /**
+     * Estados que excluyen a una actividad de contar como vencida: una vez
+     * entregada/aprobada/no aplicable, deja de estar vencida sin importar
+     * cuánto tiempo tome la revisión posterior.
+     */
+    public const NOT_OVERDUE_STATUSES = ['approved', 'delivered', 'not_applicable'];
+
+    /**
      * Actividades vencidas: con fecha de compromiso pasada, sin entrega registrada
      * y en un estado que aún espera acción del responsable. Una vez que
      * actual_delivery_date queda registrado (deliver/approve), la actividad deja
@@ -44,7 +68,20 @@ class RoleActivity extends Model
         return $query->whereNotNull('commitment_date')
             ->where('commitment_date', '<', now()->toDateString())
             ->whereNull('actual_delivery_date')
-            ->whereNotIn('status', ['approved', 'delivered', 'not_applicable']);
+            ->whereNotIn('status', self::NOT_OVERDUE_STATUSES);
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->whereIn('status', self::COMPLETED_STATUSES);
+    }
+
+    /**
+     * Actividades "activas" (en curso).
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', self::INACTIVE_STATUSES);
     }
 
     public static function defaultChecklist(string $role): array

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Deliverable;
 use App\Models\Project;
+use App\Models\RoleActivity;
 use Illuminate\Http\Request;
 
 class ExportController extends Controller
@@ -77,7 +78,7 @@ class ExportController extends Controller
                         continue;
                     }
                     $applicableRoles++;
-                    if ($act && in_array($act->status, ['approved', 'delivered'])) {
+                    if ($act && in_array($act->status, RoleActivity::COMPLETED_STATUSES, true)) {
                         $completedRoles++;
                     }
                 }
@@ -152,7 +153,7 @@ class ExportController extends Controller
                             continue;
                         }
                         $totalRoles++;
-                        if (in_array($act->status, ['approved', 'delivered'])) {
+                        if (in_array($act->status, RoleActivity::COMPLETED_STATUSES, true)) {
                             $completedRoles++;
                         }
                     }

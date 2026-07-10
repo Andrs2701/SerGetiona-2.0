@@ -28,21 +28,34 @@ class ProjectController extends Controller
             });
         }
 
+        // Antes hacía 2 consultas por proyecto dentro del map() (N+1). Ahora
+        // se trae el total/terminados de todos los entregables agrupados por
+        // proyecto en una sola consulta, y el map() solo lee de ahí.
+        $deliverableStatsByProject = Deliverable::join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+            ->join('academic_programs', 'subjects.academic_program_id', '=', 'academic_programs.id')
+            ->select(
+                'academic_programs.project_id',
+                \Illuminate\Support\Facades\DB::raw('count(*) as total'),
+                \Illuminate\Support\Facades\DB::raw("sum(case when deliverables.global_status = 'finished' then 1 else 0 end) as finished")
+            )
+            ->groupBy('academic_programs.project_id')
+            ->get()
+            ->keyBy('project_id');
+
         $projects = $projectQuery
             ->with('responsible', 'creator')
             ->get()
-            ->map(function ($project) {
-                $deliverableIds = Deliverable::whereHas('subject.academicProgram', function ($q) use ($project) {
-                    $q->where('project_id', $project->id);
-                })->pluck('id');
-
-                $total = $deliverableIds->count();
-                $finished = Deliverable::whereIn('id', $deliverableIds)
-                    ->where('global_status', 'finished')
-                    ->count();
+            ->map(function ($project) use ($deliverableStatsByProject) {
+                $stats = $deliverableStatsByProject->get($project->id);
+                $total = (int) ($stats->total ?? 0);
+                $finished = (int) ($stats->finished ?? 0);
 
                 $project->deliverables_count = $total;
-                $project->compliance_percentage = $total > 0 ? round(($finished / $total) * 100, 2) : 0;
+                // % de entregables terminados (distinto de "compliance" por
+                // actividades usada en otros reportes — mide una cosa
+                // distinta a propósito).
+                $project->deliverable_completion_percentage = $total > 0 ? round(($finished / $total) * 100, 2) : 0;
+                $project->compliance_percentage = $project->deliverable_completion_percentage;
 
                 return $project;
             });

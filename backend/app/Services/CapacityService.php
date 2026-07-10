@@ -76,7 +76,7 @@ final class CapacityService
             return $a->commitment_date
                 && $a->commitment_date->toDateString() < $today
                 && is_null($a->actual_delivery_date)
-                && !in_array($a->status, ['approved', 'delivered', 'not_applicable']);
+                && !in_array($a->status, \App\Models\RoleActivity::NOT_OVERDUE_STATUSES, true);
         })->count();
 
         return [

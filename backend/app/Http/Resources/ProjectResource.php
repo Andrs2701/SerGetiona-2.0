@@ -22,6 +22,11 @@ class ProjectResource extends JsonResource
             'created_by' => $this->created_by,
             'programs_count' => $this->programs_count ?? null,
             'deliverables_count' => $this->deliverables_count ?? null,
+            // deliverable_completion_percentage: % de entregables terminados.
+            // compliance_percentage: se mantiene por compatibilidad, mide lo mismo
+            // aquí (a nivel de proyecto es equivalente); en otros reportes
+            // "compliance_percentage" mide algo distinto (actividades completadas).
+            'deliverable_completion_percentage' => $this->deliverable_completion_percentage ?? null,
             'compliance_percentage' => $this->compliance_percentage ?? null,
             'academic_programs' => $this->whenLoaded('academicPrograms'),
             'created_at' => $this->created_at,
