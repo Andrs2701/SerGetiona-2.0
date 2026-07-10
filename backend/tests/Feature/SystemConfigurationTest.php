@@ -136,11 +136,13 @@ class SystemConfigurationTest extends TestCase
 
     public function test_cannot_delete_status_in_use(): void
     {
-        $status = SystemStatus::create([
-            'type' => 'task',
-            'slug' => 'in_progress',
-            'label' => 'En Progreso',
-        ]);
+        // firstOrCreate porque la migración de backfill de roles ya crea esta fila
+        // (con updateOrCreate) para que la validación dinámica de estados funcione
+        // sin depender de que SystemConfigSeeder se haya corrido antes.
+        $status = SystemStatus::firstOrCreate(
+            ['type' => 'task', 'slug' => 'in_progress'],
+            ['label' => 'En Progreso']
+        );
 
         $user = User::factory()->create();
         \App\Models\RoleActivity::factory()->create([
