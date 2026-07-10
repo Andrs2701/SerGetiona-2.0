@@ -23,9 +23,19 @@ NC='\033[0m'
 APP_DIR="/var/www/html/sergestiona"
 BACKEND_DIR="$APP_DIR/backend"
 FRONTEND_DIR="$APP_DIR/frontend"
-DB_FILE="$BACKEND_DIR/database/database.sqlite"
 BACKUP_DIR="$APP_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/mysql_$TIMESTAMP.sql"
+
+# Credenciales de MySQL leídas del .env real (nunca hardcodeadas en el script)
+ENV_FILE="$BACKEND_DIR/.env"
+DB_DATABASE=$(grep -E '^DB_DATABASE=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+DB_USERNAME=$(grep -E '^DB_USERNAME=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+DB_PASSWORD=$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+DB_HOST=$(grep -E '^DB_HOST=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+DB_PORT=$(grep -E '^DB_PORT=' "$ENV_FILE" | tail -1 | cut -d '=' -f2-)
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-3306}"
 
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${BLUE}   SERGESTIONA 2.0 - ACTUALIZACIÓN SEGURA          ${NC}"
@@ -34,18 +44,28 @@ echo -e "${BLUE}====================================================${NC}"
 echo ""
 
 # ─────────────────────────────────────────────
-# PASO 0: Backup automático de la base de datos
+# PASO 0: Backup automático de la base de datos (MySQL real, no sqlite)
 # ─────────────────────────────────────────────
-echo -e "${BLUE}[0/4] Realizando backup de la base de datos...${NC}"
+echo -e "${BLUE}[0/4] Realizando backup de la base de datos MySQL...${NC}"
 mkdir -p "$BACKUP_DIR"
-if [ -f "$DB_FILE" ]; then
-    cp "$DB_FILE" "$BACKUP_DIR/database_$TIMESTAMP.sqlite"
-    echo -e "  ${GREEN}✓ Backup guardado: $BACKUP_DIR/database_$TIMESTAMP.sqlite${NC}"
+
+if [ -z "$DB_DATABASE" ]; then
+    echo -e "  ${RED}✗ No se pudo leer DB_DATABASE de $ENV_FILE. Abortando por seguridad.${NC}"
+    exit 1
+fi
+
+MYSQL_PWD="$DB_PASSWORD" mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USERNAME" \
+    --single-transaction --routines --triggers "$DB_DATABASE" > "$BACKUP_FILE"
+
+if [ -s "$BACKUP_FILE" ]; then
+    echo -e "  ${GREEN}✓ Backup guardado: $BACKUP_FILE${NC}"
 else
-    echo -e "  ${YELLOW}⚠ No se encontró base de datos en $DB_FILE (primera instalación)${NC}"
+    echo -e "  ${RED}✗ El backup de MySQL falló o quedó vacío. Abortando actualización sin tocar nada.${NC}"
+    rm -f "$BACKUP_FILE"
+    exit 1
 fi
 # Conservar solo los últimos 10 backups
-ls -t "$BACKUP_DIR"/database_*.sqlite 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
+ls -t "$BACKUP_DIR"/mysql_*.sql 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
 echo ""
 
 # ─────────────────────────────────────────────
@@ -92,7 +112,6 @@ echo -e "  ${GREEN}✓ Caché limpia y dinámica asegurada${NC}"
 echo -e "  Ajustando permisos de directorios..."
 sudo chown -R moodle:apache "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" "$BACKEND_DIR/database" 2>/dev/null || true
 sudo chmod -R 775 "$BACKEND_DIR/storage" "$BACKEND_DIR/bootstrap/cache" "$BACKEND_DIR/database" 2>/dev/null || true
-sudo chmod 664 "$BACKEND_DIR/database/database.sqlite" 2>/dev/null || true
 echo -e "  ${GREEN}✓ Permisos de escritura asegurados${NC}"
 
 # Reiniciar PHP-FPM para limpiar OPcache
@@ -142,7 +161,7 @@ echo -e "${BLUE}====================================================${NC}"
 echo ""
 echo -e "  App disponible en:  http://$DOMAIN/sergestiona"
 echo -e "  API disponible en:  http://$DOMAIN/api"
-echo -e "  Backup BD en:       $BACKUP_DIR/database_$TIMESTAMP.sqlite"
+echo -e "  Backup BD en:       $BACKUP_FILE"
 echo ""
 echo -e "  Estado PM2:"
 pm2 list 2>/dev/null | grep sergestiona || echo "  Verificar con: pm2 list"
@@ -150,5 +169,5 @@ echo ""
 echo -e "  Estado Nginx:   $(sudo systemctl is-active nginx)"
 echo ""
 echo -e "${YELLOW}  TIP: Si algo falló, restaura el backup con:${NC}"
-echo -e "${YELLOW}  cp $BACKUP_DIR/database_$TIMESTAMP.sqlite $DB_FILE${NC}"
+echo -e "${YELLOW}  MYSQL_PWD='...' mysql -h $DB_HOST -P $DB_PORT -u $DB_USERNAME $DB_DATABASE < $BACKUP_FILE${NC}"
 echo ""
