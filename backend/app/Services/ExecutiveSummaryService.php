@@ -27,24 +27,27 @@ final class ExecutiveSummaryService
         $health = HealthService::portfolio();
         $capacity = CapacityService::global();
 
-        $activities = RoleActivity::whereNotNull('responsible_id')->whereHas('deliverable')->get();
+        $activities = RoleActivity::whereNotNull('responsible_id')
+            ->where('status', '!=', 'not_applicable')
+            ->whereHas('deliverable')
+            ->get();
 
         $isOverdue = fn ($a) => $a->commitment_date
             && $a->commitment_date->lt($today)
             && is_null($a->actual_delivery_date)
-            && !in_array($a->status, ['approved', 'delivered', 'not_applicable']);
+            && !in_array($a->status, ['approved', 'delivered', 'in_review'], true);
 
         $overdue = $activities->filter($isOverdue)->count();
 
         $approaching = $activities->filter(
             fn ($a) => $a->commitment_date
                 && !$isOverdue($a)
-                && !in_array($a->status, ['approved', 'delivered', 'not_applicable'])
+                && !in_array($a->status, ['approved', 'delivered', 'in_review'], true)
                 && $a->commitment_date->toDateString() === $today->toDateString()
         )->count();
 
-        $total    = $activities->count();
-        $approved = $activities->where('status', 'approved')->count();
+        $total     = $activities->count();
+        $completed = $activities->filter(fn($a) => in_array($a->status, ['approved', 'delivered', 'in_review'], true))->count();
 
         $alerts = [];
 
@@ -80,7 +83,7 @@ final class ExecutiveSummaryService
                 'health_score'      => $health['portfolio_score'],
                 'health_level'      => $health['portfolio_level'],
                 'capacity'          => $capacity,
-                'compliance_pct'    => $total > 0 ? (int) round($approved / $total * 100) : 0,
+                'compliance_pct'    => $total > 0 ? (int) round($completed / $total * 100) : 0,
                 'overdue_activities'    => $overdue,
                 'approaching_activities'=> $approaching,
             ],
