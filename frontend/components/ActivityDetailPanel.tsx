@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { EvidenceLink, ResourceType, ProductionLog, RoleStatus, Role, DeliverableType, DeliverableFlow } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
+import { useTaskStatuses } from '@/hooks/useTaskStatuses';
 
 const ROLE_ABBR: Record<Role, string> = {
   expert: 'EXP', pedagogy: 'PED', design: 'DIS',
@@ -464,6 +465,8 @@ export default function ActivityDetailPanel({
   const programName = (deliverable as any).program_name || (deliverable as any).program?.name || (activity as any).program?.name || '—';
   const subjectName = (deliverable as any).subject_name || (deliverable as any).subject?.name || (activity as any).subject?.name || '—';
 
+  const { statuses: taskStatuses, loading: loadingStatuses } = useTaskStatuses(activity.role);
+
   const [tab, setTab] = useState<'principal' | 'evidencias' | 'timeline'>('principal');
   const [status, setStatus] = useState(activity.status);
   const [notes, setNotes] = useState(activity.notes ?? '');
@@ -519,25 +522,14 @@ export default function ActivityDetailPanel({
     setFlowData(null);
   }, [activity.id]);
 
-  const allStates = useMemo(() => {
-    const associated = roleStatuses
-      .filter((rs) => rs.role === activity.role)
-      .map((rs) => rs.status_slug);
-    return associated.length > 0 ? associated : Object.keys(ROLE_STATUS_LABELS);
-  }, [roleStatuses, activity.role]);
-
   const roleStates = useMemo(() => {
-    let states = isManager
-      ? allStates
-      : activity.role === 'qa'
-        ? allStates.filter(s => s !== 'delivered') // QA no "entrega", aprueba directamente
-        : allStates.filter(s => !MANAGER_ONLY_STATUSES.includes(s));
-    
+    if (loadingStatuses) return [];
+    let states = taskStatuses.map((s) => s.slug);
     if (!states.includes(activity.status)) {
       states = [...states, activity.status];
     }
     return states;
-  }, [allStates, isManager, activity.status, activity.role]);
+  }, [taskStatuses, loadingStatuses, activity.status]);
 
   const isReadOnly = !isManager && activity.role !== 'qa' && ['delivered', 'approved'].includes(activity.status);
   const isProdRole = PRODUCTION_ROLES.has(activity.role);

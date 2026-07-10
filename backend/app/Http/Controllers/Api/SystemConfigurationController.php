@@ -155,6 +155,8 @@ class SystemConfigurationController extends Controller
             'color' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
+            'allowed_roles' => 'nullable|array',
+            'is_manager_only' => 'nullable|boolean',
         ]);
 
         // Unique combination check
@@ -187,6 +189,8 @@ class SystemConfigurationController extends Controller
             'color' => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'is_active' => 'sometimes|required|boolean',
+            'allowed_roles' => 'nullable|array',
+            'is_manager_only' => 'nullable|boolean',
         ]);
 
         $old = json_encode($status);
@@ -232,6 +236,26 @@ class SystemConfigurationController extends Controller
         ]);
 
         return response()->json(['message' => 'Estado eliminado correctamente.']);
+    }
+
+    public function getTaskStatusesForRole(Request $request)
+    {
+        $role = $request->input('role');
+        $isManager = in_array($request->user()->role, ['admin', 'coordinator'], true);
+
+        $query = SystemStatus::where('type', 'task')->where('is_active', true);
+
+        $statuses = $query->get()->filter(function ($status) use ($role, $isManager) {
+            if ($role && !$status->isAvailableForRole($role)) {
+                return false;
+            }
+            if ($status->is_manager_only && !$isManager) {
+                return false;
+            }
+            return true;
+        })->values();
+
+        return response()->json($statuses);
     }
 
     // --- Transitions ---

@@ -98,6 +98,7 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
 
     // Estados por rol — lectura abierta (Mi Espacio los necesita para cualquier rol), gestión solo admin
     Route::get('config/role-statuses', [SystemConfigurationController::class, 'getRoleStatuses']);
+    Route::get('task-statuses', [SystemConfigurationController::class, 'getTaskStatusesForRole']);
 
     // Registros de producción por actividad
     Route::get('activities/{activity}/production', [ProductionLogController::class, 'byActivity']);

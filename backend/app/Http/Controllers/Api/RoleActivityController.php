@@ -195,12 +195,7 @@ class RoleActivityController extends Controller
             'commitment_date'      => 'nullable|date',
             'actual_start_date'    => 'nullable|date',
             'actual_delivery_date' => 'nullable|date',
-            'status'               => ['nullable', Rule::in([
-                'not_started', 'draft', 'in_development', 'in_progress', 'delivered',
-                'adjustments_requested', 'approved', 'not_applicable', 'in_review',
-                'adjusting', 'designing', 'production', 'editing', 'implementing',
-                'validating', 'pending', 'in_testing', 'with_findings',
-            ])],
+            'status'                     => 'nullable|string',
             'notes'                      => 'nullable|string',
             'production_not_applicable'  => 'sometimes|boolean',
             'adjust_roles'               => 'nullable|array',
@@ -236,6 +231,26 @@ class RoleActivityController extends Controller
         }
 
         if (isset($data['status'])) {
+            $statusObj = \App\Models\SystemStatus::where('type', 'task')
+                ->where('slug', $data['status'])
+                ->where('is_active', true)
+                ->first();
+
+            if (!$statusObj) {
+                return response()->json(['message' => 'El estado de actividad no es válido o está inactivo.'], 422);
+            }
+
+            if (!$statusObj->isAvailableForRole($activity->role)) {
+                return response()->json(['message' => "El estado '{$statusObj->label}' no está disponible para el rol '{$activity->role}'."], 422);
+            }
+
+            if ($statusObj->is_manager_only && !$isManager) {
+                $isQaRole = $activity->role === 'qa';
+                if (!($statusObj->slug === 'approved' && $isQaRole)) {
+                    return response()->json(['message' => "No tienes permisos para asignar el estado '{$statusObj->label}'."], 403);
+                }
+            }
+
             if (in_array($data['status'], ['delivered', 'approved'], true)) {
                 if (empty($data['actual_delivery_date'])) {
                     $data['actual_delivery_date'] = Carbon::today()->toDateString();

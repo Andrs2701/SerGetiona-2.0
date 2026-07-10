@@ -208,6 +208,7 @@ export const ENDPOINTS = {
   ACTIVITY_PRODUCTION: (id: number) => `/activities/${id}/production`,
   PRODUCTION_SUMMARY: '/reports/production',
   EXPORT_PRODUCTION: '/export/production',
+  TASK_STATUSES: '/task-statuses',
 
   // Auth extended
   AUTH_ME: '/auth/me',

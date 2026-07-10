@@ -17,6 +17,7 @@ import ImportModal from '@/components/ImportModal';
 import EvidencePanel from '@/components/EvidencePanel';
 import NextResponsibleCard from '@/components/NextResponsibleCard';
 import ComplexitySelect from '@/components/ComplexitySelect';
+import { useTaskStatuses } from '@/hooks/useTaskStatuses';
 
 type Role = RoleType;
 
@@ -105,6 +106,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     activity: RoleActivity;
     deliverable: Deliverable;
   } | null>(null);
+  const selectedRole = selectedActivity?.activity.role;
+  const { statuses: taskStatuses, loading: loadingStatuses } = useTaskStatuses(selectedRole);
   const [activityStatus, setActivityStatus] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -275,12 +278,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   const proj = project;
   const roleStates = (() => {
-    if (!selectedActivity) return [];
-    const associated = roleStatuses
-      .filter((rs) => rs.role === selectedActivity.activity.role)
-      .map((rs) => rs.status_slug);
-    const allStates = associated.length > 0 ? associated : Object.keys(ROLE_STATUS_LABELS);
-    return allStates.filter((s) => isManager || !MANAGER_ONLY_STATUSES.includes(s));
+    if (!selectedActivity || loadingStatuses) return [];
+    let states = taskStatuses.map((s) => s.slug);
+    if (!states.includes(selectedActivity.activity.status)) {
+      states = [...states, selectedActivity.activity.status];
+    }
+    return states;
   })();
   const flowSteps = selectedActivity ? buildFlowSteps(selectedActivity.deliverable) : [];
 

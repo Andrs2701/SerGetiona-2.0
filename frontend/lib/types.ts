@@ -534,6 +534,8 @@ export interface SystemStatus {
   color?: string | null;
   description?: string | null;
   is_active: boolean;
+  allowed_roles?: string[] | null;
+  is_manager_only: boolean;
 }
 
 export interface StateTransition {

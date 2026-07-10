@@ -32,6 +32,8 @@ interface StatusForm {
   color: string;
   description: string;
   is_active: boolean;
+  allowed_roles: string[];
+  is_manager_only: boolean;
 }
 
 interface TransitionForm {
@@ -53,6 +55,7 @@ export default function SystemStatusesConfig() {
   const [roleStatusForm, setRoleStatusForm] = useState<{ role: string; status_slug: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterRole, setFilterRole] = useState<string>('');
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +92,8 @@ export default function SystemStatusesConfig() {
           color: form.color,
           description: form.description.trim() || null,
           is_active: form.is_active,
+          allowed_roles: form.type === 'task' ? form.allowed_roles : null,
+          is_manager_only: form.type === 'task' ? form.is_manager_only : false,
         });
       } else {
         await api.post('/config/statuses', {
@@ -98,6 +103,8 @@ export default function SystemStatusesConfig() {
           color: form.color,
           description: form.description.trim() || null,
           is_active: form.is_active,
+          allowed_roles: form.type === 'task' ? form.allowed_roles : null,
+          is_manager_only: form.type === 'task' ? form.is_manager_only : false,
         });
       }
       setForm(null);
@@ -211,12 +218,42 @@ export default function SystemStatusesConfig() {
     return <div className="text-sm text-gray-400 py-8 text-center">Cargando estados…</div>;
   }
 
-  const renderStatusList = (title: string, type: 'deliverable' | 'task', list: SystemStatus[]) => (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+  const renderStatusList = (title: string, type: 'deliverable' | 'task', list: SystemStatus[]) => {
+    const filteredList = type === 'task' && filterRole
+      ? list.filter((s) => s.allowed_roles?.includes(filterRole))
+      : list;
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+            {type === 'task' && (
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              >
+                <option value="">Filtrar por rol</option>
+                {OPERATIVE_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r] ?? r}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         <button
-          onClick={() => setForm({ type, slug: '', label: '', color: 'bg-gray-200', description: '', is_active: true })}
+          onClick={() => setForm({
+            type,
+            slug: '',
+            label: '',
+            color: 'bg-gray-200',
+            description: '',
+            is_active: true,
+            allowed_roles: [],
+            is_manager_only: false
+          })}
           className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium"
         >
           <Plus size={13} />
@@ -224,7 +261,7 @@ export default function SystemStatusesConfig() {
         </button>
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-50 dark:divide-gray-700">
-        {list.map((s) => (
+        {filteredList.map((s) => (
           <div key={s.id} className="px-4 py-3 flex items-center gap-3 group">
             <div className={clsx('w-3 h-3 rounded-full flex-shrink-0', s.color ?? 'bg-gray-200')} />
             <div className="flex-1 min-w-0">
@@ -244,6 +281,8 @@ export default function SystemStatusesConfig() {
                   color: s.color ?? 'bg-gray-200',
                   description: s.description ?? '',
                   is_active: s.is_active,
+                  allowed_roles: s.allowed_roles ?? [],
+                  is_manager_only: s.is_manager_only ?? false,
                 })}
                 className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
               >
@@ -255,12 +294,13 @@ export default function SystemStatusesConfig() {
             </div>
           </div>
         ))}
-        {list.length === 0 && (
+        {filteredList.length === 0 && (
           <div className="px-4 py-6 text-center text-gray-400 text-sm">Sin estados.</div>
         )}
       </div>
     </div>
   );
+}
 
   return (
     <div className="space-y-8">
@@ -467,6 +507,40 @@ export default function SystemStatusesConfig() {
                 className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
+            {form.type === 'task' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Roles autorizados</label>
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded-lg p-3">
+                    {roles.map((r) => (
+                      <label key={r.slug} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={form.allowed_roles.includes(r.slug)}
+                          onChange={(e) => setForm({
+                            ...form,
+                            allowed_roles: e.target.checked
+                              ? [...form.allowed_roles, r.slug]
+                              : form.allowed_roles.filter((x) => x !== r.slug),
+                          })}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                        />
+                        {r.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={form.is_manager_only}
+                    onChange={(e) => setForm({ ...form, is_manager_only: e.target.checked })}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Exclusivo para coordinadores y administradores
+                </label>
+              </>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
                 type="checkbox"
