@@ -213,9 +213,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       );
       // Re-fetch from server so all users see the change
       loadDeliverables();
-    } catch {
+    } catch (e) {
       setActivityStatus(previousStatus);
-      setStatusError('No se pudo guardar. Verifica tus permisos.');
+      const msg = e instanceof Error ? e.message : '';
+      let friendlyMessage = 'No se pudo guardar. Verifica tus permisos e intenta de nuevo.';
+      try {
+        const jsonStart = msg.indexOf('{');
+        if (jsonStart !== -1) {
+          const errorJson = JSON.parse(msg.substring(jsonStart));
+          if (errorJson.message) friendlyMessage = errorJson.message;
+        } else if (msg) {
+          friendlyMessage = msg;
+        }
+      } catch {
+        if (msg) friendlyMessage = msg;
+      }
+      setStatusError(friendlyMessage);
       setTimeout(() => setStatusError(null), 4000);
     } finally {
       setSavingStatus(false);
