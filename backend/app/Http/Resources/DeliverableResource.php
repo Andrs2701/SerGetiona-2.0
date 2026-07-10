@@ -21,7 +21,7 @@ class DeliverableResource extends JsonResource
             'semestre' => $this->semestre,
             'ciclo' => $this->ciclo,
             'created_by' => $this->created_by,
-            'creator' => $this->whenLoaded('creator', fn() => new UserResource($this->creator)),
+            'creator' => $this->whenLoaded('creator', fn() => new PublicUserResource($this->creator)),
             'role_activities' => $this->whenLoaded('roleActivities', function () {
                 return $this->roleActivities->map(function ($activity) {
                     return [
@@ -35,10 +35,10 @@ class DeliverableResource extends JsonResource
                         'assigned_at' => $activity->assigned_at,
                         'notes' => $activity->notes,
                         'responsible' => $activity->relationLoaded('responsible') && $activity->responsible
-                            ? new UserResource($activity->responsible)
+                            ? new PublicUserResource($activity->responsible)
                             : null,
                         'assigned_by' => $activity->relationLoaded('assignedBy') && $activity->assignedBy
-                            ? new UserResource($activity->assignedBy)
+                            ? new PublicUserResource($activity->assignedBy)
                             : null,
                     ];
                 });

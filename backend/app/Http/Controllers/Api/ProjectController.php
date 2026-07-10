@@ -84,7 +84,7 @@ class ProjectController extends Controller
                 $q->with([
                     'subjects' => function ($q2) {
                         $q2->with(['deliverables' => function ($q3) {
-                            $q3->with('roleActivities.responsible');
+                            $q3->with('roleActivities.responsible:id,name,role,photo_path');
                         }]);
                     }
                 ]);

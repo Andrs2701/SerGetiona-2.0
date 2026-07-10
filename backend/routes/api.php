@@ -34,7 +34,7 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])-
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 
 // Protegidas con Sanctum
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
@@ -178,12 +178,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reports/overdue-list', [ReportController::class, 'overdueList']);
         Route::get('reports/approaching-list', [ReportController::class, 'approachingList']);
 
-        Route::post('/import/deliverables', [ImportController::class, 'deliverables']);
+        Route::post('/import/deliverables', [ImportController::class, 'deliverables'])->middleware('throttle:10,1');
         Route::get('/import/template', [ImportController::class, 'template']);
 
-        Route::get('/export/deliverables', [ExportController::class, 'deliverables']);
-        Route::get('/export/projects', [ExportController::class, 'projects']);
-        Route::get('/export/production', [ProductionLogController::class, 'export']);
+        Route::get('/export/deliverables', [ExportController::class, 'deliverables'])->middleware('throttle:10,1');
+        Route::get('/export/projects', [ExportController::class, 'projects'])->middleware('throttle:10,1');
+        Route::get('/export/production', [ProductionLogController::class, 'export'])->middleware('throttle:10,1');
 
         // Indicadores de producción
         Route::get('reports/production', [ProductionLogController::class, 'summary']);

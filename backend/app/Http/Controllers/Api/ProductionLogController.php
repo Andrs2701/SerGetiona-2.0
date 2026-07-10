@@ -14,6 +14,12 @@ class ProductionLogController extends Controller
 {
     public function byActivity(Request $request, RoleActivity $activity)
     {
+        abort_unless(
+            \App\Support\ResourceAccess::canAccessActivity($request->user(), $activity),
+            403,
+            'No tienes permiso para ver los registros de producción de esta actividad.'
+        );
+
         $logs = $activity->productionLogs()
             ->with(['resourceType', 'producer', 'logger'])
             ->orderBy('produced_at', 'desc')

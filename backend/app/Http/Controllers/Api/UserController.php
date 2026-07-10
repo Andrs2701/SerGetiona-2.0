@@ -76,6 +76,10 @@ class UserController extends Controller
 
         $user->update($data);
 
+        if (isset($data['is_active']) && !$data['is_active']) {
+            $user->tokens()->delete();
+        }
+
         return new UserResource($user);
     }
 
