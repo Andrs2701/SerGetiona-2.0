@@ -407,7 +407,86 @@ export default function UsuariosPage() {
           <TableSkeleton rows={6} cols={6} />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista de tarjetas en móvil: la tabla de 6 columnas obligaba a
+                desplazar horizontalmente a ciegas, sin ninguna pista visual de
+                que había más columnas. Cada tarjeta muestra todo sin scroll. */}
+            <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+              {filtered.map((u) => (
+                <div key={u.id} className="px-4 py-3 flex items-start gap-3">
+                  <div className="relative flex-shrink-0">
+                    <Avatar
+                      name={u.name}
+                      photoUrl={u.photo_url}
+                      className="w-10 h-10 bg-indigo-100 text-indigo-700 text-sm font-bold"
+                    />
+                    <span
+                      className={clsx(
+                        'absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-gray-800',
+                        u.isOnline ? 'bg-emerald-500' : 'bg-gray-300'
+                      )}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{u.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.email}</p>
+                      </div>
+                      {isManagement && (
+                        <div className="flex items-center gap-2.5 flex-shrink-0">
+                          <button
+                            onClick={() => openEdit(u)}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Editar usuario"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleGenerateResetLink(u)}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Generar enlace de acceso"
+                          >
+                            <KeyRound size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role])}>
+                        {USER_ROLE_LABELS[u.role]}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {formatLastActive(u.activeDiffSeconds, u.last_active_at)}
+                      </span>
+                      <button
+                        onClick={() => isManagement && toggleActive(u)}
+                        disabled={!isManagement}
+                        className={clsx(
+                          'relative inline-flex h-5 w-9 items-center rounded-full transition-colors ml-auto',
+                          u.is_active ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700',
+                          !isManagement && 'opacity-60 cursor-not-allowed'
+                        )}
+                        title={u.is_active ? 'Activo' : 'Inactivo'}
+                      >
+                        <span
+                          className={clsx(
+                            'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
+                            u.is_active ? 'translate-x-4' : 'translate-x-1'
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <p className="px-4 py-8 text-center text-gray-400 italic text-sm">
+                  No se encontraron usuarios coincidentes.
+                </p>
+              )}
+            </div>
+
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <tr>

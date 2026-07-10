@@ -228,7 +228,13 @@ export default function Header({
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-12 w-[calc(100vw-1.5rem)] sm:w-96 max-w-[24rem] bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50">
+            // En móvil, el botón de campana no está pegado al borde derecho real
+            // de la pantalla (el avatar de usuario va más a la derecha) — anclar
+            // el panel con "right-0" relativo a ese botón lo desbordaba fuera de
+            // la pantalla por la izquierda. Con "fixed" se posiciona relativo al
+            // viewport completo en vez de al botón; desde sm: se vuelve al
+            // comportamiento original anclado al botón.
+            <div className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-96 max-w-[24rem] bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Notificaciones</h3>
                 {unread > 0 && (

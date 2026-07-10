@@ -132,57 +132,66 @@ export default function PermissionsMatrixConfig() {
         </div>
       </div>
 
-      {/* Matriz módulos × roles */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">
-                <span className="flex items-center gap-1.5"><ShieldCheck size={13} /> Módulo / Acción</span>
-              </th>
-              {roles.map((r) => (
-                <th key={r.slug} className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
-                  {r.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {permissions.map((p) => (
-              <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-5 py-3">
-                  <p className="font-medium text-gray-900">
-                    {MODULE_LABELS[p.module] ?? p.module}
-                    <span className="text-gray-400 font-normal"> · {ACTION_LABELS[p.action] ?? p.action}</span>
-                  </p>
-                  {p.description && <p className="text-xs text-gray-400 mt-0.5">{p.description}</p>}
-                </td>
-                {roles.map((r) => {
-                  const checked = r.slug === 'admin' || p.allowed_roles.includes(r.slug);
-                  return (
-                    <td key={r.slug} className="px-3 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={r.slug === 'admin'}
-                        onChange={() => togglePermission(p.id, r.slug)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                      />
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-            {permissions.length === 0 && (
+      {/* Matriz módulos × roles. Con 8 roles la tabla es más ancha que casi
+          cualquier pantalla, así que la primera columna queda fija (sticky)
+          para que el nombre del módulo no se pierda al desplazar hacia la
+          derecha, y un degradado en el borde derecho avisa que hay más
+          columnas para ver (antes no había ninguna pista visual de esto). */}
+      <div className="relative">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <td colSpan={roles.length + 1} className="px-5 py-8 text-center text-gray-400">
-                  No hay permisos configurados.
-                </td>
+                <th className="sticky left-0 z-10 bg-gray-50 text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase border-r border-gray-200">
+                  <span className="flex items-center gap-1.5"><ShieldCheck size={13} /> Módulo / Acción</span>
+                </th>
+                {roles.map((r) => (
+                  <th key={r.slug} className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
+                    {r.name}
+                  </th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {permissions.map((p) => (
+                <tr key={p.id} className="group border-b border-gray-50 hover:bg-gray-50">
+                  <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50 px-5 py-3 border-r border-gray-200">
+                    <p className="font-medium text-gray-900">
+                      {MODULE_LABELS[p.module] ?? p.module}
+                      <span className="text-gray-400 font-normal"> · {ACTION_LABELS[p.action] ?? p.action}</span>
+                    </p>
+                    {p.description && <p className="text-xs text-gray-400 mt-0.5">{p.description}</p>}
+                  </td>
+                  {roles.map((r) => {
+                    const checked = r.slug === 'admin' || p.allowed_roles.includes(r.slug);
+                    return (
+                      <td key={r.slug} className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={r.slug === 'admin'}
+                          onChange={() => togglePermission(p.id, r.slug)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {permissions.length === 0 && (
+                <tr>
+                  <td colSpan={roles.length + 1} className="px-5 py-8 text-center text-gray-400">
+                    No hay permisos configurados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Degradado que insinúa que hay más columnas a la derecha */}
+        <div className="pointer-events-none absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent rounded-r-lg" />
       </div>
+      <p className="text-xs text-gray-400 sm:hidden -mt-4">Desliza la tabla hacia la izquierda para ver todos los roles →</p>
 
       {/* Alcance de visibilidad por rol */}
       <div>
