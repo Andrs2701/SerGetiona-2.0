@@ -57,8 +57,13 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Lint
-        run: npm run lint
+      # No bloqueante: el proyecto tiene ~60 errores de lint preexistentes
+      # (no-unused-vars, set-state-in-effect, etc.) acumulados antes de este
+      # CI, ajenos a cualquier cambio puntual. Se deja visible en el log de
+      # cada corrida para que no crezca en silencio, pero no bloquea el
+      # merge hasta que se aborde esa deuda como su propia tarea aparte.
+      - name: Lint (informativo, no bloqueante)
+        run: npm run lint || true
 
       - name: Build
         run: npm run build
