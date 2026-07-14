@@ -21,3 +21,5 @@ Thumbs.db
 backend/database/seeders/PerformanceVolumeSeeder.php
 frontend/load_test.js
 frontend/simulate_load.js
+backend/test_smtp_direct.php
+
