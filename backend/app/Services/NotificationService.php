@@ -133,14 +133,7 @@ class NotificationService
 
         $pref = UserPreference::firstOrCreate(
             ['user_id' => $user->id],
-            [
-                'portfolio_view' => 'table',
-                'right_sidebar_open' => true,
-                'email_notifications_enabled' => true,
-                'email_tasks' => true,
-                'email_chat' => true,
-                'email_deadlines' => true,
-            ]
+            UserPreference::DEFAULT_PREFERENCES
         );
 
         if (!$pref->email_notifications_enabled || !$pref->{$category}) {

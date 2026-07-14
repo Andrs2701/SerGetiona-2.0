@@ -11,6 +11,7 @@ use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class RoleActivityController extends Controller
@@ -202,216 +203,225 @@ class RoleActivityController extends Controller
             'adjust_roles.*'             => 'string',
         ]);
 
-        if (!$isManager) {
-            // QA puede aprobar directamente (es su función), los demás roles no
-            $isQaRole = $activity->role === 'qa';
+        $activityId = $activity->id;
 
-            if (!$isQaRole) {
+        return DB::transaction(function () use ($request, $activityId, $data, $isManager) {
+            // Releer bajo lock: la instancia de route-model-binding puede estar
+            // obsoleta si otro request modificó esta misma fila mientras tanto.
+            $activity = RoleActivity::where('id', $activityId)->lockForUpdate()->firstOrFail();
+
+            if (!$isManager) {
+                // QA puede aprobar directamente (es su función), los demás roles no
+                $isQaRole = $activity->role === 'qa';
+
+                if (!$isQaRole) {
+                    abort_if(
+                        in_array($activity->status, ['delivered', 'approved'], true),
+                        403,
+                        'Esta actividad ya ha sido entregada o aprobada y no puede ser modificada (puede que otro usuario ya la haya actualizado).'
+                    );
+                }
+
+                $forbiddenFields = array_intersect(
+                    array_keys($data),
+                    ['responsible_id', 'assigned_at', 'commitment_date']
+                );
                 abort_if(
-                    in_array($activity->status, ['delivered', 'approved'], true),
+                    $forbiddenFields !== [],
                     403,
-                    'Esta actividad ya ha sido entregada o aprobada y no puede ser modificada.'
+                    'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
+                );
+                abort_if(
+                    ($data['status'] ?? null) === 'approved' && !$isQaRole,
+                    403,
+                    'No puedes aprobar tu propia actividad.'
                 );
             }
 
-            $forbiddenFields = array_intersect(
-                array_keys($data),
-                ['responsible_id', 'assigned_at', 'commitment_date']
-            );
-            abort_if(
-                $forbiddenFields !== [],
-                403,
-                'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
-            );
-            abort_if(
-                ($data['status'] ?? null) === 'approved' && !$isQaRole,
-                403,
-                'No puedes aprobar tu propia actividad.'
-            );
-        }
+            if (isset($data['status'])) {
+                $statusObj = \App\Models\SystemStatus::where('type', 'task')
+                    ->where('slug', $data['status'])
+                    ->where('is_active', true)
+                    ->first();
 
-        if (isset($data['status'])) {
-            $statusObj = \App\Models\SystemStatus::where('type', 'task')
-                ->where('slug', $data['status'])
-                ->where('is_active', true)
-                ->first();
+                if (!$statusObj) {
+                    return response()->json(['message' => 'El estado de actividad no es válido o está inactivo.'], 422);
+                }
 
-            if (!$statusObj) {
-                return response()->json(['message' => 'El estado de actividad no es válido o está inactivo.'], 422);
-            }
+                if (!$statusObj->isAvailableForRole($activity->role)) {
+                    return response()->json(['message' => "El estado '{$statusObj->label}' no está disponible para el rol '{$activity->role}'."], 422);
+                }
 
-            if (!$statusObj->isAvailableForRole($activity->role)) {
-                return response()->json(['message' => "El estado '{$statusObj->label}' no está disponible para el rol '{$activity->role}'."], 422);
-            }
+                if ($statusObj->is_manager_only && !$isManager) {
+                    $isQaRole = $activity->role === 'qa';
+                    if (!($statusObj->slug === 'approved' && $isQaRole)) {
+                        return response()->json(['message' => "No tienes permisos para asignar el estado '{$statusObj->label}'."], 403);
+                    }
+                }
 
-            if ($statusObj->is_manager_only && !$isManager) {
-                $isQaRole = $activity->role === 'qa';
-                if (!($statusObj->slug === 'approved' && $isQaRole)) {
-                    return response()->json(['message' => "No tienes permisos para asignar el estado '{$statusObj->label}'."], 403);
+                if (in_array($data['status'], ['delivered', 'approved'], true)) {
+                    if (empty($data['actual_delivery_date'])) {
+                        $data['actual_delivery_date'] = Carbon::today()->toDateString();
+                    }
+                } else {
+                    $data['actual_delivery_date'] = null;
                 }
             }
 
-            if (in_array($data['status'], ['delivered', 'approved'], true)) {
-                if (empty($data['actual_delivery_date'])) {
-                    $data['actual_delivery_date'] = Carbon::today()->toDateString();
+            // Extraer adjust_roles antes de actualizar el modelo (no es columna de la tabla)
+            $adjustRoles = $data['adjust_roles'] ?? [];
+            unset($data['adjust_roles']);
+
+            $activity->update($data);
+            $dirty = $activity->getChanges();
+
+            $activity->loadMissing('deliverable.subject.academicProgram');
+            $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+
+            if (isset($dirty['status'])) {
+                // Caso A: QA aprueba la actividad -> Aprobar entregable completo y roles hermanos
+                if ($activity->role === 'qa' && $activity->status === 'approved') {
+                    $deliverable = $activity->deliverable;
+                    if ($deliverable) {
+                        $deliverable->global_status = 'finished';
+                        $deliverable->save();
+
+                        $deliverable->roleActivities()
+                            ->whereIn('status', ['delivered', 'in_review'])
+                            ->update(['status' => 'approved']);
+                    }
                 }
-            } else {
-                $data['actual_delivery_date'] = null;
-            }
-        }
 
-        // Extraer adjust_roles antes de actualizar el modelo (no es columna de la tabla)
-        $adjustRoles = $data['adjust_roles'] ?? [];
-        unset($data['adjust_roles']);
+                // Caso B: QA o Admin devuelven actividades específicas a ajustes
+                if ($activity->role === 'qa' && in_array($activity->status, ['adjustments_requested', 'with_findings'], true)) {
+                    if (!empty($adjustRoles) && $activity->deliverable) {
+                        $siblingActivities = $activity->deliverable->roleActivities()
+                            ->whereIn('role', $adjustRoles)
+                            ->where('status', '!=', 'not_applicable')
+                            ->lockForUpdate()
+                            ->get();
 
-        $activity->update($data);
-        $dirty = $activity->getChanges();
+                        foreach ($siblingActivities as $sibling) {
+                            $oldSiblingStatus = $sibling->status;
+                            $sibling->status = 'adjustments_requested';
+                            $sibling->actual_delivery_date = null; // resetear fecha
+                            $sibling->save();
 
-        $activity->loadMissing('deliverable.subject.academicProgram');
-        $deliverableName = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+                            \App\Models\AuditLog::create([
+                                'user_id'       => Auth::id() ?? 1,
+                                'action'        => 'updated',
+                                'entity_type'   => 'RoleActivity',
+                                'entity_id'     => $sibling->id,
+                                'field_changed' => 'status',
+                                'old_value'     => $oldSiblingStatus,
+                                'new_value'     => 'adjustments_requested',
+                                'ip_address'    => $request->ip(),
+                                'created_at'    => now(),
+                            ]);
 
-        if (isset($dirty['status'])) {
-            // Caso A: QA aprueba la actividad -> Aprobar entregable completo y roles hermanos
-            if ($activity->role === 'qa' && $activity->status === 'approved') {
-                $deliverable = $activity->deliverable;
-                if ($deliverable) {
-                    $deliverable->global_status = 'finished';
-                    $deliverable->save();
-
-                    $deliverable->roleActivities()
-                        ->whereIn('status', ['delivered', 'in_review'])
-                        ->update(['status' => 'approved']);
-                }
-            }
-
-            // Caso B: QA o Admin devuelven actividades específicas a ajustes
-            if ($activity->role === 'qa' && in_array($activity->status, ['adjustments_requested', 'with_findings'], true)) {
-                if (!empty($adjustRoles) && $activity->deliverable) {
-                    $siblingActivities = $activity->deliverable->roleActivities()
-                        ->whereIn('role', $adjustRoles)
-                        ->where('status', '!=', 'not_applicable')
-                        ->get();
-
-                    foreach ($siblingActivities as $sibling) {
-                        $oldSiblingStatus = $sibling->status;
-                        $sibling->status = 'adjustments_requested';
-                        $sibling->actual_delivery_date = null; // resetear fecha
-                        $sibling->save();
-
-                        \App\Models\AuditLog::create([
-                            'user_id'       => Auth::id() ?? 1,
-                            'action'        => 'updated',
-                            'entity_type'   => 'RoleActivity',
-                            'entity_id'     => $sibling->id,
-                            'field_changed' => 'status',
-                            'old_value'     => $oldSiblingStatus,
-                            'new_value'     => 'adjustments_requested',
-                            'ip_address'    => $request->ip(),
-                            'created_at'    => now(),
-                        ]);
-
-                        if ($sibling->responsible) {
-                            $roleLabel = NotificationService::translateRole($sibling->role);
-                            NotificationService::notify(
-                                $sibling->responsible,
-                                'status_changed',
-                                "Tu actividad requiere ajustes: {$deliverableName}",
-                                "Tu actividad de '{$roleLabel}' fue devuelta a Ajustes Solicitados por Calidad (QA). Observaciones de QA: " . ($activity->notes ?? 'Sin observaciones específicas.'),
-                                ['entity_type' => 'RoleActivity', 'entity_id' => $sibling->id]
-                            );
+                            if ($sibling->responsible) {
+                                $roleLabel = NotificationService::translateRole($sibling->role);
+                                NotificationService::notify(
+                                    $sibling->responsible,
+                                    'status_changed',
+                                    "Tu actividad requiere ajustes: {$deliverableName}",
+                                    "Tu actividad de '{$roleLabel}' fue devuelta a Ajustes Solicitados por Calidad (QA). Observaciones de QA: " . ($activity->notes ?? 'Sin observaciones específicas.'),
+                                    ['entity_type' => 'RoleActivity', 'entity_id' => $sibling->id]
+                                );
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Notification: task assigned (new responsible)
-        if (isset($dirty['responsible_id']) && $activity->responsible_id) {
-            $newResponsible = User::find($activity->responsible_id);
-            if ($newResponsible) {
-                NotificationService::notifyTaskAssigned($activity, $newResponsible);
-            }
-        }
-
-        // Notification: status changed — notify coordinators/admin AND responsible
-        if (isset($dirty['status'])) {
-            $newLabel    = self::translateStatus($activity->status);
-            $roleLabel   = NotificationService::translateRole($activity->role);
-            $managers    = User::whereIn('role', ['admin', 'coordinator'])->get();
-            $statusData  = $this->buildStatusNotificationData($activity);
-
-            $verb = match ($activity->status) {
-                'delivered'             => 'entregó',
-                'approved'              => 'aprobó',
-                'adjustments_requested' => 'solicitó ajustes para',
-                'with_findings'         => 'marcó con hallazgos',
-                default                 => "cambió a {$newLabel}",
-            };
-
-            $notifTitle = "{$roleLabel} {$verb}: {$deliverableName}";
-            
-            $respName = $statusData['responsible_name'] ?? 'Sin asignar';
-            $progName = $statusData['program'] ?? '—';
-            $subjName = $statusData['subject'] ?? '—';
-            $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
-
-            NotificationService::notifyMany($managers, 'status_changed', $notifTitle, $notifBody, $statusData);
-
-            // Notify the responsible if change was made by a manager
-            if ($isManager && $activity->responsible_id) {
-                $responsible = User::find($activity->responsible_id);
-                if ($responsible && !$managers->contains('id', $responsible->id)) {
-                    NotificationService::notify(
-                        $responsible,
-                        'status_changed',
-                        "Estado de tu actividad actualizado: {$deliverableName}",
-                        "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
-                        $statusData
-                    );
+            // Notification: task assigned (new responsible)
+            if (isset($dirty['responsible_id']) && $activity->responsible_id) {
+                $newResponsible = User::find($activity->responsible_id);
+                if ($newResponsible) {
+                    NotificationService::notifyTaskAssigned($activity, $newResponsible);
                 }
             }
 
-            // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
-            $this->advanceChain($activity);
-        }
+            // Notification: status changed — notify coordinators/admin AND responsible
+            if (isset($dirty['status'])) {
+                $newLabel    = self::translateStatus($activity->status);
+                $roleLabel   = NotificationService::translateRole($activity->role);
+                $managers    = User::whereIn('role', ['admin', 'coordinator'])->get();
+                $statusData  = $this->buildStatusNotificationData($activity);
 
-        // Notification: commitment date changed → notify responsible
-        if (isset($dirty['commitment_date']) && $activity->responsible_id) {
-            $responsible = User::find($activity->responsible_id);
-            if ($responsible) {
-                NotificationService::notify(
-                    $responsible,
-                    'date_changed',
-                    'Fecha de compromiso actualizada',
-                    "La fecha límite de tu actividad '{$activity->role}' en '{$deliverableName}' fue actualizada a {$activity->commitment_date}.",
-                    ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
-                );
+                $verb = match ($activity->status) {
+                    'delivered'             => 'entregó',
+                    'approved'              => 'aprobó',
+                    'adjustments_requested' => 'solicitó ajustes para',
+                    'with_findings'         => 'marcó con hallazgos',
+                    default                 => "cambió a {$newLabel}",
+                };
+
+                $notifTitle = "{$roleLabel} {$verb}: {$deliverableName}";
+
+                $respName = $statusData['responsible_name'] ?? 'Sin asignar';
+                $progName = $statusData['program'] ?? '—';
+                $subjName = $statusData['subject'] ?? '—';
+                $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
+
+                NotificationService::notifyMany($managers, 'status_changed', $notifTitle, $notifBody, $statusData);
+
+                // Notify the responsible if change was made by a manager
+                if ($isManager && $activity->responsible_id) {
+                    $responsible = User::find($activity->responsible_id);
+                    if ($responsible && !$managers->contains('id', $responsible->id)) {
+                        NotificationService::notify(
+                            $responsible,
+                            'status_changed',
+                            "Estado de tu actividad actualizado: {$deliverableName}",
+                            "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
+                            $statusData
+                        );
+                    }
+                }
+
+                // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
+                $this->advanceChain($activity);
             }
-        }
 
-        // Notification: any other modification by a manager → notify responsible
-        if ($isManager && $activity->responsible_id && !empty($dirty)) {
-            $changedFields = array_keys(array_diff_key($dirty, ['updated_at' => true, 'status' => true,
-                'responsible_id' => true, 'commitment_date' => true]));
-            if (!empty($changedFields)) {
+            // Notification: commitment date changed → notify responsible
+            if (isset($dirty['commitment_date']) && $activity->responsible_id) {
                 $responsible = User::find($activity->responsible_id);
                 if ($responsible) {
                     NotificationService::notify(
                         $responsible,
-                        'activity_modified',
-                        'Tu actividad fue modificada',
-                        "Se realizaron cambios en tu actividad '{$activity->role}' del entregable '{$deliverableName}'.",
+                        'date_changed',
+                        'Fecha de compromiso actualizada',
+                        "La fecha límite de tu actividad '{$activity->role}' en '{$deliverableName}' fue actualizada a {$activity->commitment_date}.",
                         ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
                     );
                 }
             }
-        }
 
-        if ($activity->deliverable) {
-            self::recalculateGlobalStatus($activity->deliverable);
-        }
+            // Notification: any other modification by a manager → notify responsible
+            if ($isManager && $activity->responsible_id && !empty($dirty)) {
+                $changedFields = array_keys(array_diff_key($dirty, ['updated_at' => true, 'status' => true,
+                    'responsible_id' => true, 'commitment_date' => true]));
+                if (!empty($changedFields)) {
+                    $responsible = User::find($activity->responsible_id);
+                    if ($responsible) {
+                        NotificationService::notify(
+                            $responsible,
+                            'activity_modified',
+                            'Tu actividad fue modificada',
+                            "Se realizaron cambios en tu actividad '{$activity->role}' del entregable '{$deliverableName}'.",
+                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                        );
+                    }
+                }
+            }
 
-        return response()->json($activity->load('responsible', 'assignedBy'));
+            if ($activity->deliverable) {
+                self::recalculateGlobalStatus($activity->deliverable);
+            }
+
+            return response()->json($activity->load('responsible', 'assignedBy'));
+        }, 3);
     }
 
     /**
@@ -441,29 +451,59 @@ class RoleActivityController extends Controller
             abort(403, 'El responsable no puede revisar ni aprobar su propia actividad.');
         }
 
-        $today   = Carbon::today()->toDateString();
-        $oldStatus = $activity->status;
+        $activityId = $activity->id;
 
-        switch ($action) {
-            case 'deliver':
-                $hasResourceTypes = ResourceType::where('role', $activity->role)->where('is_active', true)->exists();
-                if ($hasResourceTypes && $activity->productionLogs()->count() === 0) {
-                    return response()->json([
-                        'message' => 'Debes registrar al menos un recurso producido antes de marcar como entregado.',
-                        'requires_production' => true,
-                    ], 422);
-                }
-                $activity->status               = 'delivered';
-                $activity->actual_delivery_date = $today;
-                break;
+        return DB::transaction(function () use ($request, $activityId, $action) {
+            // Releer bajo lock: evita perder escrituras o duplicar notificaciones
+            // si dos requests ejecutan una quick-action sobre la misma fila a la vez.
+            $activity = RoleActivity::where('id', $activityId)->lockForUpdate()->firstOrFail();
 
-            case 'approve':
-                $activity->status               = 'approved';
-                $activity->actual_delivery_date = $activity->actual_delivery_date ?? $today;
-                break;
+            $today   = Carbon::today()->toDateString();
+            $oldStatus = $activity->status;
 
-            case 'request_adjustments':
-                $activity->status = 'adjustments_requested';
+            switch ($action) {
+                case 'deliver':
+                    $hasResourceTypes = ResourceType::where('role', $activity->role)->where('is_active', true)->exists();
+                    if ($hasResourceTypes && $activity->productionLogs()->count() === 0) {
+                        return response()->json([
+                            'message' => 'Debes registrar al menos un recurso producido antes de marcar como entregado.',
+                            'requires_production' => true,
+                        ], 422);
+                    }
+                    $activity->status               = 'delivered';
+                    $activity->actual_delivery_date = $today;
+                    break;
+
+                case 'approve':
+                    $activity->status               = 'approved';
+                    $activity->actual_delivery_date = $activity->actual_delivery_date ?? $today;
+                    break;
+
+                case 'request_adjustments':
+                    $activity->status = 'adjustments_requested';
+                    break;
+
+                case 'reject':
+                    $activity->status = 'with_findings';
+                    break;
+            }
+
+            $activity->save();
+
+            if (!$activity->wasChanged('status')) {
+                // Otro request concurrente ya dejó la actividad en este mismo estado
+                // (p. ej. doble clic, o dos usuarios aprobando a la vez): no-op seguro,
+                // sin repetir auditoría, notificaciones ni avance de cadena.
+                $activity->load('responsible', 'assignedBy', 'deliverable');
+                return response()->json([
+                    'activity'             => $activity,
+                    'next_role'            => null,
+                    'next_responsible'     => null,
+                    'next_commitment_date' => null,
+                ]);
+            }
+
+            if ($action === 'request_adjustments') {
                 // Notificar al experto del entregable
                 $expertActivity = $activity->deliverable?->roleActivities()
                     ->where('role', 'expert')
@@ -480,91 +520,85 @@ class RoleActivityController extends Controller
                         );
                     }
                 }
-                break;
-
-            case 'reject':
-                $activity->status = 'with_findings';
-                break;
-        }
-
-        $activity->save();
-
-        // Audit log
-        AuditLog::create([
-            'user_id'       => Auth::id(),
-            'action'        => 'quick_action',
-            'entity_type'   => 'RoleActivity',
-            'entity_id'     => $activity->id,
-            'field_changed' => 'status',
-            'old_value'     => $oldStatus,
-            'new_value'     => $activity->status,
-            'ip_address'    => $request->ip(),
-            'created_at'    => now(),
-        ]);
-
-        // Notify admins + coordinators
-        $activity->loadMissing('deliverable.subject.academicProgram');
-        $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
-        $newLabel = self::translateStatus($activity->status);
-        $roleLabel = NotificationService::translateRole($activity->role);
-        $delName  = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
-        $statusData = $this->buildStatusNotificationData($activity);
-
-        $verb = match ($activity->status) {
-            'delivered'             => 'entregó',
-            'approved'              => 'aprobó',
-            'adjustments_requested' => 'solicitó ajustes para',
-            'with_findings'         => 'marcó con hallazgos',
-            default                 => "cambió a {$newLabel}",
-        };
-
-        $notifTitle = "{$roleLabel} {$verb}: {$delName}";
-        
-        $respName = $statusData['responsible_name'] ?? 'Sin asignar';
-        $progName = $statusData['program'] ?? '—';
-        $subjName = $statusData['subject'] ?? '—';
-        $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
-
-        NotificationService::notifyMany(
-            $managers,
-            'status_changed',
-            $notifTitle,
-            $notifBody,
-            $statusData
-        );
-
-        // Notify the activity owner (if different from who triggered the action)
-        if ($activity->responsible_id && (int)$activity->responsible_id !== (int)Auth::id()) {
-            $owner = User::find($activity->responsible_id);
-            if ($owner && !$managers->contains('id', $owner->id)) {
-                NotificationService::notify(
-                    $owner,
-                    'status_changed',
-                    "Estado de tu actividad actualizado: {$delName}",
-                    "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
-                    $statusData
-                );
             }
-        }
 
-        // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
-        $nextActivity       = $this->advanceChain($activity);
-        $nextRole           = $nextActivity?->role;
-        $nextResponsible    = $nextActivity?->responsible?->name;
-        $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
+            // Audit log
+            AuditLog::create([
+                'user_id'       => Auth::id(),
+                'action'        => 'quick_action',
+                'entity_type'   => 'RoleActivity',
+                'entity_id'     => $activity->id,
+                'field_changed' => 'status',
+                'old_value'     => $oldStatus,
+                'new_value'     => $activity->status,
+                'ip_address'    => $request->ip(),
+                'created_at'    => now(),
+            ]);
 
-        if ($activity->deliverable) {
-            self::recalculateGlobalStatus($activity->deliverable);
-        }
+            // Notify admins + coordinators
+            $activity->loadMissing('deliverable.subject.academicProgram');
+            $managers = User::whereIn('role', ['admin', 'coordinator'])->get();
+            $newLabel = self::translateStatus($activity->status);
+            $roleLabel = NotificationService::translateRole($activity->role);
+            $delName  = $activity->deliverable?->name ?? "entregable #{$activity->deliverable_id}";
+            $statusData = $this->buildStatusNotificationData($activity);
 
-        $activity->load('responsible', 'assignedBy', 'deliverable');
+            $verb = match ($activity->status) {
+                'delivered'             => 'entregó',
+                'approved'              => 'aprobó',
+                'adjustments_requested' => 'solicitó ajustes para',
+                'with_findings'         => 'marcó con hallazgos',
+                default                 => "cambió a {$newLabel}",
+            };
 
-        return response()->json([
-            'activity'             => $activity,
-            'next_role'            => $nextRole,
-            'next_responsible'     => $nextResponsible,
-            'next_commitment_date' => $nextCommitmentDate,
-        ]);
+            $notifTitle = "{$roleLabel} {$verb}: {$delName}";
+
+            $respName = $statusData['responsible_name'] ?? 'Sin asignar';
+            $progName = $statusData['program'] ?? '—';
+            $subjName = $statusData['subject'] ?? '—';
+            $notifBody = "Responsable: {$respName} | Programa: {$progName} | Asignatura: {$subjName}";
+
+            NotificationService::notifyMany(
+                $managers,
+                'status_changed',
+                $notifTitle,
+                $notifBody,
+                $statusData
+            );
+
+            // Notify the activity owner (if different from who triggered the action)
+            if ($activity->responsible_id && (int)$activity->responsible_id !== (int)Auth::id()) {
+                $owner = User::find($activity->responsible_id);
+                if ($owner && !$managers->contains('id', $owner->id)) {
+                    NotificationService::notify(
+                        $owner,
+                        'status_changed',
+                        "Estado de tu actividad actualizado: {$delName}",
+                        "Tu actividad '{$roleLabel}' {$verb}. {$notifBody}",
+                        $statusData
+                    );
+                }
+            }
+
+            // Habilita y notifica al siguiente rol de la cadena (delivered/approved)
+            $nextActivity       = $this->advanceChain($activity);
+            $nextRole           = $nextActivity?->role;
+            $nextResponsible    = $nextActivity?->responsible?->name;
+            $nextCommitmentDate = $nextActivity?->commitment_date?->toDateString();
+
+            if ($activity->deliverable) {
+                self::recalculateGlobalStatus($activity->deliverable);
+            }
+
+            $activity->load('responsible', 'assignedBy', 'deliverable');
+
+            return response()->json([
+                'activity'             => $activity,
+                'next_role'            => $nextRole,
+                'next_responsible'     => $nextResponsible,
+                'next_commitment_date' => $nextCommitmentDate,
+            ]);
+        }, 3);
     }
 
     /**

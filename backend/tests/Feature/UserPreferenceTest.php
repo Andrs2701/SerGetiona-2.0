@@ -48,6 +48,20 @@ class UserPreferenceTest extends TestCase
         $this->assertEquals('table', $res->json('preferences.portfolio_view'));
     }
 
+    public function test_new_user_defaults_to_only_task_email_notifications(): void
+    {
+        $user = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        $res = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/preferences')
+            ->assertStatus(200);
+
+        $this->assertTrue($res->json('preferences.email_notifications_enabled'));
+        $this->assertTrue($res->json('preferences.email_tasks'));
+        $this->assertFalse($res->json('preferences.email_chat'));
+        $this->assertFalse($res->json('preferences.email_deadlines'));
+    }
+
     public function test_user_can_update_portfolio_view(): void
     {
         $user = User::factory()->create(['role' => 'expert', 'is_active' => true]);

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   MessagesSquare, Plus, Send, Hash, Users, ChevronRight, AtSign, Lock,
   ArrowLeft, CornerDownRight, Copy, Check, Pencil, Trash2, ChevronDown, ChevronUp,
-  MoreHorizontal, X,
+  MoreHorizontal, X, Settings,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
@@ -221,6 +221,12 @@ function ColaboracionInner() {
   // Members modal
   const [membersChannel, setMembersChannel] = useState<Channel | null>(null);
 
+  // Edit channel modal
+  const [editChannel, setEditChannel] = useState<Channel | null>(null);
+  const [editChannelName, setEditChannelName] = useState('');
+  const [editChannelIsPrivate, setEditChannelIsPrivate] = useState(false);
+  const [savingChannel, setSavingChannel] = useState(false);
+
   // Mobile
   const [mobileShowMessages, setMobileShowMessages] = useState(false);
 
@@ -404,6 +410,29 @@ function ColaboracionInner() {
     }
   }
 
+  // ── edit channel (nombre / público-privado) ──────────────────────────────
+
+  function openEditChannel(ch: Channel) {
+    setEditChannel(ch);
+    setEditChannelName(ch.name);
+    setEditChannelIsPrivate(!!ch.is_private);
+  }
+
+  async function handleUpdateChannel() {
+    if (!editChannel || !editChannelName.trim()) return;
+    setSavingChannel(true);
+    try {
+      await api.put(`/channels/${editChannel.id}`, {
+        name: editChannelName.trim(),
+        is_private: editChannelIsPrivate,
+      });
+      setEditChannel(null);
+      loadChannels();
+    } finally {
+      setSavingChannel(false);
+    }
+  }
+
   // ── date separators ──────────────────────────────────────────────────────
 
   const enrichedMessages = useMemo(() => {
@@ -529,6 +558,15 @@ function ColaboracionInner() {
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Última actividad: {lastActivity}</p>
               )}
             </div>
+            {isManager && (
+              <button
+                onClick={() => openEditChannel(activeChannel)}
+                className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex-none"
+                title="Editar canal"
+              >
+                <Settings size={15} />
+              </button>
+            )}
             <button
               onClick={() => setMembersChannel(activeChannel)}
               className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-none"
@@ -821,6 +859,45 @@ function ColaboracionInner() {
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">Tú quedas incluido automáticamente.</p>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Edit Channel Modal */}
+      <Modal open={!!editChannel} onClose={() => setEditChannel(null)} title="Editar Canal" size="sm" footer={
+        <>
+          <button onClick={() => setEditChannel(null)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">Cancelar</button>
+          <button
+            onClick={handleUpdateChannel}
+            disabled={savingChannel || !editChannelName.trim()}
+            className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {savingChannel ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </>
+      }>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nombre del canal</label>
+            <input
+              type="text"
+              value={editChannelName}
+              onChange={e => setEditChannelName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleUpdateChannel()}
+              className="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              autoFocus
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input type="checkbox" checked={editChannelIsPrivate} onChange={e => setEditChannelIsPrivate(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600" />
+            <Lock size={13} className="text-amber-500" />
+            Canal privado (solo los miembros que agregues podrán verlo)
+          </label>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {editChannelIsPrivate
+              ? 'Los miembros actuales conservan su acceso. El historial de mensajes no se pierde.'
+              : 'Todos podrán ver el canal. Los miembros actuales no cambian.'}
+          </p>
         </div>
       </Modal>
 

@@ -12,14 +12,7 @@ class PreferenceController extends Controller
     {
         $pref = UserPreference::firstOrCreate(
             ['user_id' => $request->user()->id],
-            [
-                'portfolio_view' => 'table',
-                'right_sidebar_open' => true,
-                'email_notifications_enabled' => true,
-                'email_tasks' => true,
-                'email_chat' => true,
-                'email_deadlines' => true,
-            ]
+            UserPreference::DEFAULT_PREFERENCES
         );
         return response()->json(['preferences' => $pref]);
     }

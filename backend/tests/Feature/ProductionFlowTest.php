@@ -165,6 +165,41 @@ class ProductionFlowTest extends TestCase
         );
     }
 
+    public function test_concurrent_quick_action_does_not_duplicate_notifications(): void
+    {
+        $this->expertActivity->update(['status' => 'delivered']);
+
+        // Primer approve: legítimo, notifica y avanza la cadena.
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->postJson("/api/activities/{$this->expertActivity->id}/quick-action", ['action' => 'approve'])
+            ->assertOk();
+
+        $notifCountAfterFirst = Notification::where('user_id', $this->coordinator->id)
+            ->where('type', 'status_changed')
+            ->count();
+
+        // Segundo approve "concurrente" (simulado: dos usuarios aprobando casi a
+        // la vez terminan enviando este mismo request por separado): la actividad
+        // ya está aprobada, así que debe ser un no-op — sin duplicar notificación
+        // ni volver a avanzar la cadena.
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->postJson("/api/activities/{$this->expertActivity->id}/quick-action", ['action' => 'approve'])
+            ->assertOk()
+            ->assertJsonPath('next_role', null);
+
+        $this->assertEquals('approved', $this->expertActivity->fresh()->status);
+
+        $notifCountAfterSecond = Notification::where('user_id', $this->coordinator->id)
+            ->where('type', 'status_changed')
+            ->count();
+
+        $this->assertEquals(
+            $notifCountAfterFirst,
+            $notifCountAfterSecond,
+            'El segundo intento concurrente no debe duplicar notificaciones.'
+        );
+    }
+
     public function test_last_role_in_chain_has_no_next(): void
     {
         $qaUser     = User::factory()->create(['role' => 'qa', 'is_active' => true]);
