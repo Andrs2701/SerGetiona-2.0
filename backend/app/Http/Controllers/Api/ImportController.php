@@ -654,6 +654,8 @@ class ImportController extends Controller
                 if (!empty($updates)) $activity->update($updates);
             }
         }
+
+        RoleActivityController::recalculateGlobalStatus($deliverable);
     }
 
     /** Build a lightweight preview record (no DB writes). */
