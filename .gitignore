@@ -16,5 +16,8 @@ Thumbs.db
 # Tool internals
 .claude/
 
-# Archivos sensibles
+# Archivos sensibles y scripts de prueba locales
 *.txt
+backend/database/seeders/PerformanceVolumeSeeder.php
+frontend/load_test.js
+frontend/simulate_load.js
