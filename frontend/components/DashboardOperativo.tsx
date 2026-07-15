@@ -15,6 +15,7 @@ import {
 import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity } from '@/lib/types';
 import { ROLE_STATUS_LABELS, USER_ROLE_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
+import { HIDDEN_IN_WORKSPACE_STATUSES } from '@/lib/statusGroups';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ function computeWeeklyProgress(activities: WorkspaceActivity[]) {
 
   const thisWeek = activities.filter((a) => {
     if (!a.commitment_date) return false;
+    if (a.status === 'not_applicable') return false;
     const d = new Date(a.commitment_date + 'T00:00:00');
     return d >= weekStart && d <= weekEnd;
   });
@@ -60,6 +62,7 @@ function computeWeeklyProgress(activities: WorkspaceActivity[]) {
 }
 
 function computeAutoStatus(act: WorkspaceActivity): { label: string; cls: string } {
+  if (act.status === 'not_applicable') return { label: 'No Aplica', cls: 'text-gray-400 bg-gray-100/50 dark:bg-gray-800/50' };
   if (act.status === 'approved') {
     if (act.actual_delivery_date && act.commitment_date) {
       const onTime = act.actual_delivery_date <= act.commitment_date;
@@ -314,16 +317,16 @@ export default function DashboardOperativo() {
   const activities = data.activities ?? [];
 
   // KPIs
-  const total     = activities.length;
-  const pending   = activities.filter((a) => !['approved', 'delivered', 'in_review', 'not_applicable'].includes(a.status)).length;
-  const overdue   = activities.filter((a) => a.date_status === 'overdue' && !['approved', 'delivered', 'in_review'].includes(a.status)).length;
+  const total     = activities.filter(a => a.status !== 'not_applicable').length;
+  const pending   = activities.filter((a) => !HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status)).length;
+  const overdue   = activities.filter((a) => a.date_status === 'overdue' && !HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status)).length;
   const completed = activities.filter((a) => ['approved', 'delivered', 'in_review'].includes(a.status)).length;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const weekly    = computeWeeklyProgress(activities);
 
   // Priority activities
   const priorityActivities = [...activities]
-    .filter((a) => !['approved', 'delivered', 'in_review'].includes(a.status))
+    .filter((a) => !HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status))
     .sort((a, b) => {
       const diff = urgencyOrder(a) - urgencyOrder(b);
       if (diff !== 0) return diff;

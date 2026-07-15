@@ -14,6 +14,7 @@ import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, DECISION_STAT
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
 import Modal from '@/components/Modal';
+import { HIDDEN_IN_WORKSPACE_STATUSES, NOT_OVERDUE_STATUSES } from '@/lib/statusGroups';
 import { AlertCircle } from 'lucide-react';
 import ActivityDetailPanel from '@/components/ActivityDetailPanel';
 
@@ -536,14 +537,6 @@ export default function MiEspacioPage() {
   const [showFinishedDecisions, setShowFinishedDecisions] = useState(false);
   const [viewingDecisionDetail, setViewingDecisionDetail] = useState<DecisionRecord | null>(null);
 
-  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
-
-  useEffect(() => {
-    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
-      .then((res) => setRoleStatuses(res.role_statuses ?? []))
-      .catch(() => setRoleStatuses([]));
-  }, []);
-
   const loadWorkspace = useCallback(() => {
     api.get<Workspace>(ENDPOINTS.MY_WORKSPACE)
       .then(ws => {
@@ -628,13 +621,13 @@ export default function MiEspacioPage() {
   // KPIs
   const total     = activities.length;
   const pending   = activities.filter(a => ['not_started','pending'].includes(a.status)).length;
-  const overdue   = activities.filter(a => a.date_status === 'overdue' && a.status !== 'approved').length;
-  const approaching = activities.filter(a => a.date_status === 'approaching' && a.status !== 'approved').length;
+  const overdue   = activities.filter(a => a.date_status === 'overdue' && !NOT_OVERDUE_STATUSES.includes(a.status)).length;
+  const approaching = activities.filter(a => a.date_status === 'approaching' && !NOT_OVERDUE_STATUSES.includes(a.status)).length;
   const completed = activities.filter(a => a.status === 'approved').length;
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && filterStatus !== 'completed'
-      ? activities.filter(a => ['approved', 'delivered', 'in_review'].includes(a.status)).length
+      ? activities.filter(a => HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status)).length
       : 0,
     [activities, showCompleted, filterStatus]
   );
@@ -642,8 +635,8 @@ export default function MiEspacioPage() {
   // Filter activities
   const filtered = useMemo(() => activities
     .filter(a => {
-      // Hide approved, delivered, or in_review unless user toggled showCompleted or explicitly filtered for completed
-      if (!showCompleted && filterStatus !== 'completed' && ['approved', 'delivered', 'in_review'].includes(a.status)) return false;
+      // Hide approved, delivered, in_review or not_applicable unless user toggled showCompleted or explicitly filtered for completed
+      if (!showCompleted && filterStatus !== 'completed' && HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status)) return false;
       if (search && ![a.deliverable?.name ?? '', a.subject?.name ?? '', a.program?.name ?? ''].some(s => s.toLowerCase().includes(search.toLowerCase()))) return false;
       if (filterProgram && (a.program?.name ?? '') !== filterProgram) return false;
       if (filterSubject && (a.subject?.name ?? '') !== filterSubject) return false;
@@ -651,7 +644,7 @@ export default function MiEspacioPage() {
       if (filterStatus === 'overdue')    return a.date_status === 'overdue';
       if (filterStatus === 'approaching')return a.date_status === 'approaching';
       if (filterStatus === 'in_process') return ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting','adjustments_requested','with_findings'].includes(a.status);
-      if (filterStatus === 'completed')  return ['approved', 'delivered', 'in_review'].includes(a.status);
+      if (filterStatus === 'completed')  return HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status);
       return true;
     })
     .sort((a, b) => {
@@ -706,7 +699,6 @@ export default function MiEspacioPage() {
           onStatusChange={handleStatusChange}
           isManager={isManager}
           onSaved={loadWorkspace}
-          roleStatuses={roleStatuses}
         />
       )}
 

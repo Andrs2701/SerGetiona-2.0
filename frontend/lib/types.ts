@@ -551,6 +551,7 @@ export interface RoleStatus {
   role: string;
   status_slug: string;
   sort_order: number;
+  is_automatic?: boolean;
 }
 
 export interface VisibilityRule {

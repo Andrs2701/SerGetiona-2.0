@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import { useAuthContext } from '@/contexts/AuthContext';
 import type { Workspace } from '@/lib/types';
+import { DONE_STATUSES, HIDDEN_IN_WORKSPACE_STATUSES } from '@/lib/statusGroups';
 
 interface SidebarItem {
   id: number;
@@ -28,7 +29,6 @@ interface AllActivity {
   date_status?: string;
 }
 
-const DONE_STATUSES = ['approved', 'not_applicable'];
 
 function daysLeftLabel(date: string): { label: string; cls: string } {
   const today = new Date();
@@ -101,7 +101,13 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
 
   if (!open) return null;
 
-  const active = items.filter((i) => !DONE_STATUSES.includes(i.status));
+  const active = items.filter((i) => {
+    // El gestor sigue viendo lo entregado / en revisión: es lo que debe revisar.
+    if (isManager) {
+      return !DONE_STATUSES.includes(i.status);
+    }
+    return !HIDDEN_IN_WORKSPACE_STATUSES.includes(i.status);
+  });
 
   // Top 5 próximos vencimientos (con fecha, no vencidas)
   const upcoming = active
@@ -121,10 +127,11 @@ export default function RightSidebar({ open, onClose }: { open: boolean; onClose
   weekEnd.setDate(weekEnd.getDate() + 7);
   const inWeek = items.filter((i) => {
     if (!i.date) return false;
+    if (i.status === 'not_applicable') return false; // Excluir No Aplica del resumen semanal
     const d = new Date(i.date + 'T00:00:00');
     return d >= weekStart && d < weekEnd;
   });
-  const weekDone = inWeek.filter((i) => DONE_STATUSES.includes(i.status) || i.status === 'delivered').length;
+  const weekDone = inWeek.filter((i) => ['approved', 'delivered', 'in_review'].includes(i.status)).length;
   const weekPct = inWeek.length > 0 ? Math.round((weekDone / inWeek.length) * 100) : 0;
 
   const detailHref = isManager ? '/seguimiento' : '/mi-espacio';

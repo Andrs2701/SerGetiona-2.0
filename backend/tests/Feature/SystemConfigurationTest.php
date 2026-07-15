@@ -304,4 +304,94 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals(1, $rs1->fresh()->sort_order);
         $this->assertEquals(0, $rs2->fresh()->sort_order);
     }
+
+    /**
+     * El selector debe reflejar exactamente lo configurado en "Estados por Rol",
+     * en su orden, y nada más: antes leía system_statuses.allowed_roles sin ningún
+     * ORDER BY, por eso salían estados sin configurar y en orden arbitrario.
+     */
+    public function test_task_statuses_follow_role_statuses_order_and_scope(): void
+    {
+        foreach (['zeta', 'alfa', 'omega'] as $slug) {
+            SystemStatus::updateOrCreate(
+                ['type' => 'task', 'slug' => $slug],
+                ['label' => strtoupper($slug), 'is_active' => true]
+            );
+        }
+        // Configurado para otro rol: no debe filtrarse al selector de 'expert'.
+        SystemStatus::updateOrCreate(
+            ['type' => 'task', 'slug' => 'ajeno'],
+            ['label' => 'Ajeno', 'is_active' => true]
+        );
+
+        // Las migraciones ya siembran estados para 'expert'; aislamos el rol para
+        // afirmar sobre un orden conocido.
+        \App\Models\RoleStatus::where('role', 'expert')->delete();
+
+        // Orden deliberadamente distinto al alfabético y al de creación.
+        \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'zeta', 'sort_order' => 0]);
+        \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'omega', 'sort_order' => 1]);
+        \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'alfa', 'sort_order' => 2]);
+        \App\Models\RoleStatus::create(['role' => 'pedagogy', 'status_slug' => 'ajeno', 'sort_order' => 0]);
+
+        $expert = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        $slugs = $this->actingAs($expert, 'sanctum')
+            ->getJson('/api/task-statuses?role=expert')
+            ->assertOk()
+            ->json('*.slug');
+
+        $this->assertEquals(['zeta', 'omega', 'alfa'], $slugs);
+    }
+
+    /**
+     * Un estado marcado como automático lo asigna el sistema (p. ej. QA al revisar):
+     * el usuario asignado no debe poder elegirlo, pero un gestor sí conserva el
+     * escape para corregir a mano.
+     */
+    public function test_automatic_statuses_are_hidden_from_operators_but_visible_to_managers(): void
+    {
+        SystemStatus::updateOrCreate(['type' => 'task', 'slug' => 'manual_st'], ['label' => 'Manual', 'is_active' => true]);
+        SystemStatus::updateOrCreate(['type' => 'task', 'slug' => 'auto_st'], ['label' => 'Auto', 'is_active' => true]);
+
+        // Las migraciones ya siembran estados para 'expert'; aislamos el rol.
+        \App\Models\RoleStatus::where('role', 'expert')->delete();
+
+        \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'manual_st', 'sort_order' => 0, 'is_automatic' => false]);
+        \App\Models\RoleStatus::create(['role' => 'expert', 'status_slug' => 'auto_st', 'sort_order' => 1, 'is_automatic' => true]);
+
+        $expert = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        $this->assertEquals(
+            ['manual_st'],
+            $this->actingAs($expert, 'sanctum')->getJson('/api/task-statuses?role=expert')->assertOk()->json('*.slug')
+        );
+
+        $this->assertEquals(
+            ['manual_st', 'auto_st'],
+            $this->actingAs($this->admin, 'sanctum')->getJson('/api/task-statuses?role=expert')->assertOk()->json('*.slug')
+        );
+    }
+
+    /**
+     * Los 3 estados automáticos deben quedar marcados tras las migraciones —
+     * incluidos los roles que venían del estado 'adjusting' fusionado, que es
+     * justo donde el backfill original fallaba por correr antes de la fusión.
+     */
+    public function test_migrations_flag_automatic_statuses_for_every_role(): void
+    {
+        $rows = \App\Models\RoleStatus::whereIn('status_slug', ['approved', 'adjustments_requested'])->get();
+        $this->assertNotEmpty($rows, 'Se esperaba que los seeders/migraciones dejaran estados por rol configurados.');
+
+        foreach ($rows as $rs) {
+            // QA sí elige "Aprobado" desde su selector; el resto lo recibe de la cascada.
+            $esperado = ($rs->status_slug === 'approved' && $rs->role === 'qa') ? false : true;
+
+            $this->assertEquals(
+                $esperado,
+                (bool) $rs->is_automatic,
+                "is_automatic incorrecto para {$rs->role}/{$rs->status_slug}"
+            );
+        }
+    }
 }

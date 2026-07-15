@@ -1427,7 +1427,6 @@ export default function EntregablesPage() {
   const [users, setUsers]       = useState<User[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<RoleActivity | null>(null);
   const [selectedActivityDeliverable, setSelectedActivityDeliverable] = useState<Deliverable | null>(null);
-  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
   const autoOpenedRef = useRef(false);
 
   useEffect(() => {
@@ -1435,9 +1434,6 @@ export default function EntregablesPage() {
       .then(r => setProjects(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<User[]>(ENDPOINTS.USERS)
       .then(r => setUsers(Array.isArray(r) ? r : [])).catch(() => {});
-    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
-      .then(res => setRoleStatuses(res.role_statuses ?? []))
-      .catch(() => setRoleStatuses([]));
   }, []);
 
   useEffect(() => {
@@ -1905,7 +1901,6 @@ export default function EntregablesPage() {
           onStatusChange={() => {}}
           isManager={isManager}
           onSaved={handleActivitySaved}
-          roleStatuses={roleStatuses}
         />
       )}
 

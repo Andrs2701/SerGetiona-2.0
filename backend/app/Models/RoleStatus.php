@@ -15,5 +15,10 @@ class RoleStatus extends Model
         'role',
         'status_slug',
         'sort_order',
+        'is_automatic',
+    ];
+
+    protected $casts = [
+        'is_automatic' => 'boolean',
     ];
 }

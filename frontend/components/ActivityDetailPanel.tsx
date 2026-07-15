@@ -435,7 +435,6 @@ export default function ActivityDetailPanel({
   onStatusChange,
   isManager,
   onSaved,
-  roleStatuses,
 }: {
   activity: {
     id: number;
@@ -460,7 +459,6 @@ export default function ActivityDetailPanel({
   onStatusChange: (id: number, status: string) => void;
   isManager: boolean;
   onSaved: () => void;
-  roleStatuses: RoleStatus[];
 }) {
   const programName = (deliverable as any).program_name || (deliverable as any).program?.name || (activity as any).program?.name || '—';
   const subjectName = (deliverable as any).subject_name || (deliverable as any).subject?.name || (activity as any).subject?.name || '—';

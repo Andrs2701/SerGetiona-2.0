@@ -243,17 +243,21 @@ class SystemConfigurationController extends Controller
         $role = $request->input('role');
         $isManager = in_array($request->user()->role, ['admin', 'coordinator'], true);
 
-        $query = SystemStatus::where('type', 'task')->where('is_active', true);
+        if (!$role) {
+            return response()->json([]);
+        }
 
-        $statuses = $query->get()->filter(function ($status) use ($role, $isManager) {
-            if ($role && !$status->isAvailableForRole($role)) {
-                return false;
-            }
-            if ($status->is_manager_only && !$isManager) {
-                return false;
-            }
-            return true;
-        })->values();
+        $statuses = SystemStatus::join('role_statuses', 'system_statuses.slug', '=', 'role_statuses.status_slug')
+            ->where('system_statuses.type', 'task')
+            ->where('system_statuses.is_active', true)
+            ->where('role_statuses.role', $role)
+            ->select('system_statuses.*', 'role_statuses.is_automatic', 'role_statuses.sort_order')
+            ->orderBy('role_statuses.sort_order')
+            ->get();
+
+        if (!$isManager) {
+            $statuses = $statuses->filter(fn($s) => !$s->is_automatic)->values();
+        }
 
         return response()->json($statuses);
     }
@@ -420,5 +424,29 @@ class SystemConfigurationController extends Controller
         }
 
         return response()->json(['message' => 'Orden actualizado correctamente.']);
+    }
+
+    public function updateRoleStatus(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'is_automatic' => 'required|boolean',
+        ]);
+
+        $roleStatus = RoleStatus::findOrFail($id);
+        $old = json_encode($roleStatus);
+        $roleStatus->update(['is_automatic' => $data['is_automatic']]);
+
+        AuditLog::create([
+            'user_id' => Auth::id(),
+            'action' => 'updated',
+            'entity_type' => 'RoleStatus',
+            'entity_id' => $id,
+            'field_changed' => 'is_automatic',
+            'old_value' => $old,
+            'new_value' => json_encode($roleStatus),
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json($roleStatus);
     }
 }

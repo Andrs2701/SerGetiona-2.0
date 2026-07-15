@@ -114,7 +114,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showImport, setShowImport] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<'info' | 'flow' | 'evidence' | 'comments'>('info');
   const [loadError, setLoadError] = useState(false);
-  const [roleStatuses, setRoleStatuses] = useState<RoleStatus[]>([]);
   const [auditLogs, setAuditLogs] = useState<{ user: string; action: string; time: string; date: string }[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
@@ -131,12 +130,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       loadAuditLogs();
     }
   }, [activeTab, loadAuditLogs]);
-
-  useEffect(() => {
-    api.get<{ role_statuses: RoleStatus[] }>('/config/role-statuses')
-      .then((res) => setRoleStatuses(res.role_statuses ?? []))
-      .catch(() => setRoleStatuses([]));
-  }, []);
 
   const loadDeliverables = useCallback(() => {
     api.get<Deliverable[]>(ENDPOINTS.PROJECT_DELIVERABLES(projectId))

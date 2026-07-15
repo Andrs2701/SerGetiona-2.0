@@ -185,6 +185,15 @@ export default function SystemStatusesConfig() {
     }
   }
 
+  async function handleToggleAutomatic(id: number, currentVal: boolean) {
+    try {
+      await api.put(`/config/role-statuses/${id}`, { is_automatic: !currentVal });
+      await load();
+    } catch {
+      alert('No se pudo actualizar el estado de automatización.');
+    }
+  }
+
   async function handleMoveStatus(roleKey: string, index: number, direction: 'up' | 'down') {
     const associated = roleStatuses.filter((rs) => rs.role === roleKey);
     if (direction === 'up' && index === 0) return;
@@ -219,9 +228,10 @@ export default function SystemStatusesConfig() {
   }
 
   const renderStatusList = (title: string, type: 'deliverable' | 'task', list: SystemStatus[]) => {
-    const filteredList = type === 'task' && filterRole
-      ? list.filter((s) => s.allowed_roles?.includes(filterRole))
-      : list;
+    // Sin filtro por allowed_roles: quién puede usar cada estado se decide en
+    // "Estados por Rol", que es la fuente de verdad del selector. Filtrar aquí
+    // impedía asociar estados como "Ajustes Solicitados" a Calidad.
+    const filteredList = list;
 
     return (
       <div>
@@ -341,12 +351,24 @@ export default function SystemStatusesConfig() {
                     const statusObj = taskStatuses.find((ts) => ts.slug === rs.status_slug);
                     return (
                       <div key={rs.id} className="py-2.5 flex items-center justify-between text-xs group hover:bg-gray-50/50 dark:hover:bg-gray-700/20 px-2 rounded-lg transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className={clsx('w-2 h-2 rounded-full', statusObj?.color ?? 'bg-gray-300')} />
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">{statusObj?.label ?? rs.status_slug}</span>
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">({rs.status_slug})</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className={clsx('w-2 h-2 rounded-full flex-shrink-0', statusObj?.color ?? 'bg-gray-300')} />
+                          <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{statusObj?.label ?? rs.status_slug}</span>
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono flex-shrink-0">({rs.status_slug})</span>
+                          <button
+                            onClick={() => handleToggleAutomatic(rs.id, rs.is_automatic ?? false)}
+                            className={clsx(
+                              'px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-colors flex-shrink-0 ml-1',
+                              rs.is_automatic
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 hover:bg-emerald-100'
+                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200'
+                            )}
+                            title="Haz clic para cambiar entre Automático y Manual"
+                          >
+                            {rs.is_automatic ? 'Auto' : 'Manual'}
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
                           <button
                             onClick={() => handleMoveStatus(roleKey, idx, 'up')}
                             disabled={idx === 0}

@@ -248,14 +248,24 @@ class RoleActivityController extends Controller
                     return response()->json(['message' => 'El estado de actividad no es válido o está inactivo.'], 422);
                 }
 
-                if (!$statusObj->isAvailableForRole($activity->role)) {
-                    return response()->json(['message' => "El estado '{$statusObj->label}' no está disponible para el rol '{$activity->role}'."], 422);
-                }
+                // No se valida contra system_statuses.allowed_roles: quién ve qué
+                // estado lo decide role_statuses (lo que administra "Estados por
+                // Rol"), y validar aquí contra un catálogo distinto haría que el
+                // selector ofreciera opciones que al guardar dan 422.
+                //
+                // El chequeo de abajo es deliberadamente fail-open: si no hay fila
+                // en role_statuses para este par (rol, estado), se permite.
+                // role_statuses es configuración de presentación, no una frontera
+                // de seguridad — hay pares en uso real sin configurar, y borrar una
+                // fila desde la pantalla no debe romper la automatización de QA.
+                $roleStatus = \App\Models\RoleStatus::where('role', $activity->role)
+                    ->where('status_slug', $data['status'])
+                    ->first();
 
-                if ($statusObj->is_manager_only && !$isManager) {
+                if ($roleStatus && $roleStatus->is_automatic && !$isManager) {
                     $isQaRole = $activity->role === 'qa';
-                    if (!($statusObj->slug === 'approved' && $isQaRole)) {
-                        return response()->json(['message' => "No tienes permisos para asignar el estado '{$statusObj->label}'."], 403);
+                    if (!($data['status'] === 'approved' && $isQaRole)) {
+                        return response()->json(['message' => "No tienes permisos para asignar el estado '{$statusObj->label}' ya que es un estado automático."], 403);
                     }
                 }
 

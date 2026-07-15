@@ -31,8 +31,12 @@ class WorkingDayService
         return $result;
     }
 
-    public static function getStatus(Carbon $commitmentDate, ?Carbon $deliveryDate = null): string
+    public static function getStatus(Carbon $commitmentDate, ?Carbon $deliveryDate = null, ?string $status = null): string
     {
+        if ($status && in_array($status, \App\Models\RoleActivity::NOT_OVERDUE_STATUSES, true)) {
+            return 'on_time';
+        }
+
         if ($deliveryDate) {
             return 'on_time';
         }

@@ -154,8 +154,10 @@ class WorkspaceController extends Controller
         $mapped = $activities->map(function ($activity) use (&$stats, $today, $approachingLimit) {
             $status = $activity->status;
 
-            // Clasificar por categoría de status
-            if (in_array($status, self::STATUS_APPROVED)) {
+            // Clasificar por categoría de status (excluyendo not_applicable de los conteos transaccionales)
+            if ($status === 'not_applicable') {
+                // no-op para stats transaccionales
+            } elseif (in_array($status, self::STATUS_APPROVED)) {
                 $stats['approved']++;
             } elseif (in_array($status, self::STATUS_RETURNED)) {
                 $stats['returned']++;
@@ -230,6 +232,7 @@ class WorkspaceController extends Controller
 
         $calendarActivities = $mapped->filter(function ($a) use ($now, $in30Days) {
             if (!$a['commitment_date']) return false;
+            if ($a['status'] === 'not_applicable') return false;
             $d = Carbon::parse($a['commitment_date']);
             return $d->between($now, $in30Days);
         })->values();
@@ -261,7 +264,7 @@ class WorkspaceController extends Controller
         $stats['completed'] = $completedCount;
         $stats['pending']   = $stats['pending'] + $stats['in_progress'] + $stats['returned'];
 
-        $totalActivities = $activities->count();
+        $totalActivities = $activities->where('status', '!=', 'not_applicable')->count();
         $stats['compliance_percentage'] = $totalActivities > 0
             ? (int) round(($completedCount / $totalActivities) * 100)
             : 0;
@@ -287,6 +290,7 @@ class WorkspaceController extends Controller
 
             foreach ($activities as $a) {
                 if (!$a->commitment_date) continue;
+                if ($a->status === 'not_applicable') continue;
                 $activityMonth = Carbon::parse($a->commitment_date)->format('Y-m');
 
                 if ($activityMonth === $month) {

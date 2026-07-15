@@ -115,7 +115,8 @@ class CalendarController extends Controller
             if ($activity->commitment_date) {
                 $dateStatus = WorkingDayService::getStatus(
                     Carbon::parse($activity->commitment_date),
-                    $activity->actual_delivery_date ? Carbon::parse($activity->actual_delivery_date) : null
+                    $activity->actual_delivery_date ? Carbon::parse($activity->actual_delivery_date) : null,
+                    $activity->status
                 );
             }
 
@@ -160,7 +161,8 @@ class CalendarController extends Controller
                 if ($activity->commitment_date) {
                     $dateStatus = WorkingDayService::getStatus(
                         Carbon::parse($activity->commitment_date),
-                        $activity->actual_delivery_date ? Carbon::parse($activity->actual_delivery_date) : null
+                        $activity->actual_delivery_date ? Carbon::parse($activity->actual_delivery_date) : null,
+                        $activity->status
                     );
                 }
 
