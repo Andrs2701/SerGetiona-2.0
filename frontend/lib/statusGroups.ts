@@ -12,6 +12,15 @@
 export const NOT_OVERDUE_STATUSES = ['approved', 'delivered', 'not_applicable'];
 
 /**
+ * Espejo de RoleActivity::COMPLETED_STATUSES — el numerador del % de
+ * cumplimiento. El trabajo del responsable se cuenta como hecho al entregar,
+ * sin esperar la aprobación de Calidad. NO incluye 'not_applicable': una
+ * actividad que no aplica no es trabajo cumplido, se saca del denominador
+ * (así lo calcula el backend en WorkspaceController).
+ */
+export const COMPLETED_STATUSES = ['approved', 'delivered'];
+
+/**
  * Lo que un operario ya no tiene que atender: se oculta de su vista de trabajo
  * por defecto y aparece bajo el filtro de completadas. 'not_applicable' entra
  * aquí para que se comporte igual que 'delivered', que es lo que se pidió.

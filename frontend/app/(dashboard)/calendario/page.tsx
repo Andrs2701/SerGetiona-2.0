@@ -11,7 +11,7 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { WorkspaceActivity, CalendarEvent, Role } from '@/lib/types';
 import { ROLE_STATUS_LABELS, ROLE_LABELS } from '@/lib/types';
-import { HIDDEN_IN_WORKSPACE_STATUSES } from '@/lib/statusGroups';
+import { COMPLETED_STATUSES } from '@/lib/statusGroups';
 import { useAuthContext } from '@/contexts/AuthContext';
 import Modal from '@/components/Modal';
 
@@ -288,10 +288,14 @@ function SidePanel({
     const we = addDays(ws, 6);
     const wsStr = toYMD(ws);
     const weStr = toYMD(we);
+    // Misma definición que el backend: las "No Aplica" salen del denominador
+    // (no son trabajo), y el numerador cuenta lo entregado sin esperar a que
+    // Calidad apruebe.
     const scheduled = activities.filter(
       (a) => a.commitment_date && a.commitment_date >= wsStr && a.commitment_date <= weStr
+        && a.status !== 'not_applicable'
     );
-    const done = scheduled.filter((a) => HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status));
+    const done = scheduled.filter((a) => COMPLETED_STATUSES.includes(a.status));
     return { weekScheduled: scheduled.length, weekDone: done.length };
   }, [activities, today]);
 

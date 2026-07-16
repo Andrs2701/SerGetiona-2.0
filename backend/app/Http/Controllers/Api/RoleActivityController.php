@@ -640,6 +640,19 @@ class RoleActivityController extends Controller
             'date'  => $activity->created_at?->toIso8601String(),
         ];
 
+        // Observaciones: se leen de su propia tabla, que es la fuente de verdad
+        // del historial. Antes esta rama vivía de audit_logs con
+        // field_changed='notes', que nadie escribía nunca — código muerto.
+        foreach ($activity->observations()->with('user')->get() as $obs) {
+            $events[] = [
+                'type'  => 'note',
+                'icon'  => 'message',
+                'label' => 'Observación: ' . \Illuminate\Support\Str::limit($obs->observation, 80),
+                'user'  => $obs->user?->name,
+                'date'  => $obs->created_at?->toIso8601String(),
+            ];
+        }
+
         // Si tiene responsable asignado, evento de asignación
         if ($activity->responsible_id && $activity->assigned_at) {
             $events[] = [
@@ -676,14 +689,6 @@ class RoleActivityController extends Controller
                     'type'  => 'date_changed',
                     'icon'  => 'calendar',
                     'label' => "Fecha límite → {$log->new_value}",
-                    'user'  => $log->user?->name,
-                    'date'  => $log->created_at?->toIso8601String(),
-                ];
-            } elseif ($log->field_changed === 'notes' && $log->new_value) {
-                $events[] = [
-                    'type'  => 'note',
-                    'icon'  => 'message',
-                    'label' => 'Observación actualizada',
                     'user'  => $log->user?->name,
                     'date'  => $log->created_at?->toIso8601String(),
                 ];

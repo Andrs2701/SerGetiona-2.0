@@ -277,7 +277,7 @@ function EvidenceLinksPanel({
       {!disabled && (
         <div className="space-y-1.5 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
           <input value={pendingTitle} onChange={e => setPendingTitle(e.target.value)}
-            placeholder="Título (ej: Entrega Drive Semana 1)"
+            placeholder="Título (ej: Entrega Semana 1)"
             className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
           <input value={pendingUrl} onChange={e => setPendingUrl(e.target.value)}
             placeholder="https://sharepoint.com/... o Campus Virtual"
@@ -755,7 +755,9 @@ export default function ActivityDetailPanel({
         }
         setSaveError(friendlyMessage);
       }
-      setTimeout(() => setSaveError(null), 6000);
+      // Sin auto-borrado: ahora que producción y evidencias se guardan antes
+      // del cambio de estado, un error aquí es real y el usuario debe poder
+      // leerlo. El mensaje se limpia al reintentar (setSaveError(null) arriba).
     }
     setSaving(false);
   }

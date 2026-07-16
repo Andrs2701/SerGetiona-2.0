@@ -38,6 +38,10 @@ function daysDiff(date: string) {
 }
 
 function computeAutoStatus(act: WorkspaceActivity): { label: string; cls: string } {
+  // Va primero: "No Aplica" cierra la actividad, así que no debe caer al
+  // "Pendiente" del final ni pintarse como vencida.
+  if (act.status === 'not_applicable')
+    return { label: 'No Aplica', cls: 'bg-gray-100 text-gray-500' };
   if (act.status === 'approved') {
     if (act.actual_delivery_date && act.commitment_date)
       return act.actual_delivery_date <= act.commitment_date
