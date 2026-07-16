@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useCallback, use } from 'react';
 import { clsx } from 'clsx';
-import { Search, ChevronDown, ChevronRight, Download, Upload, Clock } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Download, Upload, Clock, Edit3, Trash2 } from 'lucide-react';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Project, Deliverable, AcademicProgram, RoleActivity, Role as RoleType, RoleStatus } from '@/lib/types';
 import { ROLE_LABELS, GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
@@ -18,6 +18,8 @@ import EvidencePanel from '@/components/EvidencePanel';
 import NextResponsibleCard from '@/components/NextResponsibleCard';
 import ComplexitySelect from '@/components/ComplexitySelect';
 import { useTaskStatuses } from '@/hooks/useTaskStatuses';
+import { useRouter } from 'next/navigation';
+import Modal from '@/components/Modal';
 
 type Role = RoleType;
 
@@ -91,6 +93,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const projectId = Number(id);
   const { user } = useAuthContext();
+  const router = useRouter();
   const isManager = user?.role === 'admin' || user?.role === 'coordinator';
 
   const [project, setProject] = useState<Project | null>(null);
@@ -116,6 +119,38 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [loadError, setLoadError] = useState(false);
   const [auditLogs, setAuditLogs] = useState<{ user: string; action: string; time: string; date: string }[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [savingProject, setSavingProject] = useState(false);
+
+  async function handleEditSave() {
+    if (!editName.trim()) return;
+    setSavingProject(true);
+    try {
+      const updated = await api.put<Project>(ENDPOINTS.PROJECT(projectId), { name: editName });
+      setProject(updated);
+      setShowEditModal(false);
+    } catch {
+      alert('Error al actualizar el nombre de la Escuela / Proyecto.');
+    } finally {
+      setSavingProject(false);
+    }
+  }
+
+  async function handleDelete() {
+    const hasActivities = deliverables.length > 0;
+    const msg = hasActivities
+      ? '¡ADVERTENCIA! Esta Escuela / Proyecto contiene entregables y actividades asociadas. Si la eliminas, se borrarán todos los datos permanentemente en cascada. ¿Estás seguro de que deseas proceder?'
+      : '¿Estás seguro de que deseas eliminar esta Escuela / Proyecto?';
+    if (!window.confirm(msg)) return;
+    try {
+      await api.delete(ENDPOINTS.PROJECT(projectId));
+      router.push('/proyectos');
+    } catch {
+      alert('Error al eliminar la Escuela / Proyecto.');
+    }
+  }
 
   const loadAuditLogs = useCallback(() => {
     setLoadingAudit(true);
@@ -299,10 +334,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         title={proj.name}
         breadcrumbs={[
           { label: 'Dashboard', href: '/' },
-          { label: 'Proyectos', href: '/proyectos' },
+          { label: 'Escuelas / Proyectos', href: '/proyectos' },
           { label: proj.name },
         ]}
-        actions={<StatusBadge status={proj.status} type="project" size="md" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={proj.status} type="project" size="md" />
+            {isManager && (
+              <>
+                <button
+                  onClick={() => { setEditName(proj.name); setShowEditModal(true); }}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <Edit3 size={13} />
+                  Editar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 border border-red-200 text-red-700 bg-white hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Eliminar
+                </button>
+              </>
+            )}
+          </div>
+        }
       />
 
       {/* Tabs */}
@@ -701,6 +758,43 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         onClose={() => setShowImport(false)}
         projectId={projectId}
       />
+
+      {/* Edit Modal */}
+      <Modal
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Editar Escuela / Proyecto"
+        size="md"
+        footer={
+          <>
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleEditSave}
+              disabled={savingProject || !editName.trim()}
+              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {savingProject ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Escuela / Proyecto *</label>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+              placeholder="Nombre del proyecto"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

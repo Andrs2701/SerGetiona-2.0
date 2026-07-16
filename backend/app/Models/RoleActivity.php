@@ -22,6 +22,7 @@ class RoleActivity extends Model
         'notes',
         'checklist',
         'production_not_applicable',
+        'priority',
     ];
 
     protected $casts = [
@@ -35,14 +36,18 @@ class RoleActivity extends Model
 
     /**
      * Estados que cuentan como "completado" para % de cumplimiento/avance: se
-     * considera terminado el trabajo del responsable en cuanto entrega o pasa
-     * a revisión, sin esperar a que un gestor la apruebe formalmente. Fuente
-     * única reutilizada en dashboards, reportes y resumen ejecutivo — antes
-     * existían al menos 8 variantes de este mismo cálculo divergiendo entre sí.
-     * Constante (no solo scope) para poder reutilizarla también al filtrar
-     * colecciones ya cargadas en memoria, no solo en el query builder.
+     * considera terminado el trabajo del responsable en cuanto entrega, sin
+     * esperar a que un gestor la apruebe formalmente. Fuente única reutilizada
+     * en dashboards, reportes y resumen ejecutivo — antes existían al menos 8
+     * variantes de este mismo cálculo divergiendo entre sí. Constante (no solo
+     * scope) para poder reutilizarla también al filtrar colecciones ya
+     * cargadas en memoria, no solo en el query builder.
+     *
+     * Ojo: 'in_review' salió de aquí al unificarse los verbos de trabajo en
+     * 'in_progress'. No confundir con deliverables.global_status = 'in_review',
+     * que es otro vocabulario y sigue vigente (ver recalculateGlobalStatus()).
      */
-    public const COMPLETED_STATUSES = ['approved', 'delivered', 'in_review'];
+    public const COMPLETED_STATUSES = ['approved', 'delivered'];
 
     /**
      * Estados que NO cuentan como "activo"/en curso: ni las que aún no
@@ -124,5 +129,10 @@ class RoleActivity extends Model
     public function productionLogs()
     {
         return $this->hasMany(ProductionLog::class);
+    }
+
+    public function observations()
+    {
+        return $this->hasMany(RoleActivityObservation::class, 'role_activity_id');
     }
 }

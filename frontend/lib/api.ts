@@ -200,11 +200,13 @@ export const ENDPOINTS = {
   ACTIVITY_EVIDENCE: (id: number) => `/role-activities/${id}/evidence`,
   ACTIVITY_QUICK_ACTION: (id: number) => `/activities/${id}/quick-action`,
   ACTIVITY_TIMELINE: (id: number) => `/activities/${id}/timeline`,
+  ACTIVITY_OBSERVATIONS: (id: number) => `/activities/${id}/observations`,
   DELIVERABLE_TIMELINE: (id: number) => `/deliverables/${id}/timeline`,
   DELIVERABLE_FLOW: (id: number) => `/deliverables/${id}/flow`,
 
   // Resource types & production
   RESOURCE_TYPES: '/resource-types',
+  COMPLEXITY_LEVELS: '/complexity-levels',
   ACTIVITY_PRODUCTION: (id: number) => `/activities/${id}/production`,
   PRODUCTION_SUMMARY: '/reports/production',
   EXPORT_PRODUCTION: '/export/production',

@@ -13,6 +13,7 @@ class ProductionLog extends Model
         'role_activity_id',
         'resource_type_id',
         'quantity',
+        'complexity_level_id',
         'description',
         'produced_by',
         'logged_by',
@@ -32,6 +33,11 @@ class ProductionLog extends Model
     public function resourceType()
     {
         return $this->belongsTo(ResourceType::class);
+    }
+
+    public function complexityLevel()
+    {
+        return $this->belongsTo(ComplexityLevel::class);
     }
 
     public function producer()

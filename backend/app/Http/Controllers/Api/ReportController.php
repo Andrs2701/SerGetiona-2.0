@@ -178,6 +178,56 @@ class ReportController extends Controller
             ];
         })->sortByDesc('overdue_count')->values();
 
+        // Per-subject breakdown
+        $subjects = \App\Models\Subject::with('academicProgram.project')->get();
+
+        $deliverablesBySubject = \App\Models\Deliverable::select('subject_id', 'global_status')
+            ->get()
+            ->groupBy('subject_id');
+
+        $countBySubject = function ($query) {
+            return $query
+                ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->select('deliverables.subject_id', DB::raw('count(*) as total'))
+                ->groupBy('deliverables.subject_id')
+                ->pluck('total', 'subject_id');
+        };
+
+        $totalActsBySubject = $countBySubject(
+            RoleActivity::where('role_activities.status', '!=', 'not_applicable')
+        );
+        $completedActsBySubject = $countBySubject(RoleActivity::completed());
+        $overdueBySubject = $countBySubject(RoleActivity::overdue());
+        $activeBySubject = $countBySubject(RoleActivity::active());
+
+        $subjectsBreakdown = $subjects->map(function ($sub) use (
+            $deliverablesBySubject, $totalActsBySubject, $completedActsBySubject, $overdueBySubject, $activeBySubject
+        ) {
+            $subDeliverables = $deliverablesBySubject->get($sub->id, collect());
+            $total = $subDeliverables->count();
+            $finished = $subDeliverables->where('global_status', 'finished')->count();
+
+            $totalActs = $totalActsBySubject->get($sub->id, 0);
+            $completedActs = $completedActsBySubject->get($sub->id, 0);
+            $compliance = $totalActs > 0 ? round(($completedActs / $totalActs) * 100) : 0;
+
+            return [
+                'id'                                  => $sub->id,
+                'name'                                => $sub->name,
+                'program_id'                          => $sub->academic_program_id,
+                'program_name'                        => $sub->academicProgram->name ?? '',
+                'project_id'                          => $sub->academicProgram->project_id ?? 0,
+                'project_name'                        => $sub->academicProgram->project->name ?? '',
+                'total'                               => $total,
+                'finished'                            => $finished,
+                'deliverable_completion_percentage'   => $total > 0 ? round(($finished / $total) * 100) : 0,
+                'compliance_percentage'               => $compliance,
+                'overdue_count'                       => $overdueBySubject->get($sub->id, 0),
+                'active_count'                        => $activeBySubject->get($sub->id, 0),
+                'pending_count'                       => max(0, $total - $finished),
+            ];
+        })->sortByDesc('overdue_count')->values();
+
         // Activities by role with more detail (for flow/bottleneck analysis)
         $inactiveList = implode("','", RoleActivity::INACTIVE_STATUSES);
         $activitiesByRoleDetail = RoleActivity::whereHas('deliverable')->select(
@@ -226,6 +276,7 @@ class ReportController extends Controller
             'activities_by_role'          => $activitiesByRole,
             'activities_by_role_detail'   => $activitiesByRoleDetail,
             'programs_breakdown'          => $programsBreakdown,
+            'subjects_breakdown'          => $subjectsBreakdown,
         ]);
     }
 

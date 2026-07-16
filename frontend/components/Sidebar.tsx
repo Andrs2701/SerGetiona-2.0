@@ -14,6 +14,8 @@ import {
   ClipboardList,
   MessagesSquare,
   X,
+  FolderKanban,
+  HelpCircle,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { USER_ROLE_LABELS } from "@/lib/types";
@@ -47,6 +49,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: UserCircle,
     roles: ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
     badgeKey: 'overdue',
+  },
+  {
+    href: '/proyectos',
+    label: 'Escuelas / Proyectos',
+    icon: FolderKanban,
+    roles: ['admin', 'coordinator'],
   },
   {
     href: '/programas',
@@ -90,6 +98,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Configuración',
     icon: Settings,
     roles: ['admin'],
+  },
+  {
+    href: '/ayuda',
+    label: 'Ayuda',
+    icon: HelpCircle,
+    roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
   },
 ];
 
@@ -153,10 +167,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
   const sidebarInner = (
     <aside className="w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col transition-colors">
       <div className="h-14 flex items-center justify-between px-6 border-b border-[var(--sidebar-border)] flex-shrink-0">
-        <div className="flex items-baseline gap-1">
+        <Link href="/" className="flex items-baseline gap-1 cursor-pointer hover:opacity-80 transition-opacity">
           <span className="font-bold text-lg tracking-tight" style={{ color: '#194276' }}>Sergestiona</span>
           <span className="text-xs font-medium text-gray-400">2.0</span>
-        </div>
+        </Link>
         {onMobileClose && (
           <button
             onClick={onMobileClose}

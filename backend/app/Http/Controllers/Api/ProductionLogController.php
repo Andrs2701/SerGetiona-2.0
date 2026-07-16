@@ -21,7 +21,7 @@ class ProductionLogController extends Controller
         );
 
         $logs = $activity->productionLogs()
-            ->with(['resourceType', 'producer', 'logger'])
+            ->with(['resourceType', 'complexityLevel', 'producer', 'logger'])
             ->orderBy('produced_at', 'desc')
             ->get();
 
@@ -46,10 +46,11 @@ class ProductionLogController extends Controller
         );
 
         $data = $request->validate([
-            'resource_type_id' => 'required|exists:resource_types,id',
-            'quantity'         => 'required|integer|min:1',
-            'description'      => 'nullable|string|max:500',
-            'produced_at'      => 'required|date',
+            'resource_type_id'    => 'required|exists:resource_types,id',
+            'quantity'            => 'required|integer|min:1',
+            'complexity_level_id' => 'nullable|exists:complexity_levels,id',
+            'description'         => 'nullable|string|max:500',
+            'produced_at'         => 'required|date',
         ]);
 
         $resourceType = ResourceType::find($data['resource_type_id']);
@@ -60,13 +61,14 @@ class ProductionLogController extends Controller
         }
 
         $log = ProductionLog::create([
-            'role_activity_id' => $activity->id,
-            'resource_type_id' => $data['resource_type_id'],
-            'quantity'         => $data['quantity'],
-            'description'      => $data['description'] ?? null,
-            'produced_by'      => $user->id,
-            'logged_by'        => $user->id,
-            'produced_at'      => $data['produced_at'],
+            'role_activity_id'    => $activity->id,
+            'resource_type_id'    => $data['resource_type_id'],
+            'quantity'            => $data['quantity'],
+            'complexity_level_id' => $data['complexity_level_id'] ?? null,
+            'description'         => $data['description'] ?? null,
+            'produced_by'         => $user->id,
+            'logged_by'           => $user->id,
+            'produced_at'         => $data['produced_at'],
         ]);
 
         AuditLog::create([
@@ -133,6 +135,9 @@ class ProductionLogController extends Controller
         if ($request->has('project_id')) {
             $query->where('projects.id', $request->input('project_id'));
         }
+        if ($request->has('program_id')) {
+            $query->where('academic_programs.id', $request->input('program_id'));
+        }
         if ($request->has('role')) {
             $query->where('resource_types.role', $request->input('role'));
         }
@@ -185,12 +190,17 @@ class ProductionLogController extends Controller
     public function export(Request $request)
     {
         $query = ProductionLog::query()
-            ->with(['resourceType', 'producer', 'roleActivity.deliverable.subject.academicProgram.project'])
+            ->with(['resourceType', 'complexityLevel', 'producer', 'roleActivity.deliverable.subject.academicProgram.project'])
             ->orderBy('produced_at', 'desc');
 
         if ($request->has('project_id')) {
             $query->whereHas('roleActivity.deliverable.subject.academicProgram.project', function ($q) use ($request) {
                 $q->where('id', $request->input('project_id'));
+            });
+        }
+        if ($request->has('program_id')) {
+            $query->whereHas('roleActivity.deliverable.subject.academicProgram', function ($q) use ($request) {
+                $q->where('id', $request->input('program_id'));
             });
         }
         if ($request->has('role')) {
@@ -207,7 +217,7 @@ class ProductionLogController extends Controller
 
         $logs = $query->get();
 
-        $csv = "Proyecto,Programa,Asignatura,Entregable,Rol,Tipo de Recurso,Cantidad,Descripción,Producido por,Fecha\n";
+        $csv = "Proyecto,Programa,Asignatura,Entregable,Rol,Tipo de Recurso,Cantidad,Nivel,Descripción,Producido por,Fecha\n";
 
         foreach ($logs as $log) {
             $del     = $log->roleActivity?->deliverable;
@@ -223,6 +233,7 @@ class ProductionLogController extends Controller
                 '"' . ($log->resourceType?->role ?? '') . '"',
                 '"' . str_replace('"', '""', $log->resourceType?->name ?? '') . '"',
                 $log->quantity,
+                '"' . str_replace('"', '""', $log->complexityLevel?->name ?? '') . '"',
                 '"' . str_replace('"', '""', $log->description ?? '') . '"',
                 '"' . str_replace('"', '""', $log->producer?->name ?? '') . '"',
                 $log->produced_at?->toDateString() ?? '',

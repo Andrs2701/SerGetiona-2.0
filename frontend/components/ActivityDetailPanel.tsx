@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  X, Clock, Link2, MessageSquare, GitCommitHorizontal, Trash2, ExternalLink, Package, Calendar, User as UserIcon
+  X, Clock, Link2, MessageSquare, GitCommitHorizontal, Trash2, ExternalLink, Package, Calendar, User as UserIcon, Send, CheckCircle2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { EvidenceLink, ResourceType, ProductionLog, RoleStatus, Role, DeliverableType, DeliverableFlow } from '@/lib/types';
+import type { EvidenceLink, ResourceType, ProductionLog, ComplexityLevel, RoleStatus, Role, DeliverableType, DeliverableFlow } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { useTaskStatuses } from '@/hooks/useTaskStatuses';
 
@@ -21,12 +21,12 @@ const ROLE_BADGE_BG: Record<Role, string> = {
 };
 
 const ROLE_CELL_COLORS: Record<Role, { bg: string; border: string; label: string }> = {
-  expert:      { bg: 'bg-violet-50',  border: 'border-violet-100',  label: 'text-violet-700' },
-  pedagogy:    { bg: 'bg-blue-50',    border: 'border-blue-100',    label: 'text-blue-700' },
-  design:      { bg: 'bg-pink-50',    border: 'border-pink-100',    label: 'text-pink-700' },
-  audiovisual: { bg: 'bg-amber-50',   border: 'border-amber-100',   label: 'text-amber-700' },
-  engineering: { bg: 'bg-teal-50',    border: 'border-teal-100',    label: 'text-teal-700' },
-  qa:          { bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'text-emerald-700' },
+  expert:      { bg: 'bg-violet-50 dark:bg-violet-950/20',  border: 'border-violet-100 dark:border-violet-900/30',  label: 'text-violet-700 dark:text-violet-300' },
+  pedagogy:    { bg: 'bg-blue-50 dark:bg-blue-950/20',    border: 'border-blue-100 dark:border-blue-900/30',    label: 'text-blue-700 dark:text-blue-300' },
+  design:      { bg: 'bg-pink-50 dark:bg-pink-950/20',    border: 'border-pink-100 dark:border-pink-900/30',    label: 'text-pink-700 dark:text-pink-300' },
+  audiovisual: { bg: 'bg-amber-50 dark:bg-amber-950/20',   border: 'border-amber-100 dark:border-amber-900/30',   label: 'text-amber-700 dark:text-amber-400' },
+  engineering: { bg: 'bg-teal-50 dark:bg-teal-950/20',    border: 'border-teal-100 dark:border-teal-900/30',    label: 'text-teal-700 dark:text-teal-300' },
+  qa:          { bg: 'bg-emerald-50 dark:bg-emerald-950/20', border: 'border-emerald-100 dark:border-emerald-900/30', label: 'text-emerald-700 dark:text-emerald-300' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,26 +123,48 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
   return (
     <div className="space-y-4">
       {flow.roles.map(r => {
-        const hasContent = r.production.length > 0 || r.links.length > 0 || r.notes;
-        if (!hasContent && r.status === 'not_started') return null;
+        const isNotStarted = r.status === 'not_started';
+        const isNotApplicable = r.status === 'not_applicable';
         const statusColor = STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-500';
         return (
-          <div key={r.role} className="border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div key={r.role} className={clsx(
+            "border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden transition-all duration-200",
+            isNotStarted && "opacity-60 saturate-50 hover:opacity-85 hover:saturate-100",
+            isNotApplicable && "opacity-40 select-none bg-gray-50 dark:bg-gray-800/10"
+          )}>
             {/* Role header */}
             <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-700/40">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate">
                   {ROLE_LABELS_LOCAL[r.role] ?? r.role}
                 </span>
-                {r.responsible && <span className="text-[10px] text-gray-400">— {r.responsible.name}</span>}
+                {r.responsible && <span className="text-[10px] text-gray-400 truncate">— {r.responsible.name}</span>}
               </div>
-              <span className={clsx('text-[10px] font-medium px-2 py-0.5 rounded-full', statusColor)}>
+              <span className={clsx('text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0', statusColor)}>
                 {ROLE_STATUS_LABELS[r.status] ?? r.status}
               </span>
             </div>
 
             {/* Content */}
             <div className="px-3 py-2.5 space-y-2.5">
+              {/* Fechas de la Célula */}
+              {!isNotApplicable && (r.commitment_date || r.actual_delivery_date) && (
+                <div className="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pb-1.5 border-b border-gray-100 dark:border-gray-700/40">
+                  {r.commitment_date && (
+                    <span className="flex items-center gap-1">
+                      <Calendar size={11} className="text-gray-400"/>
+                      Límite: <strong className="text-gray-600 dark:text-gray-300">{formatDate(r.commitment_date)}</strong>
+                    </span>
+                  )}
+                  {r.actual_delivery_date && (
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 size={11} className="text-emerald-500"/>
+                      Entregado: <strong className="text-emerald-600 dark:text-emerald-400">{formatDate(r.actual_delivery_date)}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Production resources */}
               {r.production.length > 0 && (
                 <div>
@@ -184,7 +206,7 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
               )}
 
               {!r.production.length && !r.links.length && !r.notes && (
-                <p className="text-xs text-gray-400 py-1">Sin registros para este rol</p>
+                <p className="text-xs text-gray-400 py-1">{isNotApplicable ? 'Rol no aplica para este entregable.' : 'Sin registros para este rol.'}</p>
               )}
             </div>
           </div>
@@ -258,7 +280,7 @@ function EvidenceLinksPanel({
             placeholder="Título (ej: Entrega Drive Semana 1)"
             className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
           <input value={pendingUrl} onChange={e => setPendingUrl(e.target.value)}
-            placeholder="https://drive.google.com/..."
+            placeholder="https://sharepoint.com/... o Campus Virtual"
             className="w-full px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
           <p className="text-[10px] text-gray-400 dark:text-gray-500">Se guardará junto con los demás cambios</p>
         </div>
@@ -274,6 +296,7 @@ function QuickProductionGrid({
   onLogsLoaded, refreshKey,
   naResources, onNAResourcesChange,
   onResourceTypesLoaded,
+  complexities, onComplexityChange,
   disabled = false,
 }: {
   activityId: number; role: string;
@@ -285,11 +308,23 @@ function QuickProductionGrid({
   naResources: Set<number>;
   onNAResourcesChange: (s: Set<number>) => void;
   onResourceTypesLoaded: (count: number) => void;
+  complexities: Record<number, number>;
+  onComplexityChange: (id: number, levelId: number) => void;
   disabled?: boolean;
 }) {
   const [resourceTypes, setResourceTypes] = useState<ResourceType[]>([]);
   const [logs, setLogs] = useState<ProductionLog[]>([]);
+  const [levels, setLevels] = useState<ComplexityLevel[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Los niveles se administran en Configuración → Complejidad; se leen del
+  // catálogo en vez de hardcodearlos para que agregar o renombrar uno no
+  // requiera tocar código.
+  useEffect(() => {
+    api.get<{ levels: ComplexityLevel[] }>(ENDPOINTS.COMPLEXITY_LEVELS)
+      .then(r => setLevels(r.levels ?? []))
+      .catch(() => setLevels([]));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -351,7 +386,15 @@ function QuickProductionGrid({
           <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide mb-1">Ya registrado</p>
           {logs.map(l => (
             <div key={l.id} className="flex items-center justify-between text-xs">
-              <span className="text-indigo-600 dark:text-indigo-400">{l.resource_type?.name} <span className="font-bold text-indigo-800 dark:text-indigo-200">x{l.quantity}</span></span>
+              <span className="text-indigo-600 dark:text-indigo-400">
+                {l.resource_type?.name}{' '}
+                <span className="font-bold text-indigo-800 dark:text-indigo-200">x{l.quantity}</span>
+                {l.complexity_level?.name && (
+                  <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-100 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 rounded">
+                    {l.complexity_level.name}
+                  </span>
+                )}
+              </span>
               <div className="flex items-center gap-2 text-[10px] text-gray-400">
                 <span>{l.produced_at ? formatDate(l.produced_at.split('T')[0]) : ''}</span>
                 {!disabled && (
@@ -368,18 +411,30 @@ function QuickProductionGrid({
           <div className="space-y-1">
             {resourceTypes.map(rt => {
               const isNA = naResources.has(rt.id);
+              const qty = quantities[rt.id] ?? 0;
               return (
                 <div key={rt.id} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg px-2.5 py-1.5">
                   <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate" title={rt.name}>{rt.name}</span>
                   {isNA ? (
                     <span className="text-xs text-gray-400 italic w-12 text-center">N/A</span>
                   ) : (
-                    <input type="number" min={0}
-                      value={quantities[rt.id] ?? ''}
-                      placeholder="0"
-                      onChange={e => onQuantityChange(rt.id, Math.max(0, Number(e.target.value)))}
-                      className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      {qty > 0 && levels.length > 0 && (
+                        <select
+                          value={complexities[rt.id] ?? levels[0].id}
+                          onChange={e => onComplexityChange(rt.id, Number(e.target.value))}
+                          className="text-[10px] font-semibold border border-indigo-200 dark:border-indigo-800 rounded-md px-1 py-0.5 bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        >
+                          {levels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                      )}
+                      <input type="number" min={0}
+                        value={quantities[rt.id] ?? ''}
+                        placeholder="0"
+                        onChange={e => onQuantityChange(rt.id, Math.max(0, Number(e.target.value)))}
+                        className="w-12 text-center text-xs border border-gray-200 dark:border-gray-600 rounded-md px-1 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                    </div>
                   )}
                   <button
                     type="button"
@@ -426,6 +481,77 @@ function StepHeader({ step, label, done }: { step: number; label: string; done?:
   );
 }
 
+interface ObservationItem {
+  id: number;
+  user: { name: string };
+  observation: string;
+  created_at: string;
+}
+
+function ObservationsPanel({ activityId }: { activityId: number }) {
+  const [observations, setObservations] = useState<ObservationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const fetchObservations = useCallback(() => {
+    api.get<ObservationItem[]>(`/activities/${activityId}/observations`)
+      .then(r => setObservations(Array.isArray(r) ? r : []))
+      .catch(() => setObservations([]))
+      .finally(() => setLoading(false));
+  }, [activityId]);
+
+  useEffect(() => {
+    fetchObservations();
+  }, [fetchObservations]);
+
+  async function handleSend() {
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      const newObs = await api.post<ObservationItem>(`/activities/${activityId}/observations`, { observation: text.trim() });
+      setObservations(p => [...p, newObs]);
+      setText('');
+    } catch { /* ignore */ }
+    setSending(false);
+  }
+
+  if (loading) return <div className="space-y-1.5 mt-3">{[...Array(2)].map((_,i) => <div key={i} className="h-10 bg-gray-50 dark:bg-gray-700/20 rounded animate-pulse"/>)}</div>;
+
+  return (
+    <div className="space-y-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/60">
+      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Historial de Observaciones</p>
+      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+        {!observations.length && <p className="text-xs text-gray-400 dark:text-gray-500 italic">Sin observaciones registradas aún.</p>}
+        {observations.map((obs) => (
+          <div key={obs.id} className="flex gap-2">
+            <div className="w-6 h-6 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+              {obs.user?.name?.[0] ?? '?'}
+            </div>
+            <div className="flex-1 bg-gray-50 dark:bg-gray-700/20 rounded-lg p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{obs.user?.name}</p>
+                <p className="text-[9px] text-gray-400 flex-shrink-0">{formatDateTime(obs.created_at)}</p>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap leading-relaxed">{obs.observation}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input value={text} onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          placeholder="Escribe una observación en el historial..."
+          className="flex-1 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
+        <button onClick={handleSend} disabled={sending || !text.trim()}
+          className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex-shrink-0">
+          <Send size={12}/>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Componente Principal ───────────────────────────────────────────────────
 
 export default function ActivityDetailPanel({
@@ -445,6 +571,7 @@ export default function ActivityDetailPanel({
     actual_start_date?: string;
     actual_delivery_date?: string;
     responsible?: { id: number; name: string } | null;
+    priority?: string;
   };
   deliverable: {
     id: number;
@@ -468,6 +595,7 @@ export default function ActivityDetailPanel({
   const [tab, setTab] = useState<'principal' | 'evidencias' | 'timeline'>('principal');
   const [status, setStatus] = useState(activity.status);
   const [notes, setNotes] = useState(activity.notes ?? '');
+  const [priorityState, setPriorityState] = useState(activity.priority ?? 'media');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -485,6 +613,7 @@ export default function ActivityDetailPanel({
 
   const [flowData, setFlowData] = useState<DeliverableFlow | null>(null);
   const [selectedRolesToAdjust, setSelectedRolesToAdjust] = useState<string[]>([]);
+  const [complexities, setComplexities] = useState<Record<number, number>>({});
 
   useEffect(() => {
     if (activity.role === 'qa' && ['adjustments_requested', 'with_findings'].includes(status)) {
@@ -505,9 +634,11 @@ export default function ActivityDetailPanel({
   useEffect(() => {
     setStatus(activity.status);
     setNotes(activity.notes ?? '');
+    setPriorityState(activity.priority ?? 'media');
     setSaved(false);
     setSaveError(null);
     setQuantities({});
+    setComplexities({});
     setProdDate(new Date().toISOString().split('T')[0]);
     setNaResources(new Set());
     setTotalResourceTypes(0);
@@ -518,7 +649,7 @@ export default function ActivityDetailPanel({
     setRefreshKey(k => k + 1);
     setSelectedRolesToAdjust([]);
     setFlowData(null);
-  }, [activity.id]);
+  }, [activity.id, activity.priority]);
 
   const roleStates = useMemo(() => {
     if (loadingStatuses) return [];
@@ -529,11 +660,15 @@ export default function ActivityDetailPanel({
     return states;
   }, [taskStatuses, loadingStatuses, activity.status]);
 
-  const isReadOnly = !isManager && activity.role !== 'qa' && ['delivered', 'approved'].includes(activity.status);
+  const isReadOnly = !isManager && ['delivered', 'approved', 'not_applicable'].includes(activity.status);
   const isProdRole = PRODUCTION_ROLES.has(activity.role);
   const toPost = Object.entries(quantities)
     .filter(([rtId, qty]) => qty > 0 && !naResources.has(Number(rtId)))
-    .map(([rtId, qty]) => ({ resource_type_id: Number(rtId), quantity: qty }));
+    .map(([rtId, qty]) => ({
+      resource_type_id: Number(rtId),
+      quantity: qty,
+      complexity_level_id: complexities[Number(rtId)] ?? null,
+    }));
   const hasProduction = existingLogsCount > 0 || toPost.length > 0;
   const allProductionNA = totalResourceTypes > 0 && naResources.size === totalResourceTypes;
 
@@ -570,13 +705,6 @@ export default function ActivityDetailPanel({
     }
 
     try {
-      await api.put(ENDPOINTS.ROLE_ACTIVITY(activity.id), {
-        status,
-        notes,
-        production_not_applicable: allProductionNA,
-        adjust_roles: selectedRolesToAdjust
-      });
-
       if (toPost.length > 0) {
         await Promise.all(toPost.map(item =>
           api.post(ENDPOINTS.ACTIVITY_PRODUCTION(activity.id), { ...item, produced_at: prodDate })
@@ -591,6 +719,14 @@ export default function ActivityDetailPanel({
         setPendingUrl('');
         setPendingTitle('');
       }
+
+      await api.put(ENDPOINTS.ROLE_ACTIVITY(activity.id), {
+        status,
+        notes,
+        production_not_applicable: allProductionNA,
+        adjust_roles: selectedRolesToAdjust,
+        priority: priorityState
+      });
 
       onStatusChange(activity.id, status);
       setSaved(true);
@@ -682,12 +818,29 @@ export default function ActivityDetailPanel({
                   ))}
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Estado</p>
-                  <select value={status} onChange={e => setStatus(e.target.value)} disabled={isReadOnly}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
-                    {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Estado</p>
+                    <select value={status} onChange={e => setStatus(e.target.value)} disabled={isReadOnly}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
+                      {roleStates.map(s => <option key={s} value={s}>{ROLE_STATUS_LABELS[s] ?? s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Prioridad</p>
+                    <div className="flex items-center gap-2">
+                      <select value={priorityState} onChange={e => setPriorityState(e.target.value)} disabled={isReadOnly}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
+                        <option value="baja">Baja</option>
+                        <option value="media">Media</option>
+                        <option value="alta">Alta</option>
+                      </select>
+                      <span className={clsx('w-3.5 h-3.5 rounded-full flex-shrink-0 border border-black/10 dark:border-white/10 shadow-sm inline-block transition-all duration-300',
+                        priorityState === 'alta' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+                        priorityState === 'baja' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                      )}/>
+                    </div>
+                  </div>
                 </div>
 
                 {activity.role === 'qa' && ['adjustments_requested', 'with_findings'].includes(status) && adjustableRoles.length > 0 && (
@@ -721,11 +874,12 @@ export default function ActivityDetailPanel({
                   <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={1} disabled={isReadOnly}
                     placeholder="Notas u observaciones..."
                     className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
+                  <ObservationsPanel activityId={activity.id} />
                 </div>
               </div>
 
               {/* ── Paso 2: Producción (solo roles productivos) ── */}
-              {isProdRole && (
+              {isProdRole && status !== 'not_applicable' && (
                 <div className="px-4 py-3 space-y-2.5">
                   <StepHeader step={2} label="Producción" done={hasProduction || allProductionNA}/>
                   <div className="mt-1">
@@ -741,6 +895,8 @@ export default function ActivityDetailPanel({
                       naResources={naResources}
                       onNAResourcesChange={setNaResources}
                       onResourceTypesLoaded={setTotalResourceTypes}
+                      complexities={complexities}
+                      onComplexityChange={(id, lvl) => setComplexities(c => ({ ...c, [id]: lvl }))}
                       disabled={isReadOnly}
                     />
                   </div>
@@ -748,21 +904,23 @@ export default function ActivityDetailPanel({
               )}
 
               {/* ── Paso 2 o 3: Enlace de entrega ── */}
-              <div className="px-4 py-3 space-y-2.5">
-                <StepHeader step={linkStep} label="Enlace de entrega" done={hasLink}/>
-                <div className="mt-1">
-                  <EvidenceLinksPanel
-                    activityId={activity.id}
-                    pendingUrl={pendingUrl}
-                    setPendingUrl={setPendingUrl}
-                    pendingTitle={pendingTitle}
-                    setPendingTitle={setPendingTitle}
-                    onLinksLoaded={setExistingLinksCount}
-                    refreshKey={refreshKey}
-                    disabled={isReadOnly}
-                  />
+              {status !== 'not_applicable' && (
+                <div className="px-4 py-3 space-y-2.5">
+                  <StepHeader step={linkStep} label="Enlace de entrega" done={hasLink}/>
+                  <div className="mt-1">
+                    <EvidenceLinksPanel
+                      activityId={activity.id}
+                      pendingUrl={pendingUrl}
+                      setPendingUrl={setPendingUrl}
+                      pendingTitle={pendingTitle}
+                      setPendingTitle={setPendingTitle}
+                      onLinksLoaded={setExistingLinksCount}
+                      refreshKey={refreshKey}
+                      disabled={isReadOnly}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
           )}

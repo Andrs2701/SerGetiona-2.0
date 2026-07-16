@@ -201,6 +201,7 @@ class RoleActivityController extends Controller
             'production_not_applicable'  => 'sometimes|boolean',
             'adjust_roles'               => 'nullable|array',
             'adjust_roles.*'             => 'string',
+            'priority'                   => 'nullable|string|in:alta,media,baja',
         ]);
 
         $activityId = $activity->id;
@@ -762,5 +763,37 @@ class RoleActivityController extends Controller
         }
 
         $deliverable->save();
+    }
+
+    public function getObservations(Request $request, RoleActivity $activity)
+    {
+        if ($denied = $this->authorizeActivity($request, $activity)) {
+            return $denied;
+        }
+
+        $observations = $activity->observations()
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return response()->json(['data' => $observations]);
+    }
+
+    public function addObservation(Request $request, RoleActivity $activity)
+    {
+        if ($denied = $this->authorizeActivity($request, $activity)) {
+            return $denied;
+        }
+
+        $data = $request->validate([
+            'observation' => 'required|string|max:5000',
+        ]);
+
+        $obs = $activity->observations()->create([
+            'user_id' => $request->user()->id,
+            'observation' => $data['observation'],
+        ]);
+
+        return response()->json($obs->load('user'), 201);
     }
 }

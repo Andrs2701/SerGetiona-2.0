@@ -282,9 +282,9 @@ export default function ProyectosPage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
-        title="Proyectos"
-        subtitle="Gestión de proyectos de producción académica"
-        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Proyectos' }]}
+        title="Escuelas / Proyectos"
+        subtitle="Gestión de escuelas y proyectos de producción académica"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Escuelas / Proyectos' }]}
         actions={
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -315,7 +315,7 @@ export default function ProyectosPage() {
               className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
             >
               <Plus size={16} />
-              <span className="hidden sm:inline">Nuevo Proyecto</span>
+              <span className="hidden sm:inline">Nueva Escuela / Proyecto</span>
               <span className="sm:hidden">Nuevo</span>
             </button>
           </div>
@@ -403,11 +403,11 @@ export default function ProyectosPage() {
         </>
       )}
 
-      {/* Modal nuevo proyecto */}
+      {/* Modal nueva escuela/proyecto */}
       <Modal
         open={showModal}
         onClose={() => { setShowModal(false); setForm(emptyForm); }}
-        title="Nuevo Proyecto"
+        title="Nueva Escuela / Proyecto"
         size="lg"
         footer={
           <>
@@ -422,7 +422,7 @@ export default function ProyectosPage() {
               disabled={saving || !form.name}
               className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
             >
-              {saving ? 'Guardando...' : 'Crear Proyecto'}
+              {saving ? 'Guardando...' : 'Crear Escuela / Proyecto'}
             </button>
           </>
         }
@@ -433,8 +433,8 @@ export default function ProyectosPage() {
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Nombre del proyecto"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+              placeholder="Nombre de la Escuela / Proyecto"
             />
           </div>
           <div>

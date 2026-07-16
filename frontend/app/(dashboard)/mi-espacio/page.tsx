@@ -45,16 +45,13 @@ function computeAutoStatus(act: WorkspaceActivity): { label: string; cls: string
         : { label: 'Entregada fuera de tiempo', cls: 'bg-amber-100  text-amber-700'  };
     return { label: 'Aprobada', cls: 'bg-emerald-100 text-emerald-700' };
   }
-  // "Entregado" is a meaningful terminal state — show it clearly before overdue check
   if (act.status === 'delivered')
                                       return { label: 'Entregado',   cls: 'bg-teal-100   text-teal-700'   };
   if (act.date_status === 'overdue') return { label: 'Vencida',     cls: 'bg-red-100    text-red-700'    };
   if (['adjustments_requested', 'with_findings'].includes(act.status))
                                       return { label: 'Devuelta',    cls: 'bg-orange-100 text-orange-700' };
-  if (['in_review','in_testing','validating'].includes(act.status))
-                                      return { label: 'En Revisión', cls: 'bg-purple-100 text-purple-700' };
-  if (['in_progress','in_development','designing','production','implementing','draft','editing','adjusting'].includes(act.status))
-                                      return { label: 'En Proceso',  cls: 'bg-blue-100   text-blue-700'   };
+  if (act.status === 'in_progress')
+                                      return { label: 'En Progreso',  cls: 'bg-blue-100   text-blue-700'   };
   return { label: 'Pendiente', cls: 'bg-gray-100 text-gray-600' };
 }
 
@@ -333,7 +330,13 @@ function ActivityRow({
 
       {/* Semana / Módulo */}
       <td className="px-3 py-2.5 font-medium text-gray-900 max-w-[160px]">
-        <p className="truncate" title={act.deliverable?.name ?? '—'}>{act.deliverable?.name ?? '—'}</p>
+        <div className="flex items-center gap-2">
+          <span className="truncate" title={act.deliverable?.name ?? '—'}>{act.deliverable?.name ?? '—'}</span>
+          <span className={clsx('w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block',
+            act.priority === 'alta' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+            act.priority === 'baja' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+          )} title={`Prioridad: ${act.priority ?? 'media'}`}/>
+        </div>
         {act.deliverable && <p className="text-[10px] text-indigo-500 mt-0.5">{DELIVERABLE_TYPE_LABELS[act.deliverable.type]}</p>}
       </td>
 
@@ -643,7 +646,7 @@ export default function MiEspacioPage() {
       if (filterStatus === 'pending')    return ['not_started','pending'].includes(a.status);
       if (filterStatus === 'overdue')    return a.date_status === 'overdue';
       if (filterStatus === 'approaching')return a.date_status === 'approaching';
-      if (filterStatus === 'in_process') return ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting','adjustments_requested','with_findings'].includes(a.status);
+      if (filterStatus === 'in_process') return a.status === 'in_progress';
       if (filterStatus === 'completed')  return HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status);
       return true;
     })
@@ -756,7 +759,7 @@ export default function MiEspacioPage() {
             { id: 'pending' as StatusFilter,    label: 'Pendientes',  count: pending,    icon: Clock,        cls: 'text-gray-600' },
             { id: 'overdue' as StatusFilter,    label: 'Vencidas',    count: overdue,    icon: XCircle,      cls: 'text-red-600' },
             { id: 'approaching' as StatusFilter,label: 'Por vencer',  count: approaching,icon: AlertTriangle,cls: 'text-amber-600' },
-            { id: 'in_process' as StatusFilter, label: 'En proceso',  count: activities.filter(a => ['in_progress','in_development','designing','production','implementing','draft','editing','adjusting'].includes(a.status)).length, icon: null, cls: 'text-blue-600' },
+            { id: 'in_process' as StatusFilter, label: 'En proceso',  count: activities.filter(a => a.status === 'in_progress').length, icon: null, cls: 'text-blue-600' },
             { id: 'completed' as StatusFilter,  label: 'Completadas', count: completed,  icon: CheckCircle2, cls: 'text-emerald-600' },
           ] as { id: StatusFilter; label: string; count: number; icon: React.ElementType | null; cls: string }[]).map(({ id, label, count, icon: Icon, cls }) => (
             <button key={id} onClick={() => setFilterStatus(id)}

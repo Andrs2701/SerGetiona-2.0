@@ -56,6 +56,9 @@ class DeliverableController extends Controller
         if ($request->filled('month')) {
             $query->whereHas('roleActivities', fn($q) => $q->whereMonth('commitment_date', $request->month));
         }
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
 
         return response()->json($query->get()->map(fn($d) => $this->formatRow($d)));
     }

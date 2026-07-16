@@ -35,12 +35,12 @@ const ROLE_BADGE_BG: Record<Role, string> = {
 };
 
 const ROLE_CELL_COLORS: Record<Role, { bg: string; border: string; label: string }> = {
-  expert:      { bg: 'bg-violet-50',  border: 'border-violet-100',  label: 'text-violet-700' },
-  pedagogy:    { bg: 'bg-blue-50',    border: 'border-blue-100',    label: 'text-blue-700' },
-  design:      { bg: 'bg-pink-50',    border: 'border-pink-100',    label: 'text-pink-700' },
-  audiovisual: { bg: 'bg-amber-50',   border: 'border-amber-100',   label: 'text-amber-700' },
-  engineering: { bg: 'bg-teal-50',    border: 'border-teal-100',    label: 'text-teal-700' },
-  qa:          { bg: 'bg-emerald-50', border: 'border-emerald-100', label: 'text-emerald-700' },
+  expert:      { bg: 'bg-violet-50 dark:bg-violet-950/20',  border: 'border-violet-100 dark:border-violet-900/30',  label: 'text-violet-700 dark:text-violet-300' },
+  pedagogy:    { bg: 'bg-blue-50 dark:bg-blue-950/20',    border: 'border-blue-100 dark:border-blue-900/30',    label: 'text-blue-700 dark:text-blue-300' },
+  design:      { bg: 'bg-pink-50 dark:bg-pink-950/20',    border: 'border-pink-100 dark:border-pink-900/30',    label: 'text-pink-700 dark:text-pink-300' },
+  audiovisual: { bg: 'bg-amber-50 dark:bg-amber-950/20',   border: 'border-amber-100 dark:border-amber-900/30',   label: 'text-amber-700 dark:text-amber-400' },
+  engineering: { bg: 'bg-teal-50 dark:bg-teal-950/20',    border: 'border-teal-100 dark:border-teal-900/30',    label: 'text-teal-700 dark:text-teal-300' },
+  qa:          { bg: 'bg-emerald-50 dark:bg-emerald-950/20', border: 'border-emerald-100 dark:border-emerald-900/30', label: 'text-emerald-700 dark:text-emerald-300' },
 };
 
 const ACTIVITY_STATUS_CFG: Record<string, { label: string; dot: string; text: string }> = {

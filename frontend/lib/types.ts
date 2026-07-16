@@ -166,6 +166,21 @@ export interface DashboardStats {
   deliverables_by_status: Record<string, number>;
   activities_by_role_detail: ActivityByRoleDetail[];
   programs_breakdown: ProgramBreakdown[];
+  subjects_breakdown?: Array<{
+    id: number;
+    name: string;
+    program_id: number;
+    program_name: string;
+    project_id: number;
+    project_name: string;
+    total: number;
+    finished: number;
+    deliverable_completion_percentage: number;
+    compliance_percentage: number;
+    overdue_count: number;
+    active_count: number;
+    pending_count: number;
+  }>;
 }
 
 export interface ComplianceReport {
@@ -298,6 +313,7 @@ export interface WorkspaceActivity {
   actual_start_date?: string;
   actual_delivery_date?: string;
   production_not_applicable?: boolean;
+  priority?: 'alta' | 'media' | 'baja';
   date_status: DateStatus;
   deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string } | null;
   subject: { id: number; name: string } | null;
@@ -577,11 +593,13 @@ export interface ProductionLog {
   role_activity_id: number;
   resource_type_id: number;
   quantity: number;
+  complexity_level_id?: number | null;
   description?: string | null;
   produced_by: number;
   logged_by: number;
   produced_at: string;
   resource_type?: ResourceType;
+  complexity_level?: ComplexityLevel | null;
   producer?: { id: number; name: string };
   created_at?: string;
 }

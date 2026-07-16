@@ -19,11 +19,11 @@ class WorkspaceController extends Controller
     private const ROLE_CHAIN = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
 
     // Grupos de status por categoría para stats
-    private const STATUS_PENDING    = ['not_started', 'pending'];
-    private const STATUS_IN_PROGRESS = ['in_development', 'in_progress', 'designing', 'production', 'implementing', 'draft'];
-    private const STATUS_IN_REVIEW  = ['delivered', 'in_review', 'in_testing', 'validating', 'editing', 'adjusting'];
-    private const STATUS_RETURNED   = ['adjustments_requested', 'with_findings'];
-    private const STATUS_APPROVED   = ['approved'];
+    private const STATUS_PENDING     = ['not_started', 'pending'];
+    private const STATUS_IN_PROGRESS = ['in_progress'];
+    private const STATUS_IN_REVIEW   = ['delivered'];
+    private const STATUS_RETURNED    = ['adjustments_requested', 'with_findings'];
+    private const STATUS_APPROVED    = ['approved'];
 
     public function index(Request $request)
     {
@@ -210,6 +210,7 @@ class WorkspaceController extends Controller
                 'actual_start_date'         => $activity->actual_start_date?->toDateString(),
                 'actual_delivery_date'      => $activity->actual_delivery_date?->toDateString(),
                 'production_not_applicable' => (bool) $activity->production_not_applicable,
+                'priority'                  => $activity->priority ?? 'media',
                 'date_status'               => $dateStatus,
                 'next_role'            => $nextInfo['next_role'],
                 'next_responsible'     => $nextInfo['next_responsible'],

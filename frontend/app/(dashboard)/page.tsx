@@ -111,8 +111,9 @@ interface DashFilters {
   role: string;
   year: string;
   month: string;
+  type: string;
 }
-const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '' };
+const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '', type: '' };
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function formatDateStr(date: string) {
@@ -147,10 +148,10 @@ function TabResumen({
   const statusTotal = Object.values(byStatus).reduce((s, v) => s + v, 0) || 1;
 
   const kpiCards = [
-    { label: 'Proyectos Activos', value: d.active_projects,       icon: FolderKanban, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', ring: 'hover:ring-indigo-300', filter: 'active_projects' as PanelFilter, highlight: false,
+    { label: 'Escuelas / Proyectos Activos', value: d.active_projects,       icon: FolderKanban, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20', ring: 'hover:ring-indigo-300', filter: 'active_projects' as PanelFilter, highlight: false,
       tooltip: 'Iniciativa de producción con fecha de inicio y fin (ej. "Actualización Curricular 2026"). Es la unidad temporal del trabajo: vive, se ejecuta y se cierra.' },
     { label: 'Programas',         value: d.total_programs,        icon: BookOpen,     color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', ring: 'hover:ring-emerald-300', filter: 'programs' as PanelFilter, highlight: false,
-      tooltip: 'Producto académico permanente de la universidad (Especializaciones, Maestrías, Pregrados). No "termina": se mantiene y se actualiza. Un proyecto puede tocar varios programas a la vez.' },
+      tooltip: 'Producto académico permanente de la universidad (Especializaciones, Maestrías, Pregrados). No "termina": se mantiene y se actualiza. Una Escuela / Proyecto puede tocar varios programas a la vez.' },
     { label: 'Total Entregables', value: d.total_deliverables,    icon: Package,      color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', ring: 'hover:ring-amber-300', filter: 'total_deliverables' as PanelFilter, highlight: false,
       tooltip: 'Unidades de producción dentro de cada asignatura (semanas, módulos). Cada entregable pasa por los 6 roles del flujo: Experto → Pedagogía → Diseño → Audiovisual → Ingeniería → Calidad.' },
     { label: 'Vencidas',          value: d.overdue_activities,    icon: XCircle,      color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', ring: 'hover:ring-red-300', filter: 'overdue' as PanelFilter, highlight: (d.overdue_activities ?? 0) > 0,
@@ -827,12 +828,22 @@ interface GanttPhaseRow {
   overdue: boolean;
 }
 
+interface GanttSubjectRow {
+  key: string;
+  name: string;
+  phases: GanttPhaseRow[];
+  start: Date | null;
+  end: Date | null;
+  progress: number;
+  overdue: boolean;
+}
+
 interface GanttProgramRow {
   key: string;
   name: string;
   projectName: string;
   color: GanttColor;
-  phases: GanttPhaseRow[];
+  subjects: GanttSubjectRow[];
   start: Date | null;
   end: Date | null;
   progress: number;
@@ -842,6 +853,7 @@ interface GanttProgramRow {
 interface RawGanttDeliverable {
   id: number;
   name?: string;
+  type?: string;
   start_date?: string | null;
   commitment_date?: string | null;
   global_status?: string;
@@ -851,6 +863,8 @@ interface RawGanttDeliverable {
   role_activities?: RoleActivity[];
   activities?: RoleActivity[];
   subject?: {
+    id?: number | string;
+    name?: string | null;
     academic_program?: {
       id?: number | string;
       name?: string | null;
@@ -861,6 +875,7 @@ interface RawGanttDeliverable {
 
 type GanttTooltip =
   | { type: 'program'; item: GanttProgramRow; x: number; y: number }
+  | { type: 'subject'; item: GanttSubjectRow; color: GanttColor; x: number; y: number }
   | { type: 'phase'; item: GanttPhaseRow; color: GanttColor; x: number; y: number }
   | { type: 'activity'; item: GanttActivityRow; color: GanttColor; x: number; y: number };
 
@@ -980,9 +995,23 @@ function GanttTooltipCard({ tooltip }: { tooltip: GanttTooltip }) {
   const item = tooltip.item;
   const color = tooltip.type === 'program' ? tooltip.item.color : tooltip.color;
   const isActivity = tooltip.type === 'activity';
-  const subtitle = tooltip.type === 'activity' ? tooltip.item.programName : tooltip.item.projectName;
-  const responsible = isActivity ? tooltip.item.responsible : tooltip.type === 'phase' ? `${tooltip.item.activities.length} actividad(es)` : `${tooltip.item.phases.length} fase(s)`;
-  const status = isActivity ? ROLE_STATUS_LABELS[tooltip.item.status] ?? tooltip.item.status : tooltip.type === 'phase' && tooltip.item.overdue ? 'Con retrasos' : tooltip.type === 'program' && tooltip.item.overdueCount > 0 ? 'Con retrasos' : 'En seguimiento';
+  
+  const subtitle = 
+    tooltip.type === 'activity' ? tooltip.item.programName :
+    tooltip.type === 'program' ? tooltip.item.projectName :
+    (tooltip.item as any).projectName || '—';
+
+  const responsible = 
+    isActivity ? tooltip.item.responsible :
+    tooltip.type === 'phase' ? `${tooltip.item.activities.length} actividad(es)` :
+    tooltip.type === 'subject' ? `${tooltip.item.phases.length} fase(s)` :
+    tooltip.type === 'program' ? `${tooltip.item.subjects.length} asignatura(s)` : '—';
+
+  const status = 
+    isActivity ? (ROLE_STATUS_LABELS[tooltip.item.status] ?? tooltip.item.status) :
+    tooltip.type === 'phase' && tooltip.item.overdue ? 'Con retrasos' :
+    tooltip.type === 'subject' && tooltip.item.overdue ? 'Con retrasos' :
+    tooltip.type === 'program' && tooltip.item.overdueCount > 0 ? 'Con retrasos' : 'En seguimiento';
   return (
     <div
       className="fixed pointer-events-none z-50 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
@@ -1022,6 +1051,7 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
   const [deliverables, setDeliverables] = useState<RawGanttDeliverable[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<string>>(new Set());
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [tooltip, setTooltip] = useState<GanttTooltip | null>(null);
 
@@ -1042,6 +1072,7 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
       if (filters.role) params.role = filters.role;
       if (filters.year) params.year = filters.year;
       if (filters.month) params.month = filters.month;
+      if (filters.type) params.type = filters.type;
       const raw = await api.get<RawGanttDeliverable[] | { data?: RawGanttDeliverable[] }>(ENDPOINTS.DELIVERABLES + '?' + new URLSearchParams(params).toString());
       setDeliverables(Array.isArray(raw) ? raw : raw?.data ?? []);
     } catch {
@@ -1055,20 +1086,37 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
   useEffect(() => { loadData(); }, [loadData]);
 
   const programs = useMemo<GanttProgramRow[]>(() => {
-    const programMap = new Map<string, { name: string; projectName: string; phases: Map<string, GanttPhaseRow> }>();
+    const programMap = new Map<string, {
+      name: string;
+      projectName: string;
+      subjects: Map<string, {
+        name: string;
+        phases: Map<string, GanttPhaseRow>;
+      }>;
+    }>();
 
-    deliverables.forEach((item) => {
+    deliverables.filter(item => !filters.type || item.type === filters.type).forEach((item) => {
       const programId = item.subject?.academic_program?.id ?? item.program_id ?? item.program_name ?? 'sin-programa';
       const programKey = String(programId);
       const programName = item.subject?.academic_program?.name ?? item.program_name ?? 'Sin programa';
       const projectName = item.subject?.academic_program?.project?.name ?? item.project_name ?? 'Sin proyecto';
-      const phaseKey = `${programKey}|${item.id}`;
+
+      const subjectId = item.subject?.id ?? 'sin-asignatura';
+      const subjectKey = `${programKey}|${subjectId}`;
+      const subjectName = item.subject?.name ?? 'Sin asignatura';
+
+      const phaseKey = `${subjectKey}|${item.id}`;
       const phaseName = item.name ?? 'Sin nombre';
       const activities: RoleActivity[] = item.role_activities ?? item.activities ?? [];
 
       if (!programMap.has(programKey)) {
-        programMap.set(programKey, { name: programName, projectName, phases: new Map() });
+        programMap.set(programKey, { name: programName, projectName, subjects: new Map() });
       }
+      const progNode = programMap.get(programKey)!;
+      if (!progNode.subjects.has(subjectKey)) {
+        progNode.subjects.set(subjectKey, { name: subjectName, phases: new Map() });
+      }
+      const subNode = progNode.subjects.get(subjectKey)!;
 
       const rows = activities.length > 0 ? activities : [{
         id: item.id,
@@ -1118,22 +1166,37 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
         overdue: activityRows.some(a => a.overdue),
       };
 
-      programMap.get(programKey)!.phases.set(phaseKey, phase);
+      subNode.phases.set(phaseKey, phase);
     });
 
     return Array.from(programMap.entries()).map(([key, value]) => {
-      const phases = Array.from(value.phases.values()).sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
-      const range = aggregateRange(phases);
+      const subjects = Array.from(value.subjects.entries()).map(([sKey, sValue]) => {
+        const phases = Array.from(sValue.phases.values()).sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
+        const sRange = aggregateRange(phases);
+        return {
+          key: sKey,
+          name: sValue.name,
+          phases,
+          start: sRange.start,
+          end: sRange.end,
+          progress: sRange.progress,
+          overdue: phases.some(p => p.overdue),
+        };
+      }).sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
+
+      const range = aggregateRange(subjects);
+      const overdueCount = subjects.reduce((sum, sub) => sum + sub.phases.reduce((sumPh, phase) => sumPh + phase.activities.filter(a => a.overdue).length, 0), 0);
+
       return {
         key,
         name: value.name,
         projectName: value.projectName,
         color: programColorFor(key + value.name),
-        phases,
+        subjects,
         start: range.start,
         end: range.end,
         progress: range.progress,
-        overdueCount: phases.reduce((sum, phase) => sum + phase.activities.filter(a => a.overdue).length, 0),
+        overdueCount,
       };
     })
       .filter(program => !onlyOverdue || program.overdueCount > 0)
@@ -1141,7 +1204,10 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
   }, [deliverables, onlyOverdue, today]);
 
   const timeline = useMemo(() => {
-    const dates = programs.flatMap(p => [p.start, p.end, ...p.phases.flatMap(ph => [ph.start, ph.end])]).filter((d): d is Date => !!d);
+    const dates = programs.flatMap(p => [
+      p.start, p.end,
+      ...p.subjects.flatMap(s => [s.start, s.end, ...s.phases.flatMap(ph => [ph.start, ph.end])])
+    ]).filter((d): d is Date => !!d);
     const min = dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))) : today;
     const max = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : addDays(today, 56);
     const start = startOfWeek(addDays(min, -14));
@@ -1170,6 +1236,11 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
+  const toggleSubject = (key: string) => setExpandedSubjects(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const togglePhase = (key: string) => setExpandedPhases(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -1177,10 +1248,12 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
   });
   const expandAll = () => {
     setExpandedPrograms(new Set(programs.map(p => p.key)));
-    setExpandedPhases(new Set(programs.flatMap(p => p.phases.map(ph => ph.key))));
+    setExpandedSubjects(new Set(programs.flatMap(p => p.subjects.map(s => s.key))));
+    setExpandedPhases(new Set(programs.flatMap(p => p.subjects.flatMap(s => s.phases.map(ph => ph.key)))));
   };
   const collapseAll = () => {
     setExpandedPrograms(new Set());
+    setExpandedSubjects(new Set());
     setExpandedPhases(new Set());
   };
 
@@ -1240,12 +1313,16 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
-          {PROGRAM_PALETTE.slice(0, 6).map((color, i) => (
-            <span key={i} className="flex items-center gap-1.5">
-              <span className="h-3 w-5 rounded-full" style={{ background: `linear-gradient(90deg, ${color.base} 55%, ${color.light} 55%)` }} />
-              Programa {i + 1}
-            </span>
-          ))}
+          {programs.slice(0, 10).map((prog) => {
+            const color = prog.color;
+            return (
+              <span key={prog.key} className="flex items-center gap-1.5">
+                <span className="h-3 w-5 rounded-full shrink-0" style={{ background: `linear-gradient(90deg, ${color.base} 55%, ${color.light} 55%)` }} />
+                <span className="truncate max-w-[150px]" title={prog.name}>{prog.name}</span>
+              </span>
+            );
+          })}
+          {programs.length > 10 && <span className="text-gray-400">y {programs.length - 10} programas más...</span>}
         </div>
       </Card>
 
@@ -1309,47 +1386,73 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
                         </div>
                       </div>
 
-                      {programOpen && program.phases.map(phase => {
-                        const phaseOpen = expandedPhases.has(phase.key);
+                      {programOpen && program.subjects.map(subject => {
+                        const subjectOpen = expandedSubjects.has(subject.key);
                         return (
-                          <div key={phase.key}>
+                          <div key={subject.key}>
                             <div
-                              className="flex border-b border-gray-100 bg-gray-50/60 dark:border-gray-700/70 dark:bg-gray-800/80"
-                              onMouseEnter={(e) => setTooltip({ type: 'phase', item: phase, color: program.color, x: e.clientX, y: e.clientY })}
-                              onMouseMove={(e) => setTooltip({ type: 'phase', item: phase, color: program.color, x: e.clientX, y: e.clientY })}
+                              className="flex border-b border-gray-150 bg-gray-50/30 dark:border-gray-700/60 dark:bg-gray-800/40"
+                              onMouseEnter={(e) => setTooltip({ type: 'phase', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
+                              onMouseMove={(e) => setTooltip({ type: 'phase', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
                             >
-                              <button onClick={() => togglePhase(phase.key)}
-                                className="sticky left-0 z-20 flex h-10 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/95 pl-8 pr-3 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-                                {phaseOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-800 dark:text-gray-200" title={phase.name}>{phase.name}</span>
-                                {phase.overdue && <span className="h-2 w-2 rounded-full bg-red-500" title="Tiene retrasos" />}
-                                <span className="text-[10px] text-gray-400">{phase.progress}%</span>
+                              <button onClick={() => toggleSubject(subject.key)}
+                                className="sticky left-0 z-20 flex h-11 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/90 pl-6 pr-3 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                                {subjectOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                                <span className="min-w-0 flex-1 truncate text-xs font-bold text-gray-850 dark:text-gray-205" title={subject.name}>{subject.name}</span>
+                                {subject.overdue && <span className="h-1.5 w-1.5 rounded-full bg-red-500" title="Tiene retrasos" />}
+                                <span className="text-[10px] text-gray-400 font-semibold">{subject.progress}%</span>
                               </button>
-                              <div className="relative h-10" style={{ width: timeline.totalPx }}>
+                              <div className="relative h-11" style={{ width: timeline.totalPx }}>
                                 {gridLines}
-                                <GanttBar start={phase.start} end={phase.end} progress={phase.progress} color={program.color} dateToX={timeline.dateToX} totalPx={timeline.totalPx} height={16} muted />
+                                <GanttBar start={subject.start} end={subject.end} progress={subject.progress} color={program.color} dateToX={timeline.dateToX} totalPx={timeline.totalPx} height={18} muted />
                               </div>
                             </div>
 
-                            {phaseOpen && phase.activities.map(activity => (
-                              <div
-                                key={activity.id}
-                                className="flex border-b border-gray-50 bg-white hover:bg-gray-50 dark:border-gray-700/50 dark:bg-gray-800 dark:hover:bg-gray-700/50"
-                                onMouseEnter={(e) => setTooltip({ type: 'activity', item: activity, color: program.color, x: e.clientX, y: e.clientY })}
-                                onMouseMove={(e) => setTooltip({ type: 'activity', item: activity, color: program.color, x: e.clientX, y: e.clientY })}
-                              >
-                                <div className="sticky left-0 z-20 flex h-9 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-white pl-14 pr-3 dark:border-gray-700 dark:bg-gray-800">
-                                  {activity.overdue && <span className="h-2 w-2 rounded-full bg-red-500" />}
-                                  <span className="w-20 shrink-0 truncate text-[11px] font-semibold text-gray-700 dark:text-gray-200">{activity.name}</span>
-                                  <span className="min-w-0 flex-1 truncate text-[11px] text-gray-500">{activity.responsible}</span>
-                                  <span className="text-[10px] text-gray-400">{activity.progress}%</span>
+                            {subjectOpen && subject.phases.map(phase => {
+                              const phaseOpen = expandedPhases.has(phase.key);
+                              return (
+                                <div key={phase.key}>
+                                  <div
+                                    className="flex border-b border-gray-100 bg-gray-50/60 dark:border-gray-700/70 dark:bg-gray-800/80"
+                                    onMouseEnter={(e) => setTooltip({ type: 'phase', item: phase, color: program.color, x: e.clientX, y: e.clientY })}
+                                    onMouseMove={(e) => setTooltip({ type: 'phase', item: phase, color: program.color, x: e.clientX, y: e.clientY })}
+                                  >
+                                    <button onClick={() => togglePhase(phase.key)}
+                                      className="sticky left-0 z-20 flex h-10 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/95 pl-10 pr-3 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                                      {phaseOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-800 dark:text-gray-200" title={phase.name}>{phase.name}</span>
+                                      {phase.overdue && <span className="h-2 w-2 rounded-full bg-red-500" title="Tiene retrasos" />}
+                                      <span className="text-[10px] text-gray-400">{phase.progress}%</span>
+                                    </button>
+                                    <div className="relative h-10" style={{ width: timeline.totalPx }}>
+                                      {gridLines}
+                                      <GanttBar start={phase.start} end={phase.end} progress={phase.progress} color={program.color} dateToX={timeline.dateToX} totalPx={timeline.totalPx} height={16} muted />
+                                    </div>
+                                  </div>
+
+                                  {phaseOpen && phase.activities.map(activity => (
+                                    <div
+                                      key={activity.id}
+                                      className="flex border-b border-gray-50 bg-white hover:bg-gray-50 dark:border-gray-700/50 dark:bg-gray-800 dark:hover:bg-gray-700/50"
+                                      onMouseEnter={(e) => setTooltip({ type: 'activity', item: activity, color: program.color, x: e.clientX, y: e.clientY })}
+                                      onMouseMove={(e) => setTooltip({ type: 'activity', item: activity, color: program.color, x: e.clientX, y: e.clientY })}
+                                    >
+                                      <div className="sticky left-0 z-20 flex h-9 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-white pl-16 pr-3 dark:border-gray-700 dark:bg-gray-800">
+                                        {activity.overdue && <span className="h-2 w-2 rounded-full bg-red-500" />}
+                                        <span className="w-20 shrink-0 truncate text-[11px] font-semibold text-gray-700 dark:text-gray-200">{activity.name}</span>
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-500">{activity.responsible}</span>
+                                        <span className="text-[10px] text-gray-400">{activity.progress}%</span>
+                                      </div>
+                                      <div className="relative h-9" style={{ width: timeline.totalPx }}>
+                                        {gridLines}
+                                        <GanttBar start={activity.start} end={activity.end} progress={activity.progress} color={program.color} dateToX={timeline.dateToX} totalPx={timeline.totalPx} height={18} />
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="relative h-9" style={{ width: timeline.totalPx }}>
-                                  {gridLines}
-                                  <GanttBar start={activity.start} end={activity.end} progress={activity.progress} color={program.color} dateToX={timeline.dateToX} totalPx={timeline.totalPx} height={18} />
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -1361,7 +1464,7 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-4 py-2 text-xs text-gray-400 dark:border-gray-700 dark:bg-gray-900">
-          <span>{programs.length} programa(s) · {programs.reduce((sum, p) => sum + p.phases.length, 0)} fase(s)</span>
+          <span>{programs.length} programa(s) · {programs.reduce((sum, p) => sum + p.subjects.reduce((sumS, s) => sumS + s.phases.length, 0), 0)} fase(s)</span>
           <span>Color sólido = avance completado · color claro = pendiente · línea punteada = hoy</span>
         </div>
       </Card>
@@ -1651,7 +1754,19 @@ function DistribucionPorProyecto({ projects }: { projects: CapacityProjectAgg[] 
 
 // ─── Tab Producción ──────────────────────────────────────────────────────────
 
-function TabProduccion({ externalRole }: { externalRole?: string }) {
+function TabProduccion({
+  externalRole,
+  externalProgramId,
+  externalResponsibleId,
+  externalYear,
+  externalMonth,
+}: {
+  externalRole?: string;
+  externalProgramId?: string;
+  externalResponsibleId?: string;
+  externalYear?: string;
+  externalMonth?: string;
+}) {
   const [data, setData] = useState<ProductionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [projectFilter, setProjectFilter] = useState('');
@@ -1665,12 +1780,16 @@ function TabProduccion({ externalRole }: { externalRole?: string }) {
     const params = new URLSearchParams();
     if (projectFilter) params.set('project_id', projectFilter);
     if (roleFilter) params.set('role', roleFilter);
+    if (externalProgramId) params.set('program_id', externalProgramId);
+    if (externalResponsibleId) params.set('responsible_id', externalResponsibleId);
+    if (externalYear) params.set('year', externalYear);
+    if (externalMonth) params.set('month', externalMonth);
     const qs = params.toString();
     api.get<ProductionSummary>(`${ENDPOINTS.PRODUCTION_SUMMARY}${qs ? `?${qs}` : ''}`)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [projectFilter, roleFilter]);
+  }, [projectFilter, roleFilter, externalProgramId, externalResponsibleId, externalYear, externalMonth]);
 
   if (loading) return <Card><div className="h-32 bg-gray-50 dark:bg-gray-700/30 rounded animate-pulse"/></Card>;
   if (!data) return <Card><p className="text-sm text-gray-400 text-center py-8">Sin datos de producción.</p></Card>;
@@ -1682,13 +1801,17 @@ function TabProduccion({ externalRole }: { externalRole?: string }) {
     <div className="space-y-6">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setLoading(true); }}
-          className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-          <option value="">Todos los roles</option>
-          {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
         <button
-          onClick={() => downloadCsv(`${ENDPOINTS.EXPORT_PRODUCTION}${roleFilter ? `?role=${roleFilter}` : ''}`, `produccion_${new Date().toISOString().split('T')[0]}.csv`)}
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (roleFilter) params.set('role', roleFilter);
+            if (externalProgramId) params.set('program_id', externalProgramId);
+            if (externalResponsibleId) params.set('responsible_id', externalResponsibleId);
+            if (externalYear) params.set('year', externalYear);
+            if (externalMonth) params.set('month', externalMonth);
+            const qs = params.toString();
+            downloadCsv(`${ENDPOINTS.EXPORT_PRODUCTION}${qs ? `?${qs}` : ''}`, `produccion_${new Date().toISOString().split('T')[0]}.csv`);
+          }}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <FileBarChart size={14}/> Exportar CSV
@@ -1939,6 +2062,53 @@ function TabReportes({
           ))}
         </Card>
       </div>
+
+      {/* Subject ranking */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={16} className="text-emerald-500" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Asignaturas con mayor avance</h3>
+          </div>
+          {stats.subjects_breakdown && [...stats.subjects_breakdown].sort((a, b) => b.compliance_percentage - a.compliance_percentage).slice(0, 6).map((s, i) => (
+            <div key={s.id} onClick={() => router.push(`/entregables?filter=subject_${s.id}`)}
+              className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg px-1 py-1.5 -mx-1 transition-colors mb-1">
+              <span className="text-xs text-gray-400 w-4 shrink-0 font-semibold">#{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{s.name}</p>
+                <p className="text-[10px] text-gray-450 dark:text-gray-400 truncate">{s.program_name}</p>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-1 overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-emerald-400" style={{ width: `${s.compliance_percentage}%` }} />
+                </div>
+              </div>
+              <span className="text-sm font-bold text-emerald-600 shrink-0">{s.compliance_percentage}%</span>
+            </div>
+          ))}
+          {!stats.subjects_breakdown && <p className="text-xs text-gray-400 py-4 text-center">Cargando...</p>}
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <XCircle size={16} className="text-red-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Asignaturas con menor avance</h3>
+          </div>
+          {stats.subjects_breakdown && [...stats.subjects_breakdown].sort((a, b) => a.compliance_percentage - b.compliance_percentage).slice(0, 6).map((s, i) => (
+            <div key={s.id} onClick={() => router.push(`/entregables?filter=subject_${s.id}`)}
+              className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg px-1 py-1.5 -mx-1 transition-colors mb-1">
+              <span className="text-xs text-gray-400 w-4 shrink-0 font-semibold">#{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{s.name}</p>
+                <p className="text-[10px] text-gray-455 dark:text-gray-400 truncate">{s.program_name}</p>
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-1 overflow-hidden">
+                  <div className={`h-1.5 rounded-full ${progressColor(s.compliance_percentage)}`} style={{ width: `${s.compliance_percentage || 3}%` }} />
+                </div>
+              </div>
+              <span className={`text-sm font-bold shrink-0 ${s.compliance_percentage < 40 ? 'text-red-600' : 'text-amber-600'}`}>{s.compliance_percentage}%</span>
+            </div>
+          ))}
+          {!stats.subjects_breakdown && <p className="text-xs text-gray-400 py-4 text-center">Cargando...</p>}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -2041,6 +2211,13 @@ function FilterBar({
           {MONTHS_ES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
         </select>
 
+        {/* Tipo de entregable */}
+        <select value={filters.type} onChange={e => onChange({ type: e.target.value })} className={SELECT_CLS}>
+          <option value="">Todos los tipos</option>
+          <option value="creation">Creación</option>
+          <option value="update">Actualización</option>
+        </select>
+
         {activeCount > 0 && (
           <button
             onClick={() => onChange(EMPTY_FILTERS)}
@@ -2085,6 +2262,7 @@ function DashboardAdmin() {
       if (filters.role) params['role'] = filters.role;
       if (filters.year) params['year'] = filters.year;
       if (filters.month) params['month'] = filters.month;
+      if (filters.type) params['type'] = filters.type;
 
       if (f === 'active_projects') {
         endpoint = '/projects';
@@ -2246,7 +2424,15 @@ function DashboardAdmin() {
         )}
         {activeTab === 'seguimiento' && <TabSeguimiento projects={projects} filters={filters} />}
         {activeTab === 'capacidad'   && <TabCapacidad capacity={capacity} workload={workload} programs={stats.programs_breakdown ?? []} />}
-        {activeTab === 'produccion'  && <TabProduccion externalRole={filters.role} />}
+        {activeTab === 'produccion'  && (
+          <TabProduccion
+            externalRole={filters.role}
+            externalProgramId={filters.programId}
+            externalResponsibleId={filters.responsibleId}
+            externalYear={filters.year}
+            externalMonth={filters.month}
+          />
+        )}
         {activeTab === 'reportes'    && <TabReportes stats={stats} health={health} />}
       </div>
 

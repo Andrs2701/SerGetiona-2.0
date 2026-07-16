@@ -11,6 +11,7 @@ import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { WorkspaceActivity, CalendarEvent, Role } from '@/lib/types';
 import { ROLE_STATUS_LABELS, ROLE_LABELS } from '@/lib/types';
+import { HIDDEN_IN_WORKSPACE_STATUSES } from '@/lib/statusGroups';
 import { useAuthContext } from '@/contexts/AuthContext';
 import Modal from '@/components/Modal';
 
@@ -290,7 +291,7 @@ function SidePanel({
     const scheduled = activities.filter(
       (a) => a.commitment_date && a.commitment_date >= wsStr && a.commitment_date <= weStr
     );
-    const done = scheduled.filter((a) => a.status === 'approved');
+    const done = scheduled.filter((a) => HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status));
     return { weekScheduled: scheduled.length, weekDone: done.length };
   }, [activities, today]);
 
@@ -368,23 +369,29 @@ function SidePanel({
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600">Cumplimiento</span>
-              <span className={clsx(
-                'font-bold',
-                weekCompliance >= 80 ? 'text-emerald-600' : weekCompliance >= 50 ? 'text-amber-600' : 'text-red-600'
-              )}>
-                {weekCompliance}%
-              </span>
+              <span className="text-gray-600">Cumplimiento de esta semana</span>
+              {weekScheduled > 0 ? (
+                <span className={clsx(
+                  'font-bold',
+                  weekCompliance >= 80 ? 'text-emerald-600' : weekCompliance >= 50 ? 'text-amber-600' : 'text-red-600'
+                )}>
+                  {weekCompliance}%
+                </span>
+              ) : (
+                <span className="text-gray-400 text-xs italic">Sin actividades esta semana</span>
+              )}
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={clsx(
-                  'h-2 rounded-full transition-all',
-                  weekCompliance >= 80 ? 'bg-emerald-500' : weekCompliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
-                )}
-                style={{ width: `${weekCompliance}%` }}
-              />
-            </div>
+            {weekScheduled > 0 && (
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={clsx(
+                    'h-2 rounded-full transition-all',
+                    weekCompliance >= 80 ? 'bg-emerald-500' : weekCompliance >= 50 ? 'bg-amber-400' : 'bg-red-400'
+                  )}
+                  style={{ width: `${weekCompliance}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -16,7 +16,7 @@ export const NOT_OVERDUE_STATUSES = ['approved', 'delivered', 'not_applicable'];
  * por defecto y aparece bajo el filtro de completadas. 'not_applicable' entra
  * aquí para que se comporte igual que 'delivered', que es lo que se pidió.
  */
-export const HIDDEN_IN_WORKSPACE_STATUSES = ['approved', 'delivered', 'in_review', 'not_applicable'];
+export const HIDDEN_IN_WORKSPACE_STATUSES = ['approved', 'delivered', 'not_applicable'];
 
 /**
  * Lo que un gestor considera cerrado. No incluye 'delivered' ni 'in_review' a

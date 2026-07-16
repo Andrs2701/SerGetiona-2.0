@@ -82,6 +82,8 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
     Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
     Route::get('activities/{activity}/timeline', [RoleActivityController::class, 'timeline']);
+    Route::get('activities/{activity}/observations', [RoleActivityController::class, 'getObservations']);
+    Route::post('activities/{activity}/observations', [RoleActivityController::class, 'addObservation']);
     Route::get('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'byActivity']);
 
     // Evidence links
