@@ -197,15 +197,30 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
                 </div>
               )}
 
-              {/* Notes */}
-              {r.notes && (
+              {/* Observations history */}
+              {(r.observations ?? []).length > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{r.notes}</p>
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Observaciones</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {(r.observations ?? []).map(obs => (
+                      <div key={obs.id} className="flex gap-2">
+                        <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-[9px] font-bold flex-shrink-0 mt-0.5">
+                          {obs.user?.name?.[0] ?? '?'}
+                        </div>
+                        <div className="flex-1 bg-gray-50 dark:bg-gray-700/20 rounded-lg px-2.5 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate">{obs.user?.name}</p>
+                            <p className="text-[9px] text-gray-400 flex-shrink-0">{formatDate(obs.created_at?.split('T')[0] ?? '')}</p>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 whitespace-pre-wrap leading-relaxed">{obs.observation}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {!r.production.length && !r.links.length && !r.notes && (
+              {!r.production.length && !r.links.length && !(r.observations ?? []).length && (
                 <p className="text-xs text-gray-400 py-1">{isNotApplicable ? 'Rol no aplica para este entregable.' : 'Sin registros para este rol.'}</p>
               )}
             </div>
@@ -419,7 +434,7 @@ function QuickProductionGrid({
                     <span className="text-xs text-gray-400 italic w-12 text-center">N/A</span>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      {qty > 0 && levels.length > 0 && (
+                      {levels.length > 0 && (
                         <select
                           value={complexities[rt.id] ?? levels[0].id}
                           onChange={e => onComplexityChange(rt.id, Number(e.target.value))}
@@ -725,7 +740,7 @@ export default function ActivityDetailPanel({
         notes,
         production_not_applicable: allProductionNA,
         adjust_roles: selectedRolesToAdjust,
-        priority: priorityState
+        ...(isManager ? { priority: priorityState } : {}),
       });
 
       onStatusChange(activity.id, status);
@@ -831,12 +846,18 @@ export default function ActivityDetailPanel({
                   <div>
                     <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Prioridad</p>
                     <div className="flex items-center gap-2">
-                      <select value={priorityState} onChange={e => setPriorityState(e.target.value)} disabled={isReadOnly}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
-                        <option value="baja">Baja</option>
-                        <option value="media">Media</option>
-                        <option value="alta">Alta</option>
-                      </select>
+                      {isManager ? (
+                        <select value={priorityState} onChange={e => setPriorityState(e.target.value)} disabled={isReadOnly}
+                          className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
+                          <option value="baja">Baja</option>
+                          <option value="media">Media</option>
+                          <option value="alta">Alta</option>
+                        </select>
+                      ) : (
+                        <span className="flex-1 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 capitalize">
+                          {priorityState === 'alta' ? 'Alta' : priorityState === 'baja' ? 'Baja' : 'Media'}
+                        </span>
+                      )}
                       <span className={clsx('w-3.5 h-3.5 rounded-full flex-shrink-0 border border-black/10 dark:border-white/10 shadow-sm inline-block transition-all duration-300',
                         priorityState === 'alta' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
                         priorityState === 'baja' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
@@ -873,9 +894,6 @@ export default function ActivityDetailPanel({
 
                 <div>
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={1} disabled={isReadOnly}
-                    placeholder="Notas u observaciones..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
                   <ObservationsPanel activityId={activity.id} />
                 </div>
               </div>

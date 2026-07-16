@@ -225,12 +225,12 @@ class RoleActivityController extends Controller
 
                 $forbiddenFields = array_intersect(
                     array_keys($data),
-                    ['responsible_id', 'assigned_at', 'commitment_date']
+                    ['responsible_id', 'assigned_at', 'commitment_date', 'priority']
                 );
                 abort_if(
                     $forbiddenFields !== [],
                     403,
-                    'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
+                    'Solo administradores y coordinadores pueden reasignar, cambiar fechas comprometidas o establecer la prioridad.'
                 );
                 abort_if(
                     ($data['status'] ?? null) === 'approved' && !$isQaRole,

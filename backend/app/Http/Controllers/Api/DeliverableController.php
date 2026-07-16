@@ -273,6 +273,7 @@ class DeliverableController extends Controller
             'roleActivities.evidenceLinks.user',
             'roleActivities.productionLogs.resourceType',
             'roleActivities.productionLogs.producer',
+            'roleActivities.observations.user',
         ]);
 
         $roleOrder  = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
@@ -316,6 +317,12 @@ class DeliverableController extends Controller
                     'url'        => $link->url,
                     'user'       => $link->user ? ['name' => $link->user->name] : null,
                     'created_at' => $link->created_at?->toIso8601String(),
+                ])->values()->all(),
+                'observations'         => $act->observations->map(fn($obs) => [
+                    'id'         => $obs->id,
+                    'observation'=> $obs->observation,
+                    'user'       => $obs->user ? ['name' => $obs->user->name] : null,
+                    'created_at' => $obs->created_at?->toIso8601String(),
                 ])->values()->all(),
             ];
         }

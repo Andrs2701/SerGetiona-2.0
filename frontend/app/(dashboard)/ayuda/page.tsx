@@ -147,7 +147,7 @@ export default function AyudaPage() {
                   ¿Qué es Sergestiona 2.0?
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                  Es la plataforma institucional diseñada para centralizar, transparentar y optimizar el flujo de producción de material académico de la **Universidad Sergio Arboleda**. Su propósito es sustituir el control manual de archivos por un sistema integrado y estructurado en base a roles y entregables.
+                  Es la plataforma institucional diseñada para centralizar, transparentar y optimizar el flujo de producción de material académico de la <strong>Universidad Sergio Arboleda</strong>. Su propósito es sustituir el control manual de archivos por un sistema integrado y estructurado en base a roles y entregables.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">

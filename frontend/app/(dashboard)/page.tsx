@@ -862,6 +862,12 @@ interface RawGanttDeliverable {
   project_name?: string | null;
   role_activities?: RoleActivity[];
   activities?: RoleActivity[];
+  // GET /deliverables serializa con formatRow(), que devuelve la jerarquía
+  // aplanada — no un `subject` anidado. Estos son los campos que llegan de
+  // verdad; el `subject` de abajo solo aparece si algún día se sirve el
+  // DeliverableResource completo, y por eso se lee como fallback.
+  subject_id?: number | string | null;
+  subject_name?: string | null;
   subject?: {
     id?: number | string;
     name?: string | null;
@@ -1101,9 +1107,9 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
       const programName = item.subject?.academic_program?.name ?? item.program_name ?? 'Sin programa';
       const projectName = item.subject?.academic_program?.project?.name ?? item.project_name ?? 'Sin proyecto';
 
-      const subjectId = item.subject?.id ?? 'sin-asignatura';
+      const subjectId = item.subject?.id ?? item.subject_id ?? 'sin-asignatura';
       const subjectKey = `${programKey}|${subjectId}`;
-      const subjectName = item.subject?.name ?? 'Sin asignatura';
+      const subjectName = item.subject?.name ?? item.subject_name ?? 'Sin asignatura';
 
       const phaseKey = `${subjectKey}|${item.id}`;
       const phaseName = item.name ?? 'Sin nombre';
