@@ -283,6 +283,7 @@ export default function DashboardOperativo() {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<'priority' | 'date'>('priority');
 
   useEffect(() => {
     api
@@ -326,7 +327,6 @@ export default function DashboardOperativo() {
 
   const data = workspace;
   const activities = data.activities ?? [];
-  const [sortBy, setSortBy] = useState<'priority' | 'date'>('priority');
 
   // KPIs
   const total     = activities.filter(a => a.status !== 'not_applicable').length;
