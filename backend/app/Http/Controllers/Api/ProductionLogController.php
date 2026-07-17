@@ -174,6 +174,13 @@ class ProductionLogController extends Controller
             ->orderByDesc('total')
             ->get();
 
+        $byLevel = (clone $query)
+            ->leftJoin('complexity_levels', 'production_logs.complexity_level_id', '=', 'complexity_levels.id')
+            ->selectRaw("COALESCE(complexity_levels.name, 'Sin nivel') as level_name, SUM(production_logs.quantity) as total, COUNT(DISTINCT production_logs.id) as records")
+            ->groupBy('complexity_levels.id', 'complexity_levels.name')
+            ->orderBy('complexity_levels.points')
+            ->get();
+
         $totals = (clone $query)
             ->selectRaw('COUNT(DISTINCT production_logs.id) as total_records, SUM(production_logs.quantity) as total_quantity, COUNT(DISTINCT production_logs.produced_by) as unique_producers')
             ->first();
@@ -184,6 +191,7 @@ class ProductionLogController extends Controller
             'by_role'    => $byRole,
             'by_user'    => $byUser,
             'by_project' => $byProject,
+            'by_level'   => $byLevel,
         ]);
     }
 

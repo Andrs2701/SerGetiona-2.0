@@ -5,7 +5,7 @@ import { Search, BookOpen, AlertTriangle, TrendingDown, Users, ChevronRight, Arr
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
 import type { AcademicProgram, Deliverable, DashboardStats, ProgramBreakdown, RoleActivity, Role } from '@/lib/types';
-import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
+import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import FilteredDetailPanel, { PanelRow } from '@/components/FilteredDetailPanel';
@@ -221,8 +221,8 @@ function GanttRow({
       <td className="px-3 py-2 text-xs font-medium text-gray-800 max-w-[140px] truncate whitespace-nowrap" title={deliverable.name}>
         {deliverable.name}
       </td>
-      <td className="px-3 py-2 text-xs text-gray-500 capitalize whitespace-nowrap">
-        {deliverable.type === 'creation' ? 'Creación' : 'Actualización'}
+      <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+        {DELIVERABLE_TYPE_LABELS[deliverable.type]}
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
         <span className={clsx(

@@ -14,6 +14,7 @@ class Deliverable extends Model
         'subject_id',
         'name',
         'type',
+        'priority',
         'record_type',
         'content_type',
         'global_status',

@@ -8,6 +8,7 @@ import {
 import { clsx } from 'clsx';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { BASE_PATH } from '@/lib/basePath';
 
 interface FAQ {
   q: string;
@@ -32,14 +33,51 @@ const FAQS: FAQ[] = [
     a: 'En la sección de producción de tu actividad, cada tipo de recurso tiene un botón "N/A" (No Aplica). Al hacer clic en él, se marcará que no aplica. Si todos los recursos de tu rol no aplican, podrás entregar la actividad sin registrar cantidades.'
   },
   {
+    category: 'Producción',
+    q: '¿Qué es el "Nivel" que aparece junto a cada recurso de producción?',
+    a: 'Es el nivel de complejidad del recurso (Nivel 1, 2 o 3), que define cuántos puntos de carga consume dentro del cálculo de capacidad del equipo. Se registra al lado de la cantidad de cada recurso en la sección de producción de tu actividad; también puedes verlo agregado por nivel en el Dashboard Ejecutivo → pestaña Producción.'
+  },
+  {
     category: 'Devoluciones',
     q: '¿Qué pasa si Calidad (QA) devuelve mi actividad?',
     a: 'Si Calidad encuentra algún hallazgo, cambiará el estado de la actividad a "Devuelta" (Ajustes Solicitados) e indicará qué rol o roles de la cadena deben realizar correcciones. Tu actividad volverá a estado activo para que realices los ajustes e ingreses tus notas en el feed interactivo.'
+  },
+  {
+    category: 'Flujo',
+    q: '¿Qué significa la prioridad (Alta/Media/Baja) que veo en un entregable?',
+    a: 'La prioridad la define un administrador o coordinador y aplica a todo el entregable, no a un rol en particular — todos los roles de la cadena ven la misma prioridad. Se usa para ordenar "Próximas entregas" en el Dashboard Operativo. Si no eres administrador ni coordinador, la verás en modo de solo lectura.'
+  },
+  {
+    category: 'Flujo',
+    q: '¿Qué tipos de entregable existen y en qué se diferencian?',
+    a: '"Creación" es contenido nuevo desde cero; "Actualización" es una revisión de contenido ya existente; "Control de cambios" es un ajuste puntual solicitado sobre un entregable ya publicado (por ejemplo, una corrección normativa o un cambio de última hora). El tipo se define al crear el entregable y aparece como etiqueta en su listado.'
+  },
+  {
+    category: 'Gestión',
+    q: '¿Cómo cargo varios entregables al tiempo en lugar de crearlos uno por uno?',
+    a: 'Si eres administrador o coordinador, en "Entregables" encontrarás la opción de carga masiva vía Excel, con una plantilla que parametriza asignatura, programa, tipo y fechas de compromiso. Es la vía recomendada para planes de semestre completos.'
+  },
+  {
+    category: 'Gestión',
+    q: '¿Cuál es la diferencia entre una "Escuela / Proyecto" y un "Programa Académico"?',
+    a: 'El Proyecto es la iniciativa de producción con fecha de inicio y fin (ej. "Actualización Curricular 2026"): es la unidad de trabajo que se ejecuta y se cierra. El Programa Académico es la oferta permanente de la universidad (una Maestría, Especialización o Pregrado) que no termina, se mantiene y se actualiza. Un mismo Proyecto puede tocar varios Programas a la vez.'
+  },
+  {
+    category: 'Notificaciones',
+    q: '¿Por qué no me llegan correos de notificación?',
+    a: 'Revisa en "Mi Perfil" → Preferencias de Notificación que el envío por correo esté activo para el tipo de evento correspondiente (asignación, cambio de estado, vencimiento próximo). Si ya está activo y sigues sin recibirlos, revisa tu carpeta de spam o contacta al administrador del sistema.'
+  },
+  {
+    category: 'Calendario',
+    q: '¿Por qué una entrega o actividad que eliminé sigue apareciendo en el Calendario?',
+    a: 'Si ves esto, repórtalo al administrador — el calendario no debe mostrar actividades de entregables eliminados. Si el problema persiste tras recargar la página, es un caso a escalar como incidencia técnica, no un comportamiento esperado.'
   }
 ];
 
-const MANUAL_PRODUCCION = '/manual_produccion_sergestiona.docx';
-const MANUAL_ADMIN = '/manual_administracion_sergestiona.docx';
+// Rutas absolutas a archivos de `public/` — deben llevar BASE_PATH (ver lib/basePath.ts),
+// a diferencia de un <Link> de next/link que lo antepone solo automáticamente.
+const MANUAL_PRODUCCION = `${BASE_PATH}/manual_produccion_sergestiona.docx`;
+const MANUAL_ADMIN = `${BASE_PATH}/manual_administracion_sergestiona.docx`;
 
 export default function AyudaPage() {
   const { user } = useAuth();
@@ -337,7 +375,7 @@ export default function AyudaPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                   Los roles de gestión tienen visibilidad global de todo el portafolio institucional, controlando la planeación temporal, el balanceo de carga y la configuración de recursos.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs pt-2">
                   <div className="p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-lg">
                     <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">Carga Masiva (Excel)</p>
                     <p className="text-gray-500 dark:text-gray-400">Permite importar cientos de entregables de forma masiva desde una plantilla de Excel parametrizando asignaturas y programas.</p>
@@ -349,6 +387,10 @@ export default function AyudaPage() {
                   <div className="p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-lg">
                     <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">Análisis de Capacidad</p>
                     <p className="text-gray-500 dark:text-gray-400">Monitorea la carga en puntos de cada operario para evitar sobrecargas y asegurar un reparto de trabajo equitativo.</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-lg">
+                    <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">Prioridad y Complejidad</p>
+                    <p className="text-gray-500 dark:text-gray-400">Fija la prioridad (Alta/Media/Baja) de un entregable completo desde su panel de detalle — aplica a todos los roles por igual — y define el nivel de complejidad de cada recurso producido, que alimenta el cálculo de capacidad.</p>
                   </div>
                 </div>
               </div>

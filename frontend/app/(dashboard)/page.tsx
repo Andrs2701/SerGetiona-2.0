@@ -1398,8 +1398,8 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
                           <div key={subject.key}>
                             <div
                               className="flex border-b border-gray-150 bg-gray-50/30 dark:border-gray-700/60 dark:bg-gray-800/40"
-                              onMouseEnter={(e) => setTooltip({ type: 'phase', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
-                              onMouseMove={(e) => setTooltip({ type: 'phase', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
+                              onMouseEnter={(e) => setTooltip({ type: 'subject', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
+                              onMouseMove={(e) => setTooltip({ type: 'subject', item: { ...subject, projectName: program.projectName, programName: program.name } as any, color: program.color, x: e.clientX, y: e.clientY })}
                             >
                               <button onClick={() => toggleSubject(subject.key)}
                                 className="sticky left-0 z-20 flex h-11 w-[340px] shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/90 pl-6 pr-3 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
@@ -1555,21 +1555,21 @@ function TabCapacidad({
           {/* Pills */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-900/10 p-4">
-              <p className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1">Capacidad utilizada</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1">Ocupación utilizada</p>
               <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{summary.active_points}<span className="text-xs text-blue-500 ml-1">pts</span></p>
               <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1">
                 {Math.round((summary.active_points / Math.max(summary.capacity_points, 1)) * 100)}% del total
               </p>
             </div>
             <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/10 p-4">
-              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-1">Capacidad libre</p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-1">Ocupación libre</p>
               <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{summary.available_points}<span className="text-xs text-emerald-500 ml-1">pts</span></p>
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
                 {Math.round((summary.available_points / Math.max(summary.capacity_points, 1)) * 100)}% disponible
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">Capacidad total</p>
+              <p className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">Ocupación total</p>
               <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">{summary.capacity_points}<span className="text-xs text-gray-400 ml-1">pts</span></p>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{users.length} usuarios activos</p>
             </div>
@@ -1941,6 +1941,24 @@ function TabProduccion({
           </div>
         </Card>
       </div>
+
+      {/* By complexity level */}
+      <Card>
+        <div className="flex items-center gap-2 mb-4">
+          <Gauge size={16} className="text-violet-400" />
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Nivel de Complejidad</h3>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {(data.by_level ?? []).map(l => (
+            <div key={l.level_name} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700 text-center">
+              <div className="text-lg font-bold text-violet-600 dark:text-violet-400">{l.total}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{l.level_name}</div>
+              <div className="text-[10px] text-gray-400 dark:text-gray-500">{l.records} registro(s)</div>
+            </div>
+          ))}
+          {(data.by_level ?? []).length === 0 && <p className="text-xs text-gray-400 text-center py-4 col-span-full">Sin datos</p>}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -2168,13 +2186,14 @@ function ResponsiveDonut({ data, total }: { data: { key: string; label: string; 
 const SELECT_CLS = 'text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 max-w-[160px]';
 
 function FilterBar({
-  filters, onChange, programs, users, activeCount,
+  filters, onChange, programs, users, activeCount, hideType,
 }: {
   filters: DashFilters;
   onChange: (partial: Partial<DashFilters>) => void;
   programs: { id: number; name: string }[];
   users: { id: number; name: string; role: string }[];
   activeCount: number;
+  hideType?: boolean;
 }) {
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
@@ -2217,12 +2236,15 @@ function FilterBar({
           {MONTHS_ES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
         </select>
 
-        {/* Tipo de entregable */}
-        <select value={filters.type} onChange={e => onChange({ type: e.target.value })} className={SELECT_CLS}>
-          <option value="">Todos los tipos</option>
-          <option value="creation">Creación</option>
-          <option value="update">Actualización</option>
-        </select>
+        {/* Tipo de entregable — no aplica en Producción, que no filtra por tipo */}
+        {!hideType && (
+          <select value={filters.type} onChange={e => onChange({ type: e.target.value })} className={SELECT_CLS}>
+            <option value="">Todos los tipos</option>
+            <option value="creation">Creación</option>
+            <option value="update">Actualización</option>
+            <option value="change_control">Control de cambios</option>
+          </select>
+        )}
 
         {activeCount > 0 && (
           <button
@@ -2413,14 +2435,16 @@ function DashboardAdmin() {
           </div>
         </div>
 
-        {/* Filter bar — visible en Seguimiento y Producción */}
-        {(activeTab === 'seguimiento' || activeTab === 'produccion' || activeTab === 'resumen') && (
+        {/* Filter bar — solo en las pestañas cuyos datos realmente se filtran.
+            Resumen usa datos globales (no lee `filters`), así que no se muestra. */}
+        {(activeTab === 'seguimiento' || activeTab === 'produccion') && (
           <FilterBar
             filters={filters}
             onChange={partial => setFilters(prev => ({ ...prev, ...partial }))}
             programs={filterPrograms}
             users={filterUsers}
             activeCount={activeFilterCount}
+            hideType={activeTab === 'produccion'}
           />
         )}
 

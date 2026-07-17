@@ -7,7 +7,7 @@ export type ProjectStatus =
   | 'finished'
   | 'cancelled';
 
-export type DeliverableType = 'creation' | 'update';
+export type DeliverableType = 'creation' | 'update' | 'change_control';
 
 export type GlobalStatus =
   | 'unpublished'
@@ -103,6 +103,7 @@ export interface Deliverable {
   subject_id: number;
   name: string;
   type: DeliverableType;
+  priority?: 'alta' | 'media' | 'baja';
   global_status: GlobalStatus;
   start_date?: string;
   notes?: string;
@@ -248,6 +249,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
 export const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   creation: 'Creación',
   update: 'Actualización',
+  change_control: 'Control de cambios',
 };
 
 export const ROLE_STATUS_LABELS: Record<string, string> = {
@@ -315,7 +317,7 @@ export interface WorkspaceActivity {
   production_not_applicable?: boolean;
   priority?: 'alta' | 'media' | 'baja';
   date_status: DateStatus;
-  deliverable: { id: number; name: string; type: DeliverableType; semestre?: string; ciclo?: string } | null;
+  deliverable: { id: number; name: string; type: DeliverableType; priority?: 'alta' | 'media' | 'baja'; semestre?: string; ciclo?: string } | null;
   subject: { id: number; name: string } | null;
   program: { id: number; name: string } | null;
   project: { id: number; name: string; status: ProjectStatus } | null;
@@ -610,6 +612,7 @@ export interface ProductionSummary {
   by_role: Array<{ role: string; records: number; total: number }>;
   by_user: Array<{ user_id: number; user_name: string; user_role: string; total: number; records: number }>;
   by_project: Array<{ project_id: number; project_name: string; total: number; records: number }>;
+  by_level: Array<{ level_name: string; total: number; records: number }>;
 }
 
 export interface DeliverableFlowRole {

@@ -16,6 +16,7 @@ import { api, ENDPOINTS } from '@/lib/api';
 import type { Workspace, WorkspaceActivity } from '@/lib/types';
 import { ROLE_STATUS_LABELS, USER_ROLE_LABELS, DELIVERABLE_TYPE_LABELS } from '@/lib/types';
 import { HIDDEN_IN_WORKSPACE_STATUSES } from '@/lib/statusGroups';
+import { clsx } from 'clsx';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -246,9 +247,19 @@ function ActivityCard({ act, onClick }: { act: WorkspaceActivity; onClick: () =>
             {autoStatus.label}
           </span>
           {act.deliverable && (
-          <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-indigo-50 text-indigo-600 font-medium">
-            {DELIVERABLE_TYPE_LABELS[act.deliverable.type]}
-          </span>
+            <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-indigo-50 text-indigo-600 font-medium">
+              {DELIVERABLE_TYPE_LABELS[act.deliverable.type]}
+            </span>
+          )}
+          {act.deliverable?.priority && (
+            <span className={clsx(
+              'text-[10px] border rounded-full px-1.5 py-0.5 font-semibold',
+              act.deliverable.priority === 'alta' ? 'bg-red-50 text-red-700 border-red-200' :
+              act.deliverable.priority === 'baja' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+              'bg-amber-50 text-amber-700 border-amber-200'
+            )}>
+              Prioridad: {act.deliverable.priority === 'alta' ? 'Alta' : act.deliverable.priority === 'baja' ? 'Baja' : 'Media'}
+            </span>
           )}
         </div>
         {dueInfo && (
@@ -315,6 +326,7 @@ export default function DashboardOperativo() {
 
   const data = workspace;
   const activities = data.activities ?? [];
+  const [sortBy, setSortBy] = useState<'priority' | 'date'>('priority');
 
   // KPIs
   const total     = activities.filter(a => a.status !== 'not_applicable').length;
@@ -324,10 +336,22 @@ export default function DashboardOperativo() {
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const weekly    = computeWeeklyProgress(activities);
 
+  // Priority weight helper
+  const priorityWeight = (p?: string) => {
+    if (p === 'alta') return 3;
+    if (p === 'baja') return 1;
+    return 2; // media / default
+  };
+
   // Priority activities
   const priorityActivities = [...activities]
     .filter((a) => !HIDDEN_IN_WORKSPACE_STATUSES.includes(a.status))
     .sort((a, b) => {
+      if (sortBy === 'priority') {
+        const wA = priorityWeight(a.deliverable?.priority);
+        const wB = priorityWeight(b.deliverable?.priority);
+        if (wA !== wB) return wB - wA;
+      }
       const diff = urgencyOrder(a) - urgencyOrder(b);
       if (diff !== 0) return diff;
       return (a.commitment_date ?? '').localeCompare(b.commitment_date ?? '');
@@ -414,17 +438,27 @@ export default function DashboardOperativo() {
 
       {/* Priority tasks */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Próximas entregas</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Actividades ordenadas por urgencia</p>
+            <p className="text-xs text-gray-400 mt-0.5">Ordenado por {sortBy === 'priority' ? 'prioridad' : 'urgencia/fecha'}</p>
           </div>
-          <button
-            onClick={() => router.push('/mi-espacio')}
-            className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-          >
-            Ver todas <ArrowRight size={14} />
-          </button>
+          <div className="flex items-center gap-3">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'priority' | 'date')}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+            >
+              <option value="priority">Ordenar por prioridad</option>
+              <option value="date">Ordenar por fecha</option>
+            </select>
+            <button
+              onClick={() => router.push('/mi-espacio')}
+              className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors whitespace-nowrap"
+            >
+              Ver todas <ArrowRight size={14} />
+            </button>
+          </div>
         </div>
 
         {priorityActivities.length === 0 ? (

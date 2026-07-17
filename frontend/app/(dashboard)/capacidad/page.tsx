@@ -219,7 +219,7 @@ export default function CapacidadPage() {
     return (
       <div className="p-4 sm:p-6">
         <p className="text-sm text-gray-500">
-          La capacidad operativa es información gerencial. No tienes acceso a este módulo.
+          La ocupación operativa es información gerencial. No tienes acceso a este módulo.
         </p>
       </div>
     );
@@ -228,9 +228,9 @@ export default function CapacidadPage() {
   return (
     <div className="p-4 sm:p-6">
       <PageHeader
-        title="Capacidad Operativa"
+        title="Ocupación Operativa"
         subtitle="Carga semanal del equipo según complejidad de entregables"
-        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Capacidad' }]}
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Ocupación' }]}
         actions={isAdmin ? (
           <button
             onClick={openSettingsPanel}
@@ -245,7 +245,7 @@ export default function CapacidadPage() {
       {loading ? (
         <StatsSkeleton />
       ) : !summary ? (
-        <p className="text-sm text-gray-400 py-12 text-center">No se pudo cargar la capacidad.</p>
+        <p className="text-sm text-gray-400 py-12 text-center">No se pudo cargar la ocupación.</p>
       ) : (
         <div className="space-y-8">
 
@@ -259,12 +259,12 @@ export default function CapacidadPage() {
             />
             <KpiCard
               icon={<Users size={18} />}
-              label="Capacidad total del equipo"
+              label="Ocupación total del equipo"
               value={`${summary.capacity_points} pts`}
             />
             <KpiCard
               icon={<BatteryCharging size={18} />}
-              label="Capacidad disponible"
+              label="Ocupación disponible"
               value={`${summary.available_points} pts`}
             />
             <KpiCard
@@ -278,7 +278,7 @@ export default function CapacidadPage() {
           {/* Capacidad por rol — expandable con individuales */}
           <section>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900">Capacidad por rol</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Ocupación por rol</h2>
               <span className="text-xs text-gray-400">
                 Haz clic en un rol para ver a sus miembros
               </span>
@@ -288,7 +288,7 @@ export default function CapacidadPage() {
               <div className="grid grid-cols-[1fr_80px_140px_200px_100px] bg-gray-50 border-b border-gray-200 px-4 py-2.5">
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Rol / Persona</span>
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Pers.</span>
-                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Carga / Capacidad</span>
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Carga / Ocupación</span>
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide pl-1">Ocupación</span>
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Estado</span>
               </div>
@@ -731,7 +731,7 @@ function TrendChart({ trend }: { trend: CapacityTrendPoint[] }) {
                     ))}
                   </tr>
                   <tr>
-                    <td className="text-gray-500 py-1.5 pr-3 whitespace-nowrap">Capacidad (pts)</td>
+                    <td className="text-gray-500 py-1.5 pr-3 whitespace-nowrap">Ocupación (pts)</td>
                     {trend.map(t => (
                       <td key={t.week_start} className="text-center text-gray-400 py-1.5 px-1">
                         {t.capacity_points}

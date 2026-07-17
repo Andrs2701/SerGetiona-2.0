@@ -201,7 +201,6 @@ class RoleActivityController extends Controller
             'production_not_applicable'  => 'sometimes|boolean',
             'adjust_roles'               => 'nullable|array',
             'adjust_roles.*'             => 'string',
-            'priority'                   => 'nullable|string|in:alta,media,baja',
         ]);
 
         $activityId = $activity->id;
@@ -225,12 +224,12 @@ class RoleActivityController extends Controller
 
                 $forbiddenFields = array_intersect(
                     array_keys($data),
-                    ['responsible_id', 'assigned_at', 'commitment_date', 'priority']
+                    ['responsible_id', 'assigned_at', 'commitment_date']
                 );
                 abort_if(
                     $forbiddenFields !== [],
                     403,
-                    'Solo administradores y coordinadores pueden reasignar, cambiar fechas comprometidas o establecer la prioridad.'
+                    'Solo administradores y coordinadores pueden reasignar o cambiar fechas comprometidas.'
                 );
                 abort_if(
                     ($data['status'] ?? null) === 'approved' && !$isQaRole,

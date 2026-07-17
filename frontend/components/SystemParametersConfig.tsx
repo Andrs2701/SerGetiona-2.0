@@ -6,7 +6,7 @@ import type { SystemSetting } from '@/lib/types';
 
 const GROUP_LABELS: Record<string, string> = {
   health: 'Salud de proyecto',
-  capacity: 'Capacidad operativa',
+  capacity: 'Ocupación operativa',
   presence: 'Presencia de usuarios',
 };
 
@@ -54,7 +54,7 @@ export default function SystemParametersConfig() {
   return (
     <div className="space-y-6 max-w-3xl">
       <p className="text-sm text-gray-500">
-        Estos parámetros controlan la fórmula de salud de proyecto y los umbrales de capacidad
+        Estos parámetros controlan la fórmula de salud de proyecto y los umbrales de ocupación
         operativa. Los cambios aplican de inmediato sin tocar código.
       </p>
 

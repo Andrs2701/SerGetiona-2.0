@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus } from '@/lib/types';
+import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus, DeliverableType } from '@/lib/types';
 import {
   GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
 } from '@/lib/types';
@@ -276,7 +276,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
             <h3 className="text-sm font-bold text-gray-900 leading-tight">{d.subject_name ?? '—'}</h3>
             <span className={clsx(
               'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide',
-              d.type === 'creation' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'
+              d.type === 'creation' ? 'bg-indigo-100 text-indigo-600' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
             )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
             {overdue && !isFinished && (
               <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">
@@ -481,14 +481,14 @@ interface ActivityForm { role: Role; responsible_id: string; commitment_date: st
 
 interface DeliverableFormData {
   project_id: string; program_name: string; subject_name: string;
-  name: string; type: 'creation' | 'update'; start_date: string;
+  name: string; type: DeliverableType; priority: 'alta' | 'media' | 'baja'; start_date: string;
   semestre: string; ciclo: string;
   activities: ActivityForm[];
 }
 
 const EMPTY_FORM: DeliverableFormData = {
   project_id: '', program_name: '', subject_name: '',
-  name: '', type: 'creation', start_date: '',
+  name: '', type: 'creation', priority: 'media', start_date: '',
   semestre: '', ciclo: '',
   activities: ROLES.map(r => ({ role: r, responsible_id: '', commitment_date: '' })),
 };
@@ -509,6 +509,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         subject_name: deliverable.subject_name ?? '',
         name: deliverable.name,
         type: deliverable.type,
+        priority: deliverable.priority ?? 'media',
         start_date: deliverable.start_date ?? '',
         semestre: deliverable.semestre ?? '',
         ciclo: deliverable.ciclo ?? '',
@@ -576,7 +577,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
       }
 
       const payload: Record<string, unknown> = {
-        name: form.name.trim(), type: form.type,
+        name: form.name.trim(), type: form.type, priority: form.priority,
         start_date: form.start_date || null,
         program_name: form.program_name.trim() || null,
         subject_name: form.subject_name.trim() || null,
@@ -689,13 +690,23 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                 placeholder="Ej: Semana 1 – Introducción"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as 'creation' | 'update' }))}
+                <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as DeliverableType }))}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
                   <option value="creation">Creación</option>
                   <option value="update">Actualización</option>
+                  <option value="change_control">Control de cambios</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Prioridad <span className="text-red-500">*</span></label>
+                <select value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value as 'alta' | 'media' | 'baja' }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baja">Baja</option>
                 </select>
               </div>
               <div>
@@ -887,7 +898,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Estado</p><StatusBadge status={deliverable.global_status} type="global" /></div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Tipo</p>
                   <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium',
-                    deliverable.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
+                    deliverable.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : deliverable.type === 'change_control' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                   )}>{DELIVERABLE_TYPE_LABELS[deliverable.type]}</span>
                 </div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Avance (excl. N/A)</p>
@@ -1830,7 +1841,7 @@ export default function EntregablesPage() {
                               </td>
                               <td className="px-3 py-2.5">
                                 <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                                  d.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
+                                  d.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                                 )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
                               </td>
                               <td className="px-3 py-2.5"><StatusBadge status={d.global_status} type="global" /></td>

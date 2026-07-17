@@ -73,7 +73,8 @@ class DeliverableController extends Controller
             'program_name'                  => 'nullable|string|max:255',
             'subject_name'                  => 'nullable|string|max:255',
             'name'                          => 'required|string|max:255',
-            'type'                          => 'nullable|in:creation,update',
+            'type'                          => 'nullable|in:creation,update,change_control',
+            'priority'                      => 'nullable|string|in:alta,media,baja',
             'start_date'                    => 'nullable|date',
             'notes'                         => 'nullable|string',
             'semestre'                      => 'nullable|in:I,II,III,IV,V,VI,VII,VIII,IX,X,NA',
@@ -108,6 +109,7 @@ class DeliverableController extends Controller
             'subject_id'    => $subjectId,
             'name'          => $data['name'],
             'type'          => $data['type'] ?? 'creation',
+            'priority'      => $data['priority'] ?? 'media',
             'global_status' => 'unpublished',
             'start_date'    => $data['start_date'] ?? null,
             'notes'         => $data['notes'] ?? null,
@@ -157,7 +159,8 @@ class DeliverableController extends Controller
     {
         $data = $request->validate([
             'name'                          => 'sometimes|string|max:255',
-            'type'                          => 'nullable|in:creation,update',
+            'type'                          => 'nullable|in:creation,update,change_control',
+            'priority'                      => 'nullable|string|in:alta,media,baja',
             'global_status'                 => 'nullable|in:unpublished,pending_start,in_progress,in_review,with_observations,finished,cancelled,not_applicable',
             'start_date'                    => 'nullable|date',
             'notes'                         => 'nullable|string',
@@ -202,7 +205,7 @@ class DeliverableController extends Controller
 
         // ── Update deliverable fields ─────────────────────────────────────────
         $fields = [];
-        foreach (['name', 'type', 'global_status', 'start_date', 'notes', 'complexity_level_id', 'semestre', 'ciclo'] as $f) {
+        foreach (['name', 'type', 'priority', 'global_status', 'start_date', 'notes', 'complexity_level_id', 'semestre', 'ciclo'] as $f) {
             if (array_key_exists($f, $data)) $fields[$f] = $data[$f];
         }
         if (!empty($fields)) $deliverable->update($fields);
@@ -504,6 +507,7 @@ class DeliverableController extends Controller
             'subject_id'            => $d->subject_id,
             'name'                  => $d->name,
             'type'                  => $d->type,
+            'priority'              => $d->priority,
             'global_status'         => $d->global_status,
             'start_date'            => $d->start_date ? $d->start_date->toDateString() : null,
             'notes'                 => $d->notes,

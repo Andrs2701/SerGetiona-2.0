@@ -592,6 +592,7 @@ export default function ActivityDetailPanel({
     id: number;
     name: string;
     type: string;
+    priority?: string;
     semestre?: string | null;
     ciclo?: string | null;
     subject?: { id: number; name: string } | null;
@@ -610,7 +611,7 @@ export default function ActivityDetailPanel({
   const [tab, setTab] = useState<'principal' | 'evidencias' | 'timeline'>('principal');
   const [status, setStatus] = useState(activity.status);
   const [notes, setNotes] = useState(activity.notes ?? '');
-  const [priorityState, setPriorityState] = useState(activity.priority ?? 'media');
+  const [priorityState, setPriorityState] = useState(deliverable.priority ?? activity.priority ?? 'media');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -649,7 +650,7 @@ export default function ActivityDetailPanel({
   useEffect(() => {
     setStatus(activity.status);
     setNotes(activity.notes ?? '');
-    setPriorityState(activity.priority ?? 'media');
+    setPriorityState(deliverable.priority ?? activity.priority ?? 'media');
     setSaved(false);
     setSaveError(null);
     setQuantities({});
@@ -664,7 +665,7 @@ export default function ActivityDetailPanel({
     setRefreshKey(k => k + 1);
     setSelectedRolesToAdjust([]);
     setFlowData(null);
-  }, [activity.id, activity.priority]);
+  }, [activity.id, deliverable.priority, activity.priority]);
 
   const roleStates = useMemo(() => {
     if (loadingStatuses) return [];
@@ -735,12 +736,17 @@ export default function ActivityDetailPanel({
         setPendingTitle('');
       }
 
+      if (isManager && priorityState !== (deliverable.priority ?? activity.priority ?? 'media')) {
+        await api.put(ENDPOINTS.DELIVERABLE(deliverable.id), {
+          priority: priorityState
+        });
+      }
+
       await api.put(ENDPOINTS.ROLE_ACTIVITY(activity.id), {
         status,
         notes,
         production_not_applicable: allProductionNA,
         adjust_roles: selectedRolesToAdjust,
-        ...(isManager ? { priority: priorityState } : {}),
       });
 
       onStatusChange(activity.id, status);

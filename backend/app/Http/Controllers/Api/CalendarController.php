@@ -147,6 +147,7 @@ class CalendarController extends Controller
         $user = $request->user();
 
         $activities = RoleActivity::where('responsible_id', $user->id)
+            ->whereHas('deliverable')
             ->with([
                 'deliverable.subject.academicProgram.project',
             ])

@@ -22,7 +22,6 @@ class RoleActivity extends Model
         'notes',
         'checklist',
         'production_not_applicable',
-        'priority',
     ];
 
     protected $casts = [

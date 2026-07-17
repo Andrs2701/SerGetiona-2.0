@@ -15,6 +15,7 @@ class DeliverableResource extends JsonResource
             'subject' => $this->whenLoaded('subject'),
             'name' => $this->name,
             'type' => $this->type,
+            'priority' => $this->priority,
             'global_status' => $this->global_status,
             'start_date' => $this->start_date ? (\Illuminate\Support\Carbon::parse($this->start_date))->toDateString() : null,
             'notes' => $this->notes,
