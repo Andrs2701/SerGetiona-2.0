@@ -279,6 +279,9 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
               'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide',
               d.type === 'creation' ? 'bg-indigo-100 text-indigo-600' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
             )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
+            {d.priority === 'alta' && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-red-100 text-red-600">Prioridad alta</span>
+            )}
             {overdue && !isFinished && (
               <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">
                 <AlertCircle size={8} /> Vencida
@@ -830,7 +833,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
 // ─── Side Panel ───────────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'flow' | 'evidencias' | 'timeline';
+type PanelTab = 'info' | 'evidencias' | 'timeline';
 
 function InfoField({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -867,12 +870,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
           <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
         <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
-          {(['info', 'flow', 'evidencias', 'timeline'] as PanelTab[]).map(t => (
+          {(['info', 'evidencias', 'timeline'] as PanelTab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={clsx(
               'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
             )}>
-              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : t === 'evidencias' ? 'Evidencias' : 'Línea de tiempo'}
+              {t === 'info' ? 'Info' : t === 'evidencias' ? 'Evidencias' : 'Línea de tiempo'}
             </button>
           ))}
         </div>
@@ -902,6 +905,11 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                     deliverable.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : deliverable.type === 'change_control' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                   )}>{DELIVERABLE_TYPE_LABELS[deliverable.type]}</span>
                 </div>
+                <div><p className="text-xs text-gray-400 uppercase mb-1">Prioridad</p>
+                  <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium',
+                    deliverable.priority === 'alta' ? 'bg-red-100 text-red-700' : deliverable.priority === 'baja' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-700'
+                  )}>{deliverable.priority === 'alta' ? 'Alta' : deliverable.priority === 'baja' ? 'Baja' : 'Media'}</span>
+                </div>
                 <div><p className="text-xs text-gray-400 uppercase mb-1">Avance (excl. N/A)</p>
                   <ProgressExcNA activities={deliverable.role_activities ?? []} compact />
                 </div>
@@ -919,107 +927,13 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                   <p className="text-sm text-gray-700">{deliverable.notes}</p>
                 </div>
               )}
-              {/* Fechas por Rol */}
+              {/* Flujo por rol — antes vivía en una pestaña aparte ("Flujo") duplicando
+                  la tabla "Fechas por Rol" de aquí mismo; se unificó en una sola vista
+                  para reducir clics, dejando esta versión (con clic a cada actividad). */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Fechas por Rol</p>
-                <div className="rounded-lg border border-gray-100 overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-400">
-                        <th className="text-left px-3 py-2 font-medium">Rol</th>
-                        <th className="text-left px-3 py-2 font-medium">Programada</th>
-                        <th className="text-left px-3 py-2 font-medium">Real</th>
-                        <th className="text-left px-3 py-2 font-medium">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {ROLES.map(role => {
-                        const act = (deliverable.role_activities ?? []).find(a => a.role === role);
-                        const isNA = act?.status === 'not_applicable';
-                        const cfg = ACTIVITY_STATUS_CFG[act?.status ?? 'not_started'];
-                        return (
-                          <tr key={role} className={clsx('transition-colors', isNA ? 'opacity-50' : '')}>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className={clsx('text-[9px] font-black px-1 py-0.5 rounded text-white', ROLE_BADGE_BG[role])}>{ROLE_ABBR[role]}</span>
-                                <span className="text-gray-700 font-medium">{ROLE_LABELS[role]}</span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-gray-600">
-                              {isNA ? <span className="text-gray-400 italic">No aplica</span> : formatDateShort(act?.commitment_date)}
-                            </td>
-                            <td className="px-3 py-2 text-gray-600">
-                              {(() => {
-                                if (isNA) return '—';
-                                
-                                const status = act?.status ?? 'not_started';
-                                
-                                if (['not_started', 'pending'].includes(status)) {
-                                  const todayStr = new Date().toISOString().split('T')[0];
-                                  const isOverdue = act?.commitment_date && act.commitment_date < todayStr;
-                                  return isOverdue ? (
-                                    <span className="text-rose-600 dark:text-rose-400 font-medium">Pendiente (Vencido)</span>
-                                  ) : '—';
-                                }
-
-                                const refDate = act?.actual_delivery_date || act?.updated_at || act?.actual_start_date || null;
-                                if (!refDate) return '—';
-
-                                const refDateShort = formatDateShort(refDate);
-
-                                if (['delivered', 'approved'].includes(status)) {
-                                  const deliveryDay = act?.actual_delivery_date ? act.actual_delivery_date.split('T')[0].split(' ')[0] : refDate.split('T')[0].split(' ')[0];
-                                  const commitmentDay = act?.commitment_date ? act.commitment_date.split('T')[0].split(' ')[0] : '';
-                                  const isDelayed = commitmentDay && deliveryDay > commitmentDay;
-                                  
-                                  return isDelayed ? (
-                                    <div className="flex flex-col">
-                                      <span className="text-rose-600 dark:text-rose-400 font-semibold">{refDateShort}</span>
-                                      <span className="text-[9px] text-rose-500 font-medium">Vencido</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col">
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{refDateShort}</span>
-                                      <span className="text-[9px] text-emerald-500 font-medium">A tiempo</span>
-                                    </div>
-                                  );
-                                }
-
-                                if (['adjustments_requested', 'with_findings'].includes(status)) {
-                                  return (
-                                    <div className="flex flex-col">
-                                      <span className="text-amber-600 dark:text-amber-400 font-semibold">{refDateShort}</span>
-                                      <span className="text-[9px] text-amber-500 font-medium">Devuelto</span>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="flex flex-col">
-                                    <span className="text-blue-600 dark:text-blue-400 font-semibold">{refDateShort}</span>
-                                    <span className="text-[9px] text-blue-500 font-medium">En proceso</span>
-                                  </div>
-                                );
-                              })()}
-                            </td>
-                            <td className="px-3 py-2">
-                              <span className={clsx('font-medium', cfg?.text ?? 'text-gray-500')}>
-                                {cfg?.label ?? '—'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            );
-          })()}
-          {tab === 'flow' && (
-            <div className="space-y-2">
-              {ROLES.map(role => {
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Flujo por rol</p>
+                <div className="space-y-2">
+                  {ROLES.map(role => {
                 const act = (deliverable.role_activities ?? []).find(a => a.role === role);
                 const isNA = act?.status === 'not_applicable';
                 const daysLeft = daysUntil(act?.commitment_date);
@@ -1094,8 +1008,11 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                   </div>
                 );
               })}
+                </div>
+              </div>
             </div>
-          )}
+            );
+          })()}
           {tab === 'evidencias' && (
             loadingFlow
               ? <div className="text-center py-10 text-gray-400 text-sm">Cargando evidencias…</div>
