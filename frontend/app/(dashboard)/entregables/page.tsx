@@ -16,6 +16,7 @@ import {
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+import DeliverableTimelineView from '@/components/DeliverableTimelineView';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import ActivityDetailPanel from '@/components/ActivityDetailPanel';
@@ -829,7 +830,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
 // ─── Side Panel ───────────────────────────────────────────────────────────────
 
-type PanelTab = 'info' | 'flow' | 'evidencias';
+type PanelTab = 'info' | 'flow' | 'evidencias' | 'timeline';
 
 function InfoField({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -866,12 +867,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
           <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
         </div>
         <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
-          {(['info', 'flow', 'evidencias'] as PanelTab[]).map(t => (
+          {(['info', 'flow', 'evidencias', 'timeline'] as PanelTab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={clsx(
               'py-2.5 px-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               tab === t ? 'border-[#194276] text-[#194276]' : 'border-transparent text-gray-500 hover:text-gray-700'
             )}>
-              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : 'Evidencias'}
+              {t === 'info' ? 'Info' : t === 'flow' ? 'Flujo' : t === 'evidencias' ? 'Evidencias' : 'Línea de tiempo'}
             </button>
           ))}
         </div>
@@ -1133,8 +1134,13 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                                 ) : (
                                   <div className="flex flex-wrap gap-1.5">
                                     {r.production.map(p => (
-                                      <span key={p.resource_type} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-semibold text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
+                                      <span key={`${p.resource_type}-${p.complexity_level ?? 'na'}`} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-white dark:bg-gray-800 rounded text-[10px] font-semibold text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
                                         <span className="font-bold text-indigo-600 dark:text-indigo-400">{p.total}</span> {p.resource_type}
+                                        {p.complexity_level && (
+                                          <span className="ml-0.5 px-1.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 text-[9px] font-bold">
+                                            {p.complexity_level}
+                                          </span>
+                                        )}
                                       </span>
                                     ))}
                                   </div>
@@ -1168,6 +1174,30 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                                 </div>
                               )}
 
+                              {/* Observaciones (historial con usuario+fecha, no solo el texto libre de r.notes) */}
+                              {(r.observations ?? []).length > 0 && (
+                                <div className="pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
+                                  <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Observaciones</p>
+                                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                    {(r.observations ?? []).map(obs => (
+                                      <div key={obs.id} className="flex gap-2">
+                                        <div className="w-5 h-5 rounded-full bg-white/70 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 flex items-center justify-center text-[9px] font-bold flex-shrink-0 mt-0.5">
+                                          {obs.user?.name?.[0] ?? '?'}
+                                        </div>
+                                        <div className="flex-1 bg-white/40 dark:bg-gray-900/20 rounded-md px-2.5 py-1.5 border border-white/30 dark:border-gray-700/10">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <p className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate">{obs.user?.name}</p>
+                                            <p className="text-[9px] text-gray-400 flex-shrink-0">
+                                              {obs.created_at ? new Date(obs.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : ''}
+                                            </p>
+                                          </div>
+                                          <p className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5 whitespace-pre-wrap leading-relaxed">{obs.observation}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               {r.notes && (
                                 <p className="text-[10px] text-gray-500 dark:text-gray-400 italic leading-relaxed pt-1.5 border-t border-gray-200/30 dark:border-gray-700/30">{r.notes}</p>
                               )}
@@ -1182,6 +1212,12 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                       </div>
                     </div>
                   </div>
+          )}
+          {tab === 'timeline' && (
+            // Sin activityRole: vista consolidada de los 6 roles, sin filtros —
+            // el admin/coordinador ve toda la información, a diferencia de la
+            // línea de tiempo de un solo rol que ve un responsable.
+            <DeliverableTimelineView deliverableId={deliverable.id} />
           )}
         </div>
       </div>
@@ -1438,7 +1474,7 @@ export default function EntregablesPage() {
   const [users, setUsers]       = useState<User[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<RoleActivity | null>(null);
   const [selectedActivityDeliverable, setSelectedActivityDeliverable] = useState<Deliverable | null>(null);
-  const autoOpenedRef = useRef(false);
+  const openedDeliverableIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     api.get<Array<{ id: number; name: string }>>(ENDPOINTS.PROJECTS)
@@ -1452,20 +1488,23 @@ export default function EntregablesPage() {
     if (!filter) return;
     if (filter === 'overdue') setOnlyOverdue(true);
     else if (filter.startsWith('status_')) setFilterStatus(filter.replace('status_', ''));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
+  // Depende de searchParams (no solo de `data`): una notificación puede
+  // navegar aquí con un ?deliverable= nuevo mientras la página ya está
+  // montada (mismo pathname), y Next no vuelve a correr efectos con deps
+  // vacías en ese caso — hay que reaccionar al cambio de query param.
   useEffect(() => {
-    if (autoOpenedRef.current || data.length === 0) return;
     const deliverableIdStr = searchParams.get('deliverable');
     if (!deliverableIdStr) return;
-    const target = data.find(d => d.id === Number(deliverableIdStr));
+    const deliverableId = Number(deliverableIdStr);
+    if (openedDeliverableIdRef.current === deliverableId || data.length === 0) return;
+    const target = data.find(d => d.id === deliverableId);
     if (target) {
       setPanel({ deliverable: target, tab: 'info' });
-      autoOpenedRef.current = true;
+      openedDeliverableIdRef.current = deliverableId;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [searchParams, data]);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();

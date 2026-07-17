@@ -171,8 +171,13 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
                   <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Recursos producidos</p>
                   <div className="flex flex-wrap gap-1.5">
                     {r.production.map(p => (
-                      <span key={p.resource_type} className="inline-flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                      <span key={`${p.resource_type}-${p.complexity_level ?? 'na'}`} className="inline-flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">
                         {p.resource_type} <span className="font-bold">({p.total})</span>
+                        {p.complexity_level && (
+                          <span className="ml-0.5 px-1.5 py-0 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 text-[10px] font-semibold">
+                            {p.complexity_level}
+                          </span>
+                        )}
                       </span>
                     ))}
                   </div>

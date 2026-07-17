@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
   LayoutDashboard,
-  BookOpen,
   FileText,
   Users,
   Settings,
@@ -54,12 +53,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     href: '/proyectos',
     label: 'Escuelas / Proyectos',
     icon: FolderKanban,
-    roles: ['admin', 'coordinator'],
-  },
-  {
-    href: '/programas',
-    label: 'Programas Académicos',
-    icon: BookOpen,
     roles: ['admin', 'coordinator'],
   },
   {

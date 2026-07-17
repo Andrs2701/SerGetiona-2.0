@@ -275,6 +275,7 @@ class DeliverableController extends Controller
             'roleActivities.responsible',
             'roleActivities.evidenceLinks.user',
             'roleActivities.productionLogs.resourceType',
+            'roleActivities.productionLogs.complexityLevel',
             'roleActivities.productionLogs.producer',
             'roleActivities.observations.user',
         ]);
@@ -289,15 +290,25 @@ class DeliverableController extends Controller
                 continue;
             }
 
-            // Group production logs by resource type
+            // Group production logs por (tipo de recurso, nivel de complejidad):
+            // un mismo tipo puede tener registros en niveles distintos (p. ej.
+            // una corrección posterior con más complejidad), y mezclarlos bajo
+            // un solo total/badge de nivel sería engañoso.
             $productionByType = [];
             foreach ($act->productionLogs as $log) {
-                $typeName = $log->resourceType?->name ?? 'Sin tipo';
-                if (!isset($productionByType[$typeName])) {
-                    $productionByType[$typeName] = ['resource_type' => $typeName, 'total' => 0, 'logs' => []];
+                $typeName  = $log->resourceType?->name ?? 'Sin tipo';
+                $levelName = $log->complexityLevel?->name;
+                $groupKey  = $typeName . '|' . ($levelName ?? '');
+                if (!isset($productionByType[$groupKey])) {
+                    $productionByType[$groupKey] = [
+                        'resource_type'    => $typeName,
+                        'complexity_level' => $levelName,
+                        'total'            => 0,
+                        'logs'             => [],
+                    ];
                 }
-                $productionByType[$typeName]['total'] += $log->quantity;
-                $productionByType[$typeName]['logs'][] = [
+                $productionByType[$groupKey]['total'] += $log->quantity;
+                $productionByType[$groupKey]['logs'][] = [
                     'quantity'    => $log->quantity,
                     'produced_at' => $log->produced_at?->toDateString(),
                     'producer'    => $log->producer?->name,

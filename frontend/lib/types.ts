@@ -623,7 +623,7 @@ export interface DeliverableFlowRole {
   commitment_date?: string;
   actual_delivery_date?: string;
   responsible?: { id: number; name: string };
-  production: { resource_type: string; total: number; logs: { quantity: number; produced_at?: string; producer?: string }[] }[];
+  production: { resource_type: string; complexity_level?: string | null; total: number; logs: { quantity: number; produced_at?: string; producer?: string }[] }[];
   links: { id: number; type: string; title: string; url?: string; user?: { name: string }; created_at: string }[];
   observations?: { id: number; observation: string; user?: { name: string }; created_at: string }[];
 }

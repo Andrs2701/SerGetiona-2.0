@@ -106,7 +106,10 @@ class ReportController extends Controller
             ->groupBy('role')
             ->get();
 
-        $activeProjects = Project::where('status', 'in_progress')->count();
+        // "Activo" = no cerrado todavía (vive, se ejecuta y se cierra — ver
+        // tooltip del KPI), no estrictamente "in_progress": un proyecto en
+        // draft/parameterized sigue siendo una iniciativa activa.
+        $activeProjects = Project::whereNotIn('status', ['finished', 'cancelled'])->count();
         $totalPrograms = \App\Models\AcademicProgram::count();
 
         // Overdue: definición única en RoleActivity::scopeOverdue(), reutilizada

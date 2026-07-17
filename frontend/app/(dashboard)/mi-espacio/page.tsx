@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { Workspace, WorkspaceActivity, TimelineEvent, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow, DecisionRecord, DecisionStatus, RoleStatus } from '@/lib/types';
+import type { Workspace, WorkspaceActivity, EvidenceLink, ResourceType, ProductionLog, DeliverableFlow, DecisionRecord, DecisionStatus, RoleStatus } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, DECISION_STATUS_LABELS, DECISION_IMPACT_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useSearchParams } from 'next/navigation';
@@ -72,60 +72,8 @@ type PanelTab = 'principal' | 'evidencias' | 'comentarios' | 'timeline';
 
 const PRODUCTION_ROLES = new Set(['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa']);
 
-// Timeline
-const TIMELINE_COLORS: Record<string, string> = {
-  created: 'bg-indigo-500', assigned: 'bg-sky-500', status: 'bg-blue-500',
-  delivered: 'bg-teal-500', date_changed: 'bg-amber-400', note: 'bg-gray-400', approved: 'bg-emerald-500',
-};
-
 // TimelineView se movió a '@/components/ActivityDetailPanel'
-
-// Deliverable-level timeline — shows events from ALL roles in chronological order
-const ROLE_DOT_COLORS: Record<string, string> = {
-  expert: 'bg-purple-400', pedagogy: 'bg-pink-400', design: 'bg-blue-400',
-  audiovisual: 'bg-orange-400', engineering: 'bg-cyan-400', qa: 'bg-emerald-400',
-};
-
-function DeliverableTimelineView({ deliverableId, activityRole }: { deliverableId: number; activityRole?: string }) {
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    api.get<{ events: TimelineEvent[] }>(ENDPOINTS.DELIVERABLE_TIMELINE(deliverableId))
-      .then((r) => setEvents(r.events ?? []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  }, [deliverableId]);
-
-  if (loading) return <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse"/>)}</div>;
-  if (!events.length) return <p className="text-sm text-gray-400 py-4 text-center">Sin eventos registrados</p>;
-
-  // For creation/assignment events, only show the current user's own role; all other event types are shown for all roles
-  const filtered = activityRole
-    ? events.filter(ev => (ev.type !== 'created' && ev.type !== 'assigned') || ev.role === activityRole)
-    : events;
-
-  return (
-    <div className="relative pl-5 space-y-4">
-      <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gray-100"/>
-      {filtered.map((ev, i) => {
-        const dotColor = ev.role ? (ROLE_DOT_COLORS[ev.role] ?? 'bg-gray-400') : (TIMELINE_COLORS[ev.type] ?? 'bg-gray-400');
-        return (
-          <div key={i} className="relative flex gap-3">
-            <div className={`absolute -left-3 w-2 h-2 rounded-full mt-1.5 ${dotColor}`}/>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{ev.label}</p>
-              <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
-                {ev.user && <span>{ev.user}</span>}
-                {ev.date && <span>{formatDateTime(ev.date)}</span>}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
+// DeliverableTimelineView se movió a '@/components/DeliverableTimelineView'
 // EvidenceLinksPanel movido a '@/components/ActivityDetailPanel'
 
 // Evidencias tab — full flow per role
