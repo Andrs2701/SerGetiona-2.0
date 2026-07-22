@@ -2,7 +2,7 @@
 # ============================================================
 #  Sergestiona 2.0 - Script de Actualización Segura
 #  Diseñado por Antigravity
-#  Uso: bash update_server.sh
+#  Uso: bash update_server.sh   (también funciona con "sudo bash update_server.sh")
 #
 #  ESTE SCRIPT ES SEGURO PARA PRODUCCIÓN:
 #  - NO borra la base de datos
@@ -19,6 +19,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Este script funciona igual invocado como "bash update_server.sh" o como
+# "sudo bash update_server.sh". Con sudo, el PATH se reduce al secure_path
+# de root, que normalmente NO incluye dónde viven composer/nvm/npm/pm2 del
+# usuario normal — eso hacía fallar "composer: command not found" aunque el
+# mismo usuario, sin sudo, lo encuentra sin problema. Se amplía el PATH acá
+# con las rutas típicas (propias y del usuario real que invocó sudo) para
+# que el script sea robusto sin importar cómo se llame.
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME="$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6)"
+for extra_path in /usr/local/bin /usr/bin "$REAL_HOME"/.nvm/versions/node/*/bin "$REAL_HOME/bin" "$REAL_HOME/.local/bin"; do
+    [ -d "$extra_path" ] && PATH="$PATH:$extra_path"
+done
+export PATH
 
 APP_DIR="/var/www/html/sergestiona"
 BACKEND_DIR="$APP_DIR/backend"
@@ -85,9 +99,6 @@ echo -e "${BLUE}[1/4] Actualizando Backend (Laravel)...${NC}"
 cd "$BACKEND_DIR"
 
 # Instalar/actualizar dependencias PHP (sin dev, optimizado)
-# Sin sudo: el usuario que corre este script ya es dueño de vendor/, y el
-# secure_path por defecto de sudo en RHEL no incluye /usr/local/bin (donde
-# vive composer), lo que hacía fallar "sudo composer" con "command not found".
 echo -e "  Instalando dependencias Composer..."
 composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
 
