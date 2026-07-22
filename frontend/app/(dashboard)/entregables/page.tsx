@@ -178,7 +178,7 @@ function ProgressExcNA({ activities, compact }: { activities: RoleActivity[]; co
 
 // ─── Role cell ─────────────────────────────────────────────────────────────────
 
-function RoleCell({ role, activity, onSelect }: { role: Role; activity?: RoleActivity; onSelect?: () => void }) {
+function RoleCell({ role, activity, onSelect, isCovering }: { role: Role; activity?: RoleActivity; onSelect?: () => void; isCovering?: boolean }) {
   const isNA = !activity || activity.status === 'not_applicable';
   const colors = ROLE_CELL_COLORS[role];
   const days = daysUntil(activity?.commitment_date);
@@ -213,6 +213,9 @@ function RoleCell({ role, activity, onSelect }: { role: Role; activity?: RoleAct
             <span className="text-[11px] font-semibold text-gray-800 truncate leading-tight">
               {activity?.responsible?.name ?? <span className="text-gray-300 font-normal italic">Sin asignar</span>}
             </span>
+            {isCovering && (
+              <span title="Cubriendo este rol temporalmente" className="text-[8px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded shrink-0">CUBRE</span>
+            )}
           </div>
 
           {/* Status */}
@@ -243,6 +246,7 @@ function RoleCell({ role, activity, onSelect }: { role: Role; activity?: RoleAct
 interface RowProps {
   deliverable: Deliverable;
   isManager: boolean;
+  users?: User[];
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -250,10 +254,19 @@ interface RowProps {
   onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void;
 }
 
-function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, onQuickAction, onSelectActivity }: RowProps) {
+function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit, onDelete, onQuickAction, onSelectActivity }: RowProps) {
   const acts = d.role_activities ?? [];
   const byRole: Partial<Record<Role, RoleActivity>> = {};
   acts.forEach(a => { byRole[a.role] = a; });
+
+  // Un responsable "cubre" un rol cuando su rol propio es distinto al de la
+  // actividad pero tiene una cobertura temporal activa que lo incluye.
+  const isCoveringRole = (role: Role, activity?: RoleActivity) => {
+    const responsibleId = activity?.responsible?.id;
+    if (!responsibleId) return false;
+    const u = users.find(x => x.id === responsibleId);
+    return !!u && u.role !== role && !!u.covering_roles?.includes(role);
+  };
 
   const overdue = isOverdue(d);
   const { pct, done, total } = calcProgressExcNA(acts);
@@ -337,7 +350,7 @@ function DeliverableRow({ deliverable: d, isManager, onView, onEdit, onDelete, o
       {/* ── Role grid: 2 cols mobile · 3 cols sm · 6 cols lg ─────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:grid-cols-6">
         {ROLES.map(role => (
-          <RoleCell key={role} role={role} activity={byRole[role]} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
+          <RoleCell key={role} role={role} activity={byRole[role]} isCovering={isCoveringRole(role, byRole[role])} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
         ))}
       </div>
 
@@ -633,14 +646,14 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
             </p>
             {mode === 'create' && (
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Proyecto <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Escuela / Proyecto <span className="text-red-500">*</span></label>
                 {creatingNewProject ? (
                   <div className="flex items-center gap-2">
                     <input
                       autoFocus
                       value={newProjectName}
                       onChange={e => setNewProjectName(e.target.value)}
-                      placeholder="Nombre del nuevo proyecto"
+                      placeholder="Nombre de la nueva Escuela / Proyecto"
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30"
                     />
                     <button
@@ -658,9 +671,9 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                     setForm(p => ({ ...p, project_id: e.target.value }));
                   }}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
-                    <option value="">Selecciona un proyecto...</option>
+                    <option value="">Selecciona una Escuela / Proyecto...</option>
                     {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                    <option value="__new__">+ Crear proyecto nuevo</option>
+                    <option value="__new__">+ Crear Escuela / Proyecto nuevo</option>
                   </select>
                 )}
               </div>
@@ -768,7 +781,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
             <div className="space-y-2">
               {form.activities.map(act => {
                 const colors = ROLE_CELL_COLORS[act.role];
-                const filteredUsers = showAllRoles ? users : users.filter(u => u.role === act.role);
+                const filteredUsers = showAllRoles ? users : users.filter(u => u.role === act.role || u.covering_roles?.includes(act.role));
                 return (
                   <div key={act.role} className={clsx('rounded-xl border p-3 space-y-2', colors.bg, colors.border)}>
                     <div className="flex items-center gap-1.5">
@@ -1251,25 +1264,25 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Proyecto de destino <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Escuela / Proyecto de destino <span className="text-red-500">*</span></label>
                   <div className="flex gap-2 mb-2">
                     {(['existing', 'new'] as const).map(m => (
                       <button key={m} type="button" onClick={() => setProjectMode(m)}
                         className={clsx('flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors',
                           projectMode === m ? 'text-white border-blue-700 bg-blue-700 shadow-sm' : 'text-gray-500 border-gray-200 hover:bg-gray-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800'
                         )}>
-                        {m === 'existing' ? 'Proyecto existente' : 'Crear nuevo proyecto'}
+                        {m === 'existing' ? 'Escuela / Proyecto existente' : 'Crear Escuela / Proyecto nueva'}
                       </button>
                     ))}
                   </div>
                   {projectMode === 'existing'
                     ? <select value={projectId} onChange={e => setProjectId(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                        <option value="">Selecciona un proyecto...</option>
+                        <option value="">Selecciona una Escuela / Proyecto...</option>
                         {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                       </select>
                     : <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
-                        placeholder="Nombre del nuevo proyecto"
+                        placeholder="Nombre de la nueva Escuela / Proyecto"
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500" />
                   }
                 </div>
@@ -1556,7 +1569,7 @@ export default function EntregablesPage() {
 
         <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
           className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
-          <option value="">Todos los proyectos</option>
+          <option value="">Todas las Escuelas / Proyectos</option>
           {projectNames.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
@@ -1707,7 +1720,7 @@ export default function EntregablesPage() {
                   <>
                     {group.items.map(d => (
                       <DeliverableRow
-                        key={d.id} deliverable={d} isManager={isManager}
+                        key={d.id} deliverable={d} isManager={isManager} users={users}
                         onView={() => setPanel({ deliverable: d, tab: 'info' })}
                         onEdit={() => setFormPanel({ mode: 'edit', deliverable: d })}
                         onDelete={() => setDeleteTarget(d)}

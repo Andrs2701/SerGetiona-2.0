@@ -15,10 +15,17 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $users = User::query();
+        $users = User::query()->with(['roleCoverages' => fn ($q) => $q->active()]);
 
         if ($request->filled('role')) {
-            $users->where('role', $request->role);
+            // Incluye tambien a quien esta cubriendo temporalmente ese rol
+            // (vacaciones/incapacidades), no solo a quienes lo tienen como
+            // rol propio — ver RoleCoverage.
+            $role = $request->role;
+            $users->where(function ($q) use ($role) {
+                $q->where('role', $role)
+                    ->orWhereHas('roleCoverages', fn ($q2) => $q2->where('covering_role', $role)->active());
+            });
         }
 
         if ($request->filled('is_active')) {

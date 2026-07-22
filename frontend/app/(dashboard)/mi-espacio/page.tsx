@@ -661,7 +661,12 @@ export default function MiEspacioPage() {
         {/* Heading */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mi Espacio de Trabajo</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{roleLabel} · {total} actividades asignadas</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {roleLabel} · {total} actividades asignadas
+            {user?.covering_roles && user.covering_roles.length > 0 && (
+              <span className="text-indigo-500"> · Cubriendo {user.covering_roles.map(r => (ROLE_LABELS as Record<string, string>)[r] ?? r).join(', ')}</span>
+            )}
+          </p>
         </div>
 
         {/* Decisiones asignadas a mí — solo roles no admin/coordinador */}

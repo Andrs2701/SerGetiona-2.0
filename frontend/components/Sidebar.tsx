@@ -248,6 +248,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
               {user ? USER_ROLE_LABELS[user.role] : ''}
+              {user?.covering_roles && user.covering_roles.length > 0 && (
+                <span className="text-indigo-500 dark:text-indigo-400"> · Cubriendo {user.covering_roles.map(r => USER_ROLE_LABELS[r as keyof typeof USER_ROLE_LABELS] ?? r).join(', ')}</span>
+              )}
             </p>
           </div>
         </Link>

@@ -159,6 +159,9 @@ export const ENDPOINTS = {
   USERS: '/users',
   USER: (id: number) => `/users/${id}`,
   USER_RESET_LINK: (id: number) => `/users/${id}/reset-link`,
+  USER_ROLE_COVERAGES: (id: number) => `/users/${id}/role-coverages`,
+  ROLE_COVERAGES: '/role-coverages',
+  ROLE_COVERAGE: (id: number) => `/role-coverages/${id}`,
   PROFILE: '/profile',
   PROFILE_PHOTO: '/profile/photo',
 

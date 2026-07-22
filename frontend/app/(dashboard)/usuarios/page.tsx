@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Search, AlertCircle, KeyRound, Copy, Check, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Search, AlertCircle, KeyRound, Copy, Check, ArrowUpDown, ChevronUp, ChevronDown, Repeat, X as XIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
-import type { User, UserRole } from '@/lib/types';
-import { USER_ROLE_LABELS } from '@/lib/types';
+import type { User, UserRole, RoleCoverage, Role } from '@/lib/types';
+import { USER_ROLE_LABELS, ROLE_LABELS } from '@/lib/types';
+
+const OPERATIONAL_ROLES = Object.keys(ROLE_LABELS) as Role[];
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
@@ -97,6 +99,7 @@ export default function UsuariosPage() {
   const router = useRouter();
   
   const isManagement = user?.role === 'admin';
+  const canManageCoverage = user?.role === 'admin' || user?.role === 'coordinator';
 
   const [data, setData] = useState<User[]>([]);
   const [dataLoadedAt, setDataLoadedAt] = useState(Date.now());
@@ -121,6 +124,19 @@ export default function UsuariosPage() {
   const [resetLinkLoading, setResetLinkLoading] = useState(false);
   const [resetLinkError, setResetLinkError] = useState('');
   const [resetLinkCopied, setResetLinkCopied] = useState(false);
+
+  // Cobertura temporal de rol (vacaciones/incapacidades)
+  const [coverageUser, setCoverageUser] = useState<User | null>(null);
+  const [coverages, setCoverages] = useState<RoleCoverage[]>([]);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [coverageError, setCoverageError] = useState('');
+  const [coverageSaving, setCoverageSaving] = useState(false);
+  const [coverageForm, setCoverageForm] = useState({
+    covering_role: OPERATIONAL_ROLES[0] as Role,
+    starts_at: new Date().toISOString().split('T')[0],
+    ends_at: '',
+    reason: '',
+  });
 
   // Tick cada segundo
   useEffect(() => {
@@ -266,6 +282,60 @@ export default function UsuariosPage() {
     } catch (err) {
       console.error('Fallback copy failed:', err);
       alert('No se pudo copiar el enlace. Por favor, selecciónalo y cópialo manualmente.');
+    }
+  }
+
+  function loadCoverages(userId: number) {
+    setCoverageLoading(true);
+    api
+      .get<{ coverages: RoleCoverage[] }>(ENDPOINTS.USER_ROLE_COVERAGES(userId))
+      .then((res) => setCoverages(res.coverages ?? []))
+      .catch(() => setCoverages([]))
+      .finally(() => setCoverageLoading(false));
+  }
+
+  function openCoverage(u: User) {
+    setCoverageUser(u);
+    setCoverageError('');
+    setCoverageForm({
+      covering_role: OPERATIONAL_ROLES.find((r) => r !== u.role) ?? OPERATIONAL_ROLES[0],
+      starts_at: new Date().toISOString().split('T')[0],
+      ends_at: '',
+      reason: '',
+    });
+    loadCoverages(u.id);
+  }
+
+  async function handleAddCoverage() {
+    if (!coverageUser) return;
+    setCoverageSaving(true);
+    setCoverageError('');
+    try {
+      await api.post(ENDPOINTS.ROLE_COVERAGES, {
+        user_id: coverageUser.id,
+        covering_role: coverageForm.covering_role,
+        starts_at: coverageForm.starts_at,
+        ends_at: coverageForm.ends_at || null,
+        reason: coverageForm.reason || null,
+      });
+      loadCoverages(coverageUser.id);
+      fetchUsersSilent();
+      setCoverageForm((f) => ({ ...f, ends_at: '', reason: '' }));
+    } catch (err) {
+      setCoverageError(parseApiError(err));
+    } finally {
+      setCoverageSaving(false);
+    }
+  }
+
+  async function handleEndCoverage(id: number) {
+    if (!coverageUser) return;
+    try {
+      await api.delete(ENDPOINTS.ROLE_COVERAGE(id));
+      loadCoverages(coverageUser.id);
+      fetchUsersSilent();
+    } catch (err) {
+      setCoverageError(parseApiError(err));
     }
   }
 
@@ -448,6 +518,15 @@ export default function UsuariosPage() {
                           >
                             <KeyRound size={16} />
                           </button>
+                          {canManageCoverage && (
+                            <button
+                              onClick={() => openCoverage(u)}
+                              className="text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="Cobertura temporal de rol"
+                            >
+                              <Repeat size={16} />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -455,6 +534,11 @@ export default function UsuariosPage() {
                       <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role])}>
                         {USER_ROLE_LABELS[u.role]}
                       </span>
+                      {u.covering_roles && u.covering_roles.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-200">
+                          Cubre {u.covering_roles.map((r) => (ROLE_LABELS as Record<string, string>)[r] ?? r).join(', ')}
+                        </span>
+                      )}
                       <span className="text-xs text-gray-400">
                         {formatLastActive(u.activeDiffSeconds, u.last_active_at)}
                       </span>
@@ -533,9 +617,16 @@ export default function UsuariosPage() {
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-300">{u.email}</td>
                       <td className="px-5 py-3">
-                        <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role])}>
-                          {USER_ROLE_LABELS[u.role]}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-medium', ROLE_COLORS[u.role])}>
+                            {USER_ROLE_LABELS[u.role]}
+                          </span>
+                          {u.covering_roles && u.covering_roles.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-200">
+                              Cubre {u.covering_roles.map((r) => (ROLE_LABELS as Record<string, string>)[r] ?? r).join(', ')}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-300 font-medium text-xs">
                         {formatLastActive(u.activeDiffSeconds, u.last_active_at)}
@@ -575,6 +666,15 @@ export default function UsuariosPage() {
                             >
                               <KeyRound size={16} />
                             </button>
+                            {canManageCoverage && (
+                              <button
+                                onClick={() => openCoverage(u)}
+                                className="text-gray-400 hover:text-indigo-600 transition-colors"
+                                title="Cobertura temporal de rol"
+                              >
+                                <Repeat size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -770,6 +870,136 @@ export default function UsuariosPage() {
               </p>
             </>
           ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!coverageUser}
+        onClose={() => setCoverageUser(null)}
+        title="Cobertura temporal de rol"
+        footer={
+          <button
+            onClick={() => setCoverageUser(null)}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            Cerrar
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            <strong>{coverageUser?.name}</strong> (rol propio: {coverageUser ? USER_ROLE_LABELS[coverageUser.role] : ''})
+            puede cubrir temporalmente actividades de otro rol operativo — útil para vacaciones o incapacidades.
+            Mientras esté vigente, aparecerá como sugerido para asignar actividades de ese rol.
+          </p>
+
+          {coverageError && (
+            <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+              <span>{coverageError}</span>
+            </div>
+          )}
+
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nueva cobertura</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Rol a cubrir</label>
+                <select
+                  value={coverageForm.covering_role}
+                  onChange={(e) => setCoverageForm((f) => ({ ...f, covering_role: e.target.value as Role }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {OPERATIONAL_ROLES.filter((r) => r !== coverageUser?.role).map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Desde</label>
+                  <input
+                    type="date"
+                    value={coverageForm.starts_at}
+                    onChange={(e) => setCoverageForm((f) => ({ ...f, starts_at: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hasta (opcional)</label>
+                  <input
+                    type="date"
+                    value={coverageForm.ends_at}
+                    onChange={(e) => setCoverageForm((f) => ({ ...f, ends_at: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Motivo (opcional)</label>
+              <input
+                value={coverageForm.reason}
+                onChange={(e) => setCoverageForm((f) => ({ ...f, reason: e.target.value }))}
+                placeholder="Vacaciones de Sara Mejía"
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <button
+              onClick={handleAddCoverage}
+              disabled={coverageSaving}
+              className="w-full sm:w-auto px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {coverageSaving ? 'Guardando...' : 'Agregar cobertura'}
+            </button>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Historial</p>
+            {coverageLoading ? (
+              <p className="text-sm text-gray-400">Cargando...</p>
+            ) : coverages.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">Sin coberturas registradas.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {coverages.map((c) => {
+                  // starts_at/ends_at llegan como fecha o datetime ISO según el
+                  // cast del backend — normalizar a solo la fecha (YYYY-MM-DD)
+                  // antes de comparar, si no la comparación de string falla
+                  // silenciosamente (un datetime siempre "mayor" que su propia fecha).
+                  const today = new Date().toISOString().split('T')[0];
+                  const startDate = c.starts_at.split('T')[0];
+                  const endDate = c.ends_at?.split('T')[0];
+                  const active = startDate <= today && (!endDate || endDate >= today);
+                  return (
+                    <div key={c.id} className={clsx(
+                      'flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs',
+                      active ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200 opacity-70'
+                    )}>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800">
+                          {ROLE_LABELS[c.covering_role]} {active && <span className="text-indigo-600">· vigente</span>}
+                        </p>
+                        <p className="text-gray-500">
+                          {startDate} — {endDate ?? 'indefinida'}
+                          {c.reason && ` · ${c.reason}`}
+                        </p>
+                      </div>
+                      {active && (
+                        <button
+                          onClick={() => handleEndCoverage(c.id)}
+                          className="shrink-0 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Terminar cobertura"
+                        >
+                          <XIcon size={16} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
     </div>

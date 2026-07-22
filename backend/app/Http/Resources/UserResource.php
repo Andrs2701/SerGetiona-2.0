@@ -21,6 +21,12 @@ class UserResource extends JsonResource
             'department' => $this->department,
             'photo_url' => $this->photo_url,
             'weekly_capacity_points' => $this->weekly_capacity_points,
+            // Roles operativos que cubre temporalmente hoy (vacaciones/incapacidades),
+            // ademas del propio 'role'. Se lee de la relacion precargada cuando esta
+            // disponible (listados) para evitar N+1; si no, cae a una consulta puntual.
+            'covering_roles' => $this->relationLoaded('roleCoverages')
+                ? $this->roleCoverages->pluck('covering_role')->values()->all()
+                : $this->activeCoveringRoles(),
             'created_at' => $this->created_at,
             'last_active_at' => $this->last_active_at ? \Carbon\Carbon::parse($this->last_active_at)->toIso8601String() : null,
             'active_diff_seconds' => $this->last_active_at ? \Carbon\Carbon::parse($this->last_active_at)->diffInSeconds(now()) : null,

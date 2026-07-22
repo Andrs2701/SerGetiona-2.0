@@ -78,6 +78,17 @@ class User extends Authenticatable
         return $this->hasMany(RoleActivity::class, 'responsible_id');
     }
 
+    public function roleCoverages()
+    {
+        return $this->hasMany(RoleCoverage::class);
+    }
+
+    /** Roles operativos que este usuario cubre temporalmente hoy (vacaciones/incapacidades), además del propio. */
+    public function activeCoveringRoles(): array
+    {
+        return $this->roleCoverages()->active()->pluck('covering_role')->all();
+    }
+
     public function comments()
     {
         return $this->hasMany(Comment::class);

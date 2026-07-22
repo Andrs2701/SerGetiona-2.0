@@ -52,6 +52,20 @@ export interface User {
   is_online?: boolean;
   active_diff_seconds?: number | null;
   online_threshold_seconds?: number;
+  /** Roles operativos que cubre temporalmente hoy (vacaciones/incapacidades), además de `role`. */
+  covering_roles?: string[];
+}
+
+export interface RoleCoverage {
+  id: number;
+  user_id: number;
+  covering_role: Role;
+  starts_at: string;
+  ends_at?: string | null;
+  reason?: string | null;
+  created_by: number;
+  creator?: { id: number; name: string };
+  created_at: string;
 }
 
 export interface Project {

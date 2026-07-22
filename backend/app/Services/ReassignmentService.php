@@ -17,7 +17,13 @@ final class ReassignmentService
         $points = CapacityService::pointsFor($activity);
 
         $candidates = User::where('is_active', true)
-            ->where('role', $activity->role)
+            ->where(function ($q) use ($activity) {
+                // Incluye tambien a quien cubre temporalmente este rol
+                // (vacaciones/incapacidades) ademas de a quien lo tiene
+                // como rol propio — ver RoleCoverage.
+                $q->where('role', $activity->role)
+                    ->orWhereHas('roleCoverages', fn ($q2) => $q2->where('covering_role', $activity->role)->active());
+            })
             ->where('id', '!=', $activity->responsible_id ?? 0)
             ->get();
 

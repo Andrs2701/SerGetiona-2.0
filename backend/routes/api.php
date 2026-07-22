@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\SystemConfigurationController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\RoleCoverageController;
 use App\Http\Controllers\Api\EvidenceLinkController;
 use App\Http\Controllers\Api\ProductionLogController;
 use App\Http\Controllers\Api\ResourceTypeController;
@@ -157,6 +158,13 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         ->middleware('role:admin');
     Route::post('/users/{user}/reset-link', [UserController::class, 'generateResetLink'])
         ->middleware('role:admin');
+
+    // Cobertura temporal de rol (vacaciones/incapacidades) — admin/coordinador
+    Route::middleware('role:admin,coordinator')->group(function () {
+        Route::get('/users/{user}/role-coverages', [RoleCoverageController::class, 'index']);
+        Route::post('/role-coverages', [RoleCoverageController::class, 'store']);
+        Route::delete('/role-coverages/{roleCoverage}', [RoleCoverageController::class, 'destroy']);
+    });
 
     // Reportes, importación y exportación — información gerencial
     Route::middleware('role:admin,coordinator')->group(function () {
