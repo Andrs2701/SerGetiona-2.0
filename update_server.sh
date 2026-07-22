@@ -21,18 +21,23 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Este script funciona igual invocado como "bash update_server.sh" o como
-# "sudo bash update_server.sh". Con sudo, el PATH se reduce al secure_path
-# de root, que normalmente NO incluye dónde viven composer/nvm/npm/pm2 del
-# usuario normal — eso hacía fallar "composer: command not found" aunque el
-# mismo usuario, sin sudo, lo encuentra sin problema. Se amplía el PATH acá
-# con las rutas típicas (propias y del usuario real que invocó sudo) para
-# que el script sea robusto sin importar cómo se llame.
-REAL_USER="${SUDO_USER:-$USER}"
-REAL_HOME="$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6)"
-for extra_path in /usr/local/bin /usr/bin "$REAL_HOME"/.nvm/versions/node/*/bin "$REAL_HOME/bin" "$REAL_HOME/.local/bin"; do
-    [ -d "$extra_path" ] && PATH="$PATH:$extra_path"
-done
-export PATH
+# "sudo bash update_server.sh". Con sudo, TODO el proceso (y sus hijos)
+# corre como root — eso rompe dos cosas de forma distinta:
+#   1. composer no está en el secure_path de root -> "command not found".
+#   2. pm2 es un daemon POR USUARIO: "sudo pm2" habla con el daemon de
+#      root (~/.pm2, vacío), no con el de moodle donde vive el proceso
+#      real que sirve tráfico. El script "restart" no falla ni avisa: en
+#      silencio arranca un proceso fantasma nuevo bajo root mientras el
+#      proceso real (el que la gente usa) sigue vivo, sin reiniciar, con
+#      el build de Next.js reescrito debajo de él -> errores en cascada
+#      (client reference manifest, Server Action no encontrada, etc.).
+# Por eso composer/npm/pm2 se ejecutan siempre como el usuario real
+# (AS_USER), nunca como root, sin importar cómo se invocó el script.
+if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+    AS_USER=(sudo -u "$SUDO_USER" -H)
+else
+    AS_USER=()
+fi
 
 APP_DIR="/var/www/html/sergestiona"
 BACKEND_DIR="$APP_DIR/backend"
@@ -100,7 +105,7 @@ cd "$BACKEND_DIR"
 
 # Instalar/actualizar dependencias PHP (sin dev, optimizado)
 echo -e "  Instalando dependencias Composer..."
-composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
+"${AS_USER[@]}" composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
 
 # Limpiar caché de config ANTES de migrar: si quedó una config cacheada
 # desactualizada (p.ej. una ruta de base de datos vieja), migrate la usaría
@@ -145,24 +150,28 @@ echo -e "${GREEN}Backend actualizado correctamente.${NC}\n"
 echo -e "${BLUE}[2/4] Actualizando Frontend (Next.js)...${NC}"
 cd "$FRONTEND_DIR"
 
+if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+    chown -R "$SUDO_USER" "$FRONTEND_DIR" 2>/dev/null || true
+fi
+
 # Instalar dependencias nuevas si las hay
 echo -e "  Instalando dependencias npm..."
-npm install --production=false 2>&1 | tail -3
+"${AS_USER[@]}" npm install --production=false 2>&1 | tail -3
 
 # Compilar para producción
 echo -e "  Compilando Next.js (puede tardar 1-2 minutos)..."
-npm run build
+"${AS_USER[@]}" npm run build
 echo -e "${GREEN}Frontend compilado correctamente.${NC}\n"
 
 # ─────────────────────────────────────────────
 # PASO 3: Reiniciar Frontend con PM2
 # ─────────────────────────────────────────────
 echo -e "${BLUE}[3/4] Reiniciando Frontend con PM2...${NC}"
-pm2 restart sergestiona-frontend 2>/dev/null || {
+"${AS_USER[@]}" pm2 restart sergestiona-frontend 2>/dev/null || {
     echo -e "  ${YELLOW}Proceso no encontrado, iniciando nuevo...${NC}"
-    pm2 start npm --name "sergestiona-frontend" -- start -- -p 3000
+    "${AS_USER[@]}" pm2 start npm --name "sergestiona-frontend" -- start -- -p 3000
 }
-pm2 save
+"${AS_USER[@]}" pm2 save
 echo -e "${GREEN}Frontend reiniciado.${NC}\n"
 
 # ─────────────────────────────────────────────
@@ -185,7 +194,7 @@ echo -e "  API disponible en:  http://$DOMAIN/api"
 echo -e "  Backup BD en:       $BACKUP_FILE"
 echo ""
 echo -e "  Estado PM2:"
-pm2 list 2>/dev/null | grep sergestiona || echo "  Verificar con: pm2 list"
+"${AS_USER[@]}" pm2 list 2>/dev/null | grep sergestiona || echo "  Verificar con: pm2 list"
 echo ""
 echo -e "  Estado Nginx:   $(sudo systemctl is-active nginx)"
 echo ""
