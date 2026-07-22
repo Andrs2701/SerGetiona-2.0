@@ -34,9 +34,9 @@ NC='\033[0m'
 # Por eso composer/npm/pm2 se ejecutan siempre como el usuario real
 # (AS_USER), nunca como root, sin importar cómo se invocó el script.
 if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
-    AS_USER=(sudo -u "$SUDO_USER" -H)
+    run_as_user() { sudo -u "$SUDO_USER" -i bash -c "cd $(printf %q "$PWD") && $1"; }
 else
-    AS_USER=()
+    run_as_user() { bash -c "$1"; }
 fi
 
 APP_DIR="/var/www/html/sergestiona"
@@ -105,7 +105,7 @@ cd "$BACKEND_DIR"
 
 # Instalar/actualizar dependencias PHP (sin dev, optimizado)
 echo -e "  Instalando dependencias Composer..."
-"${AS_USER[@]}" composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -3
+run_as_user "composer install --no-dev --optimize-autoloader --no-interaction" 2>&1 | tail -3
 
 # Limpiar caché de config ANTES de migrar: si quedó una config cacheada
 # desactualizada (p.ej. una ruta de base de datos vieja), migrate la usaría
@@ -156,22 +156,19 @@ fi
 
 # Instalar dependencias nuevas si las hay
 echo -e "  Instalando dependencias npm..."
-"${AS_USER[@]}" npm install --production=false 2>&1 | tail -3
+run_as_user "npm install --production=false" 2>&1 | tail -3
 
 # Compilar para producción
 echo -e "  Compilando Next.js (puede tardar 1-2 minutos)..."
-"${AS_USER[@]}" npm run build
+run_as_user "npm run build"
 echo -e "${GREEN}Frontend compilado correctamente.${NC}\n"
 
 # ─────────────────────────────────────────────
 # PASO 3: Reiniciar Frontend con PM2
 # ─────────────────────────────────────────────
 echo -e "${BLUE}[3/4] Reiniciando Frontend con PM2...${NC}"
-"${AS_USER[@]}" pm2 restart sergestiona-frontend 2>/dev/null || {
-    echo -e "  ${YELLOW}Proceso no encontrado, iniciando nuevo...${NC}"
-    "${AS_USER[@]}" pm2 start npm --name "sergestiona-frontend" -- start -- -p 3000
-}
-"${AS_USER[@]}" pm2 save
+run_as_user "pm2 restart sergestiona-frontend 2>/dev/null || pm2 start npm --name 'sergestiona-frontend' -- start -- -p 3000"
+run_as_user "pm2 save"
 echo -e "${GREEN}Frontend reiniciado.${NC}\n"
 
 # ─────────────────────────────────────────────
@@ -194,7 +191,7 @@ echo -e "  API disponible en:  http://$DOMAIN/api"
 echo -e "  Backup BD en:       $BACKUP_FILE"
 echo ""
 echo -e "  Estado PM2:"
-"${AS_USER[@]}" pm2 list 2>/dev/null | grep sergestiona || echo "  Verificar con: pm2 list"
+run_as_user "pm2 list" 2>/dev/null | grep sergestiona || echo "  Verificar con: pm2 list"
 echo ""
 echo -e "  Estado Nginx:   $(sudo systemctl is-active nginx)"
 echo ""
