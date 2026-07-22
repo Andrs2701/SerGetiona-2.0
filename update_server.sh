@@ -33,8 +33,15 @@ NC='\033[0m'
 #      (client reference manifest, Server Action no encontrada, etc.).
 # Por eso composer/npm/pm2 se ejecutan siempre como el usuario real
 # (AS_USER), nunca como root, sin importar cómo se invocó el script.
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME="$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6)"
+for extra_path in /usr/local/bin /usr/bin "$REAL_HOME"/.nvm/versions/node/*/bin "$REAL_HOME/bin" "$REAL_HOME/.local/bin" "$REAL_HOME/.config/composer/vendor/bin"; do
+    [ -d "$extra_path" ] && PATH="$PATH:$extra_path"
+done
+export PATH
+
 if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
-    run_as_user() { sudo -u "$SUDO_USER" -i bash -c "cd $(printf %q "$PWD") && $1"; }
+    run_as_user() { sudo -u "$SUDO_USER" -H env "PATH=$PATH" bash -c "cd $(printf %q "$PWD") && $1"; }
 else
     run_as_user() { bash -c "$1"; }
 fi
