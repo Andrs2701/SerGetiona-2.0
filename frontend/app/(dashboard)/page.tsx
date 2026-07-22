@@ -15,7 +15,7 @@ import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type {
   DashboardStats, ProgramBreakdown, ActivityByRoleDetail,
   HealthReport, CapacitySummary, CapacityUser, Role, RoleActivity,
-  ProductionSummary,
+  ProductionSummary, AcademicLevel,
 } from '@/lib/types';
 import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -112,8 +112,9 @@ interface DashFilters {
   year: string;
   month: string;
   type: string;
+  academicLevel: string;
 }
-const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '', type: '' };
+const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '', type: '', academicLevel: '' };
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function formatDateStr(date: string) {
@@ -854,6 +855,7 @@ interface RawGanttDeliverable {
   id: number;
   name?: string;
   type?: string;
+  academic_level_id?: number | null;
   start_date?: string | null;
   commitment_date?: string | null;
   global_status?: string;
@@ -1079,6 +1081,7 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
       if (filters.year) params.year = filters.year;
       if (filters.month) params.month = filters.month;
       if (filters.type) params.type = filters.type;
+      if (filters.academicLevel) params.academic_level_id = filters.academicLevel;
       const raw = await api.get<RawGanttDeliverable[] | { data?: RawGanttDeliverable[] }>(ENDPOINTS.DELIVERABLES + '?' + new URLSearchParams(params).toString());
       setDeliverables(Array.isArray(raw) ? raw : raw?.data ?? []);
     } catch {
@@ -1101,7 +1104,10 @@ function TabSeguimiento({ projects, filters }: { projects: Project[]; filters: D
       }>;
     }>();
 
-    deliverables.filter(item => !filters.type || item.type === filters.type).forEach((item) => {
+    deliverables.filter(item =>
+      (!filters.type || item.type === filters.type) &&
+      (!filters.academicLevel || String(item.academic_level_id ?? '') === filters.academicLevel)
+    ).forEach((item) => {
       const programId = item.subject?.academic_program?.id ?? item.program_id ?? item.program_name ?? 'sin-programa';
       const programKey = String(programId);
       const programName = item.subject?.academic_program?.name ?? item.program_name ?? 'Sin programa';
@@ -2186,12 +2192,13 @@ function ResponsiveDonut({ data, total }: { data: { key: string; label: string; 
 const SELECT_CLS = 'text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 max-w-[160px]';
 
 function FilterBar({
-  filters, onChange, programs, users, activeCount, hideType,
+  filters, onChange, programs, users, academicLevels, activeCount, hideType,
 }: {
   filters: DashFilters;
   onChange: (partial: Partial<DashFilters>) => void;
   programs: { id: number; name: string }[];
   users: { id: number; name: string; role: string }[];
+  academicLevels: AcademicLevel[];
   activeCount: number;
   hideType?: boolean;
 }) {
@@ -2246,6 +2253,12 @@ function FilterBar({
           </select>
         )}
 
+        {/* Nivel académico */}
+        <select value={filters.academicLevel} onChange={e => onChange({ academicLevel: e.target.value })} className={SELECT_CLS}>
+          <option value="">Todos los niveles</option>
+          {academicLevels.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
+        </select>
+
         {activeCount > 0 && (
           <button
             onClick={() => onChange(EMPTY_FILTERS)}
@@ -2276,6 +2289,7 @@ function DashboardAdmin() {
   const [capacity, setCapacity] = useState<{ summary: CapacitySummary; users: CapacityUser[] } | null>(null);
   const [workload, setWorkload] = useState<WorkloadUser[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filters, setFilters]   = useState<DashFilters>(EMPTY_FILTERS);
 
@@ -2291,6 +2305,7 @@ function DashboardAdmin() {
       if (filters.year) params['year'] = filters.year;
       if (filters.month) params['month'] = filters.month;
       if (filters.type) params['type'] = filters.type;
+      if (filters.academicLevel) params['academic_level_id'] = filters.academicLevel;
 
       if (f === 'active_projects') {
         endpoint = '/projects';
@@ -2388,13 +2403,15 @@ function DashboardAdmin() {
       api.get<{ summary: CapacitySummary; users: CapacityUser[] }>('/capacity').catch(() => null),
       api.get<WorkloadUser[]>('/reports/workload').catch(() => []),
       api.get<Project[] | { data: Project[] }>('/projects?per_page=50').catch(() => []),
-    ]).then(([s, h, c, w, p]) => {
+      api.get<{ levels: AcademicLevel[] }>(ENDPOINTS.ACADEMIC_LEVELS).catch(() => null),
+    ]).then(([s, h, c, w, p, al]) => {
       setStats(s);
       setHealth(h);
       setCapacity(c);
       setWorkload(Array.isArray(w) ? w : []);
       const projs = Array.isArray(p) ? p : (p as { data: Project[] })?.data ?? [];
       setProjects(projs);
+      setAcademicLevels(al?.levels ?? []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -2443,6 +2460,7 @@ function DashboardAdmin() {
             onChange={partial => setFilters(prev => ({ ...prev, ...partial }))}
             programs={filterPrograms}
             users={filterUsers}
+            academicLevels={academicLevels}
             activeCount={activeFilterCount}
             hideType={activeTab === 'produccion'}
           />

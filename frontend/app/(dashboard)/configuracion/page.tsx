@@ -7,16 +7,18 @@ import PermissionsMatrixConfig from '@/components/PermissionsMatrixConfig';
 import SystemRolesConfig from '@/components/SystemRolesConfig';
 import SystemStatusesConfig from '@/components/SystemStatusesConfig';
 import ComplexityLevelsConfig from '@/components/ComplexityLevelsConfig';
+import AcademicLevelsConfig from '@/components/AcademicLevelsConfig';
 import SystemParametersConfig from '@/components/SystemParametersConfig';
 import ResourceTypesConfig from '@/components/ResourceTypesConfig';
 
-type Tab = 'permissions' | 'roles' | 'statuses' | 'complexity' | 'parameters' | 'resource_types';
+type Tab = 'permissions' | 'roles' | 'statuses' | 'complexity' | 'academic_level' | 'parameters' | 'resource_types';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'permissions', label: 'Matriz de Permisos' },
   { key: 'roles', label: 'Roles' },
   { key: 'statuses', label: 'Estados' },
   { key: 'complexity', label: 'Complejidad' },
+  { key: 'academic_level', label: 'Nivel académico' },
   { key: 'parameters', label: 'Parámetros' },
   { key: 'resource_types', label: 'Tipos de Recurso' },
 ];
@@ -54,6 +56,7 @@ export default function ConfiguracionPage() {
       {activeTab === 'roles' && <SystemRolesConfig />}
       {activeTab === 'statuses' && <SystemStatusesConfig />}
       {activeTab === 'complexity' && <ComplexityLevelsConfig />}
+      {activeTab === 'academic_level' && <AcademicLevelsConfig />}
       {activeTab === 'parameters' && <SystemParametersConfig />}
       {activeTab === 'resource_types' && <ResourceTypesConfig />}
     </div>

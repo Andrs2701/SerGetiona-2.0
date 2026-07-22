@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ChannelController;
 use App\Http\Controllers\Api\ChannelMessageController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\ComplexityLevelController;
+use App\Http\Controllers\Api\AcademicLevelController;
 use App\Http\Controllers\Api\DecisionRecordController;
 use App\Http\Controllers\Api\DeliverableController;
 use App\Http\Controllers\Api\ExportController;
@@ -110,10 +111,16 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
 
     // Niveles de complejidad — lectura abierta (formularios), gestión solo admin
     Route::get('complexity-levels', [ComplexityLevelController::class, 'index']);
+    // Niveles académicos (Pregrado/Posgrado/...) — lectura abierta, gestión solo admin
+    Route::get('academic-levels', [AcademicLevelController::class, 'index']);
     Route::middleware('role:admin')->group(function () {
         Route::post('complexity-levels', [ComplexityLevelController::class, 'store']);
         Route::put('complexity-levels/{level}', [ComplexityLevelController::class, 'update']);
         Route::delete('complexity-levels/{level}', [ComplexityLevelController::class, 'destroy']);
+
+        Route::post('academic-levels', [AcademicLevelController::class, 'store']);
+        Route::put('academic-levels/{level}', [AcademicLevelController::class, 'update']);
+        Route::delete('academic-levels/{level}', [AcademicLevelController::class, 'destroy']);
 
         // Parámetros del sistema (salud, capacidad)
         Route::get('settings', [SystemSettingController::class, 'index']);

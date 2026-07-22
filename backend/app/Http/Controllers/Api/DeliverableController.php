@@ -30,6 +30,7 @@ class DeliverableController extends Controller
             'subject.academicProgram.project',
             'roleActivities.responsible',
             'complexityLevel',
+            'academicLevel',
         ]);
 
         if (in_array($user->role, self::OPERATIONAL_ROLES)) {
@@ -59,6 +60,9 @@ class DeliverableController extends Controller
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
+        if ($request->filled('academic_level_id')) {
+            $query->where('academic_level_id', $request->academic_level_id);
+        }
 
         return response()->json($query->get()->map(fn($d) => $this->formatRow($d)));
     }
@@ -79,6 +83,7 @@ class DeliverableController extends Controller
             'notes'                         => 'nullable|string',
             'semestre'                      => 'nullable|in:I,II,III,IV,V,VI,VII,VIII,IX,X,NA',
             'ciclo'                         => 'nullable|in:0,1,2,3,4,NA',
+            'academic_level_id'             => 'nullable|exists:academic_levels,id',
             'activities'                    => 'nullable|array',
             'activities.*.role'             => 'required|in:expert,pedagogy,design,audiovisual,engineering,qa',
             'activities.*.responsible_id'   => 'nullable|exists:users,id',
@@ -115,6 +120,7 @@ class DeliverableController extends Controller
             'notes'         => $data['notes'] ?? null,
             'semestre'      => $data['semestre'] ?? null,
             'ciclo'         => $data['ciclo'] ?? null,
+            'academic_level_id' => $data['academic_level_id'] ?? null,
             'created_by'    => $userId,
         ]);
 
@@ -169,6 +175,7 @@ class DeliverableController extends Controller
             'program_name'                  => 'nullable|string|max:255',
             'subject_name'                  => 'nullable|string|max:255',
             'complexity_level_id'           => 'nullable|exists:complexity_levels,id',
+            'academic_level_id'             => 'nullable|exists:academic_levels,id',
             'activities'                    => 'nullable|array',
             'activities.*.role'             => 'required|in:expert,pedagogy,design,audiovisual,engineering,qa',
             'activities.*.responsible_id'   => 'nullable|integer',
@@ -205,7 +212,7 @@ class DeliverableController extends Controller
 
         // ── Update deliverable fields ─────────────────────────────────────────
         $fields = [];
-        foreach (['name', 'type', 'priority', 'global_status', 'start_date', 'notes', 'complexity_level_id', 'semestre', 'ciclo'] as $f) {
+        foreach (['name', 'type', 'priority', 'global_status', 'start_date', 'notes', 'complexity_level_id', 'academic_level_id', 'semestre', 'ciclo'] as $f) {
             if (array_key_exists($f, $data)) $fields[$f] = $data[$f];
         }
         if (!empty($fields)) $deliverable->update($fields);
@@ -533,6 +540,10 @@ class DeliverableController extends Controller
             'complexity_level_id'   => $d->complexity_level_id,
             'complexity'            => $d->complexityLevel ? [
                 'id' => $d->complexityLevel->id, 'name' => $d->complexityLevel->name, 'points' => $d->complexityLevel->points,
+            ] : null,
+            'academic_level_id'     => $d->academic_level_id,
+            'academic_level'        => $d->academicLevel ? [
+                'id' => $d->academicLevel->id, 'name' => $d->academicLevel->name,
             ] : null,
             'role_activities' => $activities->map(fn($a) => [
                 'id'                   => $a->id,

@@ -210,6 +210,7 @@ export const ENDPOINTS = {
   // Resource types & production
   RESOURCE_TYPES: '/resource-types',
   COMPLEXITY_LEVELS: '/complexity-levels',
+  ACADEMIC_LEVELS: '/academic-levels',
   ACTIVITY_PRODUCTION: (id: number) => `/activities/${id}/production`,
   PRODUCTION_SUMMARY: '/reports/production',
   EXPORT_PRODUCTION: '/export/production',

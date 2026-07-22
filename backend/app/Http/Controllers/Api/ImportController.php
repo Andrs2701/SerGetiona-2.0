@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicLevel;
 use App\Models\AcademicProgram;
 use App\Models\Deliverable;
 use App\Models\Project;
@@ -84,7 +85,8 @@ class ImportController extends Controller
 
     /**
      * Maps tipo_contenido → Deliverable::type enum (creation | update).
-     * `tipo` column stores the academic level (pregrado, posgrado…) in record_type.
+     * `tipo` column stores the academic level (pregrado, posgrado…) in record_type,
+     * and — when it matches a catalog entry — also resolves academic_level_id.
      */
     private const TIPO_CONTENIDO_MAP = [
         'creacion'      => 'creation',
@@ -136,7 +138,7 @@ class ImportController extends Controller
 
         // ── Row 2: allowed values reference ─────────────────────────
         $notes = [
-            'Tipo'           => 'Pregrado | Posgrado | Diplomado | Tarea | Curso | Otro',
+            'Tipo'           => 'Pregrado | Posgrado | Continuada | Curso | Externo',
             'Semestre'       => 'I | II | III | IV | NA',
             'Ciclo'          => '0 | 1 | 2 | 3 | 4 | NA',
             'Tipo Contenido' => 'Creacion | Actualizacion | Tarea | Otro',
@@ -281,6 +283,11 @@ class ImportController extends Controller
             ->mapWithKeys(fn ($id, $email) => [mb_strtolower($email) => $id])
             ->all();
 
+        // Pre-cache academic levels by normalized name (sin tildes, minúsculas) para la columna 'Tipo'
+        $academicLevelsByName = AcademicLevel::active()->pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [$this->removeDiacritics($name) => $id])
+            ->all();
+
         $valid   = 0;
         $invalid = 0;
         $errors  = [];
@@ -309,7 +316,7 @@ class ImportController extends Controller
                 }
 
                 if (!$validateOnly) {
-                    $this->persistRow($row, $projectId, $userId, $usersByEmail);
+                    $this->persistRow($row, $projectId, $userId, $usersByEmail, $academicLevelsByName);
                 }
             }
 
@@ -593,7 +600,7 @@ class ImportController extends Controller
     }
 
     /** Persist a validated row inside an existing DB transaction. */
-    private function persistRow(array $row, int $projectId, int $userId, array $usersByEmail): void
+    private function persistRow(array $row, int $projectId, int $userId, array $usersByEmail, array $academicLevelsByName = []): void
     {
         $program = AcademicProgram::firstOrCreate(
             ['name' => $row['programa'], 'project_id' => $projectId],
@@ -608,18 +615,22 @@ class ImportController extends Controller
         $tipoContenidoKey = mb_strtolower(trim($row['tipo_contenido'] ?? ''));
         $mappedType       = self::TIPO_CONTENIDO_MAP[$this->removeDiacritics($tipoContenidoKey)] ?? 'creation';
         $recordType       = !empty($row['tipo']) ? trim($row['tipo']) : null;
+        $academicLevelId  = $recordType !== null
+            ? ($academicLevelsByName[$this->removeDiacritics($recordType)] ?? null)
+            : null;
 
         $deliverable = Deliverable::firstOrCreate(
             ['subject_id' => $subject->id, 'name' => $row['semana_modulo']],
             [
-                'type'          => $mappedType,
-                'record_type'   => $recordType,
-                'content_type'  => $row['tipo_contenido'] ?: null,
-                'global_status' => 'unpublished',
-                'semestre'      => $row['semestre'] ?: null,
-                'ciclo'         => $row['ciclo'] ?: null,
-                'start_date'    => !empty($row['fecha_inicio']) ? $this->parseDate($row['fecha_inicio']) : null,
-                'created_by'    => $userId,
+                'type'              => $mappedType,
+                'record_type'       => $recordType,
+                'academic_level_id' => $academicLevelId,
+                'content_type'      => $row['tipo_contenido'] ?: null,
+                'global_status'     => 'unpublished',
+                'semestre'          => $row['semestre'] ?: null,
+                'ciclo'             => $row['ciclo'] ?: null,
+                'start_date'        => !empty($row['fecha_inicio']) ? $this->parseDate($row['fecha_inicio']) : null,
+                'created_by'        => $userId,
             ]
         );
 

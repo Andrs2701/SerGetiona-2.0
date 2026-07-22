@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
-import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus, DeliverableType } from '@/lib/types';
+import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus, DeliverableType, AcademicLevel } from '@/lib/types';
 import {
   GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
 } from '@/lib/types';
@@ -295,6 +295,9 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
             {d.priority === 'alta' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-red-100 text-red-600">Prioridad alta</span>
             )}
+            {d.academic_level && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-slate-100 text-slate-600">{d.academic_level.name}</span>
+            )}
             {overdue && !isFinished && (
               <span className="flex items-center gap-0.5 text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">
                 <AlertCircle size={8} /> Vencida
@@ -499,14 +502,14 @@ interface ActivityForm { role: Role; responsible_id: string; commitment_date: st
 interface DeliverableFormData {
   project_id: string; program_name: string; subject_name: string;
   name: string; type: DeliverableType; priority: 'alta' | 'media' | 'baja'; start_date: string;
-  semestre: string; ciclo: string;
+  semestre: string; ciclo: string; academic_level_id: string;
   activities: ActivityForm[];
 }
 
 const EMPTY_FORM: DeliverableFormData = {
   project_id: '', program_name: '', subject_name: '',
   name: '', type: 'creation', priority: 'media', start_date: '',
-  semestre: '', ciclo: '',
+  semestre: '', ciclo: '', academic_level_id: '',
   activities: ROLES.map(r => ({ role: r, responsible_id: '', commitment_date: '' })),
 };
 
@@ -530,6 +533,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         start_date: deliverable.start_date ?? '',
         semestre: deliverable.semestre ?? '',
         ciclo: deliverable.ciclo ?? '',
+        academic_level_id: deliverable.academic_level_id ? String(deliverable.academic_level_id) : '',
         activities: ROLES.map(r => {
           const act = (deliverable.role_activities ?? []).find(a => a.role === r);
           return { role: r, responsible_id: act?.responsible ? String(act.responsible.id) : '', commitment_date: act?.commitment_date ?? '' };
@@ -549,6 +553,13 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
   const [creatingNewProject, setCreatingNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [showAllRoles, setShowAllRoles] = useState(false);
+  const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([]);
+
+  useEffect(() => {
+    api.get<{ levels: AcademicLevel[] }>(ENDPOINTS.ACADEMIC_LEVELS)
+      .then(res => setAcademicLevels(res.levels ?? []))
+      .catch(() => setAcademicLevels([]));
+  }, []);
   const [responsibleQuery, setResponsibleQuery] = useState<Record<Role, string>>(() => {
     const initial = {} as Record<Role, string>;
     for (const act of form.activities) {
@@ -600,6 +611,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
         subject_name: form.subject_name.trim() || null,
         semestre: form.semestre || null,
         ciclo: form.ciclo || null,
+        academic_level_id: form.academic_level_id ? Number(form.academic_level_id) : null,
         activities: form.activities.filter(a => a.responsible_id || a.commitment_date).map(a => ({
           role: a.role,
           responsible_id: a.responsible_id ? Number(a.responsible_id) : null,
@@ -732,7 +744,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Semestre</label>
                 <select value={form.semestre} onChange={e => setForm(p => ({ ...p, semestre: e.target.value }))}
@@ -762,6 +774,14 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                   <option value="3">3</option>
                   <option value="4">4</option>
                   <option value="NA">NA</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Nivel académico</label>
+                <select value={form.academic_level_id} onChange={e => setForm(p => ({ ...p, academic_level_id: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="">Sin clasificar</option>
+                  {academicLevels.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
                 </select>
               </div>
             </div>
@@ -1391,6 +1411,14 @@ export default function EntregablesPage() {
   const [filterResponsible, setFilterResponsible] = useState('');
   const [filterSemestre, setFilterSemestre]     = useState('');
   const [filterCiclo, setFilterCiclo]           = useState('');
+  const [filterAcademicLevel, setFilterAcademicLevel] = useState('');
+  const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([]);
+
+  useEffect(() => {
+    api.get<{ levels: AcademicLevel[] }>(ENDPOINTS.ACADEMIC_LEVELS)
+      .then(res => setAcademicLevels(res.levels ?? []))
+      .catch(() => setAcademicLevels([]));
+  }, []);
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [panel, setPanel]     = useState<PanelState | null>(null);
@@ -1488,11 +1516,12 @@ export default function EntregablesPage() {
     if (filterResponsible && !(d.role_activities ?? []).some(a => a.responsible?.name === filterResponsible)) return false;
     if (filterSemestre && d.semestre !== filterSemestre) return false;
     if (filterCiclo && d.ciclo !== filterCiclo) return false;
+    if (filterAcademicLevel && String(d.academic_level_id ?? '') !== filterAcademicLevel) return false;
     if (onlyOverdue && !isOverdue(d)) return false;
     // Hide completed unless the user explicitly filtered for them or toggled showCompleted
     if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, onlyOverdue, showCompleted]);
+  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, onlyOverdue, showCompleted]);
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
@@ -1612,6 +1641,12 @@ export default function EntregablesPage() {
               <option value="3">Ciclo 3</option>
               <option value="4">Ciclo 4</option>
               <option value="NA">Ciclo NA</option>
+            </select>
+
+            <select value={filterAcademicLevel} onChange={e => setFilterAcademicLevel(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
+              <option value="">Nivel (Todos)</option>
+              {academicLevels.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
             </select>
           </>
         )}
@@ -1804,6 +1839,11 @@ export default function EntregablesPage() {
                                       {d.semestre && `Sem ${d.semestre}`}
                                       {d.semestre && d.ciclo && ' · '}
                                       {d.ciclo && `Ciclo ${d.ciclo}`}
+                                    </span>
+                                  )}
+                                  {d.academic_level && (
+                                    <span className="text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded whitespace-nowrap">
+                                      {d.academic_level.name}
                                     </span>
                                   )}
                                 </div>

@@ -133,6 +133,8 @@ export interface Deliverable {
   compliance_percentage?: number;
   complexity_level_id?: number | null;
   complexity?: { id: number; name: string; points: number } | null;
+  academic_level_id?: number | null;
+  academic_level?: { id: number; name: string } | null;
 }
 
 export interface Comment {
@@ -389,6 +391,13 @@ export interface ComplexityLevel {
   id: number;
   name: string;
   points: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface AcademicLevel {
+  id: number;
+  name: string;
   is_active: boolean;
   sort_order: number;
 }

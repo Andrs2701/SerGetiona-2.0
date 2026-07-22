@@ -25,6 +25,7 @@ class Deliverable extends Model
         'requirement',
         'observation',
         'complexity_level_id',
+        'academic_level_id',
         'created_by',
     ];
 
@@ -55,6 +56,11 @@ class Deliverable extends Model
     public function complexityLevel()
     {
         return $this->belongsTo(ComplexityLevel::class);
+    }
+
+    public function academicLevel()
+    {
+        return $this->belongsTo(AcademicLevel::class);
     }
 
     public function scopeByStatus($query, $status)
