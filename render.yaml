@@ -68,3 +68,10 @@ services:
       # Ejemplo: https://sergestiona-backend.onrender.com/api
       - key: NEXT_PUBLIC_API_URL
         value: https://sergestiona-backend.onrender.com/api
+
+  # ── Sitio de cumpleaños para Noia (estático, independiente) ────────
+  - type: web
+    name: noia-cumple
+    runtime: static
+    staticPublishPath: ./noia-cumple
+    buildCommand: echo "sitio estatico, sin build"
