@@ -59,9 +59,17 @@ class ImportController extends Controller
         'correo_responsable_calidad',
     ];
 
-    /** Columns that MUST have a value in every data row. */
+    /**
+     * Columns that MUST have a value in every data row.
+     * `fecha_entrega_experto` is NOT required: no bulk-import column exists to
+     * assign an Experto responsable, so that activity is always created
+     * without responsible_id, and RoleActivityObserver::creating() already
+     * marks any role_activity without a responsable as 'not_applicable' —
+     * whether or not a commitment_date was supplied. Requiring the date here
+     * would only block rows where the Experto phase genuinely doesn't apply.
+     */
     private const REQUIRED_COLS = [
-        'programa', 'asignatura', 'semana_modulo', 'tipo_contenido', 'fecha_entrega_experto',
+        'programa', 'asignatura', 'semana_modulo', 'tipo_contenido',
     ];
 
     /** Map column key → role key (for responsible e-mail look-ups). */
