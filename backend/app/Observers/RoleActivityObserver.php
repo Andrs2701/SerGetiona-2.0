@@ -59,9 +59,11 @@ class RoleActivityObserver
             if ($activity->status === 'not_applicable') {
                 $activity->status = 'not_started';
             }
-            if (is_null($activity->assigned_at)) {
-                $activity->assigned_at = now();
-            }
+            // Se actualiza en CADA reasignación, no solo la primera vez: el
+            // timeline muestra "Asignada a {responsable actual}" junto a esta
+            // fecha, así que debe reflejar cuándo quedó asignado el responsable
+            // de hoy, no el de la primera persona que tuvo el rol.
+            $activity->assigned_at = now();
         }
     }
 

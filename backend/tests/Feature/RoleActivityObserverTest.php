@@ -60,4 +60,32 @@ class RoleActivityObserverTest extends TestCase
 
         $this->assertSame('not_started', $activity->fresh()->status);
     }
+
+    public function test_assigned_at_is_set_on_creation_and_refreshed_on_every_reassignment(): void
+    {
+        $subject     = Subject::factory()->create();
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $userA       = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+        $userB       = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+
+        $activity = RoleActivity::create([
+            'deliverable_id'  => $deliverable->id,
+            'role'            => 'pedagogy',
+            'responsible_id'  => $userA->id,
+            'checklist'       => RoleActivity::defaultChecklist('pedagogy'),
+        ]);
+
+        $firstAssignedAt = $activity->fresh()->assigned_at;
+        $this->assertNotNull($firstAssignedAt);
+
+        // El timeline muestra "Asignada a {responsable actual}" junto a esta
+        // fecha, así que al reasignar debe reflejar la fecha de la persona
+        // que quedó, no la de quien tuvo el rol primero.
+        $this->travel(1)->hours();
+        $activity->update(['responsible_id' => $userB->id]);
+
+        $secondAssignedAt = $activity->fresh()->assigned_at;
+        $this->assertNotNull($secondAssignedAt);
+        $this->assertTrue($secondAssignedAt->gt($firstAssignedAt));
+    }
 }
