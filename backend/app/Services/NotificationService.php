@@ -108,7 +108,7 @@ class NotificationService
             $user = User::find($user);
         }
 
-        if (!$user) {
+        if (!$user || !$user->is_active) {
             return;
         }
 

@@ -681,11 +681,25 @@ class ImportController extends Controller
                 ]
             );
 
+            $justAssigned = false;
             if (!$activity->wasRecentlyCreated) {
                 $updates = [];
                 if ($commitmentDate !== null && $activity->commitment_date === null) $updates['commitment_date'] = $commitmentDate;
-                if ($responsibleId !== null && $activity->responsible_id === null)   $updates['responsible_id']  = $responsibleId;
+                if ($responsibleId !== null && $activity->responsible_id === null) {
+                    $updates['responsible_id'] = $responsibleId;
+                    $justAssigned = true;
+                }
                 if (!empty($updates)) $activity->update($updates);
+            }
+
+            // Notificar al responsable, igual que en la creación manual desde
+            // el formulario (DeliverableController::store()) — antes la carga
+            // masiva no avisaba a nadie de sus asignaciones nuevas.
+            if ($responsibleId && ($activity->wasRecentlyCreated || $justAssigned)) {
+                $responsibleUser = User::find($responsibleId);
+                if ($responsibleUser) {
+                    \App\Services\NotificationService::notifyTaskAssigned($activity, $responsibleUser);
+                }
             }
         }
 

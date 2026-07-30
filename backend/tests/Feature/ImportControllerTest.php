@@ -118,4 +118,60 @@ class ImportControllerTest extends TestCase
         $deliverable = Deliverable::where('name', 'Semana 1')->first();
         $this->assertSame('Otro Proyecto Del Excel', $deliverable->subject->academicProgram->project->name);
     }
+
+    public function test_import_notifies_the_responsible_and_sets_assigned_at(): void
+    {
+        $project     = Project::factory()->create();
+        $responsible = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+
+        $csv = "programa,asignatura,semana_modulo,semestre,ciclo,tipo_contenido,fecha_entrega_pedagogia,correo_responsable_pedagogia\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,I,1,Creacion,2026-08-01,{$responsible->email}\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('imported', 1);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $responsible->id,
+            'type'    => 'task_assigned',
+        ]);
+
+        $deliverable = Deliverable::where('name', 'Semana 1')->first();
+        $pedagogyActivity = $deliverable->roleActivities()->where('role', 'pedagogy')->first();
+        $this->assertSame($responsible->id, $pedagogyActivity->responsible_id);
+        $this->assertNotNull($pedagogyActivity->assigned_at);
+    }
+
+    public function test_import_does_not_notify_an_inactive_responsible(): void
+    {
+        $project     = Project::factory()->create();
+        $responsible = User::factory()->create(['role' => 'pedagogy', 'is_active' => false]);
+
+        $csv = "programa,asignatura,semana_modulo,semestre,ciclo,tipo_contenido,fecha_entrega_pedagogia,correo_responsable_pedagogia\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,I,1,Creacion,2026-08-01,{$responsible->email}\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('imported', 1);
+
+        // El responsable sí queda asignado en la actividad (la carga no lo bloquea),
+        // pero no debe generarse ninguna notificación para un usuario inactivo.
+        $deliverable = Deliverable::where('name', 'Semana 1')->first();
+        $pedagogyActivity = $deliverable->roleActivities()->where('role', 'pedagogy')->first();
+        $this->assertSame($responsible->id, $pedagogyActivity->responsible_id);
+
+        $this->assertDatabaseMissing('notifications', ['user_id' => $responsible->id]);
+    }
 }

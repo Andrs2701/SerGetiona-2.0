@@ -8,13 +8,19 @@ use App\Services\ProductionEventService;
 class RoleActivityObserver
 {
     /**
-     * Auto-asigna 'not_applicable' cuando no hay responsable al crear.
+     * Auto-asigna 'not_applicable' cuando no hay responsable al crear, o
+     * registra la fecha de asignación (assigned_at) cuando sí lo hay — ningún
+     * controlador la seteaba, así que el evento "Asignada a X" del timeline
+     * (DeliverableController::timeline(), que exige assigned_at) nunca
+     * aparecía para ninguna actividad, sin importar cómo se hubiera creado.
      */
     public function creating(RoleActivity $activity): void
     {
         if (is_null($activity->responsible_id)) {
             $activity->status               = 'not_applicable';
             $activity->actual_delivery_date = null;
+        } elseif (is_null($activity->assigned_at)) {
+            $activity->assigned_at = now();
         }
     }
 
@@ -49,8 +55,13 @@ class RoleActivityObserver
         if (is_null($activity->responsible_id)) {
             $activity->status               = 'not_applicable';
             $activity->actual_delivery_date = null;
-        } elseif ($activity->status === 'not_applicable') {
-            $activity->status = 'not_started';
+        } else {
+            if ($activity->status === 'not_applicable') {
+                $activity->status = 'not_started';
+            }
+            if (is_null($activity->assigned_at)) {
+                $activity->assigned_at = now();
+            }
         }
     }
 
