@@ -84,6 +84,20 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
+/** Icono "i" con tooltip al pasar el mouse — explica qué muestra un widget y cómo se calcula. */
+function InfoTooltip({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="group/info relative ml-auto">
+      <Info size={12} className="text-gray-300 dark:text-gray-600 hover:!text-indigo-500 cursor-help transition-colors" />
+      <div className="invisible opacity-0 group-hover/info:visible group-hover/info:opacity-100 transition-opacity absolute right-0 top-5 w-64 bg-gray-900 dark:bg-gray-700 text-white text-[11px] leading-relaxed rounded-lg p-3 shadow-2xl z-50 pointer-events-none">
+        <p className="font-semibold mb-1 text-indigo-200">{title}</p>
+        <p className="text-gray-200">{text}</p>
+        <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 
 type DashTab = 'resumen' | 'seguimiento' | 'capacidad' | 'produccion' | 'reportes';
@@ -207,7 +221,10 @@ function TabResumen({
               <div className="flex items-center gap-2 mb-4">
                 <Activity size={16} className="text-gray-400" />
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Salud de Proyectos</h3>
-                <span className="ml-auto"><HealthBadge level={health.portfolio_level} score={health.portfolio_score} size="sm" /></span>
+                <span className="ml-auto flex items-center gap-2">
+                  <HealthBadge level={health.portfolio_level} score={health.portfolio_score} size="sm" />
+                  <InfoTooltip title="Salud de Proyectos" text="Puntaje 0-100 por Escuela/Proyecto: 100 menos penalizaciones por actividades vencidas, entregables atrasados, integrantes del equipo sobrecargados y desviación de cronograma en entregas tardías. Verde ≥80, amarillo ≥60, rojo por debajo. El puntaje de portafolio es el promedio de todos los proyectos activos." />
+                </span>
               </div>
               <div className="space-y-2.5">
                 {health.projects.map(p => (
@@ -232,6 +249,7 @@ function TabResumen({
                 <Gauge size={16} className="text-gray-400" />
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Capacidad del Equipo</h3>
                 <span className="text-[10px] text-gray-400 ml-auto">Resumen rápido</span>
+                <InfoTooltip title="Capacidad del Equipo" text="Carga semanal de cada persona = suma de puntos de complejidad de sus actividades pendientes (no aprobadas/entregadas) con fecha de compromiso hasta el fin de esta semana — las vencidas siguen sumando hasta que se entreguen. Utilización % = puntos activos / capacidad semanal de la persona (pts). No es solo 'trabajo nuevo de esta semana': incluye todo lo atrasado que aún debe." />
               </div>
               <div className="flex items-center gap-4 mb-4">
                 <p className={`text-2xl font-bold ${capacity.summary.status === 'overloaded' ? 'text-red-600' : capacity.summary.status === 'high' ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -261,6 +279,7 @@ function TabResumen({
             <BarChart3 size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Distribución por Estado</h3>
             <span className="text-[10px] text-gray-400 ml-auto">Clic para filtrar</span>
+            <InfoTooltip title="Distribución por Estado" text="Cantidad de entregables activos en cada estado del flujo (no iniciado, en proceso, aprobado, con observaciones, etc.), sobre el total de entregables. Clic en una barra filtra el Gantt de Seguimiento y la pestaña de Producción por ese estado." />
           </div>
           <div className="space-y-2.5">
             {Object.entries(STATUS_INFO)
@@ -286,6 +305,7 @@ function TabResumen({
             <Users size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance por Rol</h3>
             <span className="text-[10px] text-gray-400 ml-auto">% completado</span>
+            <InfoTooltip title="Avance por Rol" text="Para cada rol del flujo (Experto, Pedagogía, Diseño, Audiovisual, Ingeniería, Calidad): % = actividades aprobadas de ese rol / total de actividades de ese rol (excluyendo las marcadas 'no aplica'). Entre paréntesis, cuántas de esas actividades están vencidas." />
           </div>
           {roleDetail.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">Sin datos</p> : (
             <div className="space-y-3">
@@ -324,7 +344,10 @@ function TabResumen({
             <GlobalRing value={Math.round(globalPct)} />
           </div>
           <div className="flex-1 space-y-3">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance global de la organización</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance global de la organización</p>
+              <InfoTooltip title="Avance global de la organización" text="% de cumplimiento = entregables finalizados / total de entregables, contando todas las Escuelas/Proyectos activos. Es el mismo dato que alimenta el anillo: clic en el anillo lleva al listado completo de entregables." />
+            </div>
             <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
               <div className="flex justify-between"><span>Total entregables</span><span className="font-semibold">{d.total_deliverables}</span></div>
               <div className="flex justify-between"><span>Finalizados</span><span className="font-semibold text-emerald-600">{d.finished_deliverables}</span></div>
@@ -337,6 +360,7 @@ function TabResumen({
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance por programa</h3>
+            <InfoTooltip title="Avance por programa" text="% de cumplimiento por Programa = entregables finalizados / total de entregables del programa. Ordenado de mayor a menor avance; el conteo de vencidas cuenta actividades con fecha de compromiso pasada aún sin aprobar/entregar." />
           </div>
           {programs.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">Sin datos</p> : (
             <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
