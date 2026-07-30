@@ -584,13 +584,13 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
 
   async function handleSave() {
     if (!form.name.trim()) { addToast('El nombre del entregable es obligatorio.', 'error'); return; }
-    if (mode === 'create' && creatingNewProject && !newProjectName.trim()) {
+    if (creatingNewProject && !newProjectName.trim()) {
       addToast('Escribe un nombre para el nuevo proyecto.', 'error'); return;
     }
     setSaving(true);
     try {
       let projectId = form.project_id;
-      if (mode === 'create' && creatingNewProject) {
+      if (creatingNewProject) {
         const newProject = await api.post<{ id: number }>(ENDPOINTS.PROJECTS, {
           name: newProjectName.trim(),
           status: 'draft',
@@ -618,7 +618,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
           commitment_date: a.commitment_date || null,
         })),
       };
-      if (mode === 'create') payload.project_id = projectId ? Number(projectId) : null;
+      payload.project_id = projectId ? Number(projectId) : null;
       if (mode === 'create') {
         await api.post<Deliverable>(ENDPOINTS.DELIVERABLES, payload);
         addToast('Entregable creado correctamente.', 'success');
@@ -656,40 +656,38 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
               <FolderOpen size={12} /> Ubicación
             </p>
-            {mode === 'create' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Escuela / Proyecto <span className="text-red-500">*</span></label>
-                {creatingNewProject ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      autoFocus
-                      value={newProjectName}
-                      onChange={e => setNewProjectName(e.target.value)}
-                      placeholder="Nombre de la nueva Escuela / Proyecto"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { setCreatingNewProject(false); setNewProjectName(''); }}
-                      className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"
-                      title="Cancelar y volver a la lista"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <select value={form.project_id} onChange={e => {
-                    if (e.target.value === '__new__') { setCreatingNewProject(true); return; }
-                    setForm(p => ({ ...p, project_id: e.target.value }));
-                  }}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
-                    <option value="">Selecciona una Escuela / Proyecto...</option>
-                    {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                    <option value="__new__">+ Crear Escuela / Proyecto nuevo</option>
-                  </select>
-                )}
-              </div>
-            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Escuela / Proyecto <span className="text-red-500">*</span></label>
+              {creatingNewProject ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={newProjectName}
+                    onChange={e => setNewProjectName(e.target.value)}
+                    placeholder="Nombre de la nueva Escuela / Proyecto"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setCreatingNewProject(false); setNewProjectName(''); }}
+                    className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"
+                    title="Cancelar y volver a la lista"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <select value={form.project_id} onChange={e => {
+                  if (e.target.value === '__new__') { setCreatingNewProject(true); return; }
+                  setForm(p => ({ ...p, project_id: e.target.value }));
+                }}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+                  <option value="">Selecciona una Escuela / Proyecto...</option>
+                  {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                  <option value="__new__">+ Crear Escuela / Proyecto nuevo</option>
+                </select>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Programa</label>
@@ -1234,7 +1232,7 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
     finally { setLoading(false); }
   }
 
-  const isReady = !!file && (projectMode === 'existing' ? !!projectId : newProjectName.trim().length > 0);
+  const isReady = !!file;
 
   return (
     <>
@@ -1284,7 +1282,10 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Escuela / Proyecto de destino <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
+                    Escuela / Proyecto de destino
+                    <span className="text-gray-400 dark:text-slate-400 font-normal"> (opcional si tu Excel ya trae la columna "Escuela / Proyecto")</span>
+                  </label>
                   <div className="flex gap-2 mb-2">
                     {(['existing', 'new'] as const).map(m => (
                       <button key={m} type="button" onClick={() => setProjectMode(m)}

@@ -27,6 +27,7 @@ class ImportController extends Controller
     // ---------------------------------------------------------------
 
     private const HEADERS = [
+        'proyecto'                      => 'Escuela / Proyecto',
         'tipo'                          => 'Tipo',
         'programa'                      => 'Programa',
         'asignatura'                    => 'Asignatura',
@@ -50,7 +51,7 @@ class ImportController extends Controller
 
     /** Canonical key names (lower snake_case) used internally. */
     private const KEYS = [
-        'tipo', 'programa', 'asignatura', 'semana_modulo', 'semestre', 'ciclo',
+        'proyecto', 'tipo', 'programa', 'asignatura', 'semana_modulo', 'semestre', 'ciclo',
         'tipo_contenido', 'fecha_inicio',
         'fecha_entrega_experto', 'fecha_entrega_pedagogia', 'fecha_entrega_diseno',
         'fecha_entrega_audiovisual', 'fecha_entrega_ingeniero', 'fecha_entrega_calidad',
@@ -134,9 +135,10 @@ class ImportController extends Controller
             'INSTRUCCIONES: Completa los datos desde la fila 4. ' .
             'Columnas en ROJO son obligatorias. ' .
             'Las fechas deben ir en formato YYYY-MM-DD (ej: 2026-08-15). ' .
-            'Los correos deben corresponder a usuarios registrados en SerGestiona.'
+            'Los correos deben corresponder a usuarios registrados en SerGestiona. ' .
+            'Si no seleccionas una Escuela/Proyecto en la pantalla de Carga Masiva, la columna "Escuela / Proyecto" es obligatoria.'
         );
-        $sheet->mergeCells('A1:S1');
+        $sheet->mergeCells('A1:T1');
         $sheet->getStyle('A1')->applyFromArray([
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFFFF3CD']],
             'font'      => ['bold' => false, 'size' => 9, 'color' => ['argb' => 'FF856404']],
@@ -153,7 +155,7 @@ class ImportController extends Controller
         ];
         $notesText = implode('   ·   ', array_map(fn($k, $v) => "$k: $v", array_keys($notes), $notes));
         $sheet->setCellValue('A2', 'VALORES PERMITIDOS:  ' . $notesText);
-        $sheet->mergeCells('A2:S2');
+        $sheet->mergeCells('A2:T2');
         $sheet->getStyle('A2')->applyFromArray([
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFD1ECF1']],
             'font'      => ['bold' => false, 'size' => 8, 'color' => ['argb' => 'FF0C5460']],
@@ -180,6 +182,7 @@ class ImportController extends Controller
 
         // ── Row 4: example data ──────────────────────────────────────
         $example = [
+            'Actualización Curricular 2026',
             'Pregrado',
             'Ingeniería de Sistemas',
             'Fundamentos de Programación',
@@ -206,7 +209,7 @@ class ImportController extends Controller
             $sheet->getCell(Coordinate::stringFromColumnIndex($col) . '4')->setValue($value);
             $col++;
         }
-        $sheet->getStyle('A4:S4')->applyFromArray([
+        $sheet->getStyle('A4:T4')->applyFromArray([
             'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => self::COLOR_EXAMPLE_BG]],
             'font'      => ['italic' => true, 'size' => 9, 'color' => ['argb' => 'FF4A6FA5']],
             'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFCDD8E8']]],
@@ -214,7 +217,7 @@ class ImportController extends Controller
         $sheet->getRowDimension(4)->setRowHeight(18);
 
         // ── Column widths ────────────────────────────────────────────
-        $widths = [18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30];
+        $widths = [22, 18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30];
         $col = 1;
         foreach ($widths as $w) {
             $sheet->getColumnDimensionByColumn($col)->setWidth($w);
@@ -249,25 +252,22 @@ class ImportController extends Controller
             'project_name' => 'nullable|string|max:255',
         ]);
 
-        if (!$request->filled('project_id') && !$request->filled('project_name')) {
-            return response()->json([
-                'imported' => 0,
-                'errors'   => [['row' => 0, 'field' => 'project_id', 'message' => 'Debes seleccionar un proyecto o ingresar el nombre de uno nuevo.']],
-            ], 422);
-        }
-
         $userId       = $request->user()->id;
         $validateOnly = (bool) $request->query('validate_only', false);
 
-        // Resolve or create the target project
+        // Resolve or create the DEFAULT project (used for rows that don't
+        // bring their own "Escuela / Proyecto" column). Nullable: if the
+        // file provides that column on every row, no default is needed.
         if ($request->filled('project_id')) {
-            $projectId = (int) $request->input('project_id');
-        } else {
-            $project   = Project::firstOrCreate(
+            $defaultProjectId = (int) $request->input('project_id');
+        } elseif ($request->filled('project_name')) {
+            $project          = Project::firstOrCreate(
                 ['name' => trim($request->input('project_name'))],
                 ['created_by' => $userId, 'status' => 'in_progress']
             );
-            $projectId = $project->id;
+            $defaultProjectId = $project->id;
+        } else {
+            $defaultProjectId = null;
         }
 
         // Parse file
@@ -309,7 +309,7 @@ class ImportController extends Controller
         try {
             foreach ($rows as $row) {
                 $rowNum++;
-                $rowErrors = $this->validateRow($row, $rowNum, $usersByEmail);
+                $rowErrors = $this->validateRow($row, $rowNum, $usersByEmail, $defaultProjectId);
 
                 if (!empty($rowErrors)) {
                     $errors  = array_merge($errors, $rowErrors);
@@ -324,7 +324,7 @@ class ImportController extends Controller
                 }
 
                 if (!$validateOnly) {
-                    $this->persistRow($row, $projectId, $userId, $usersByEmail, $academicLevelsByName);
+                    $this->persistRow($row, $defaultProjectId, $userId, $usersByEmail, $academicLevelsByName);
                 }
             }
 
@@ -352,14 +352,14 @@ class ImportController extends Controller
                 'invalid'    => $invalid,
                 'errors'     => $errors,
                 'preview'    => $preview,
-                'project_id' => $projectId,
+                'project_id' => $defaultProjectId,
             ]);
         }
 
         return response()->json([
             'imported'   => $valid,
             'errors'     => $errors,
-            'project_id' => $projectId,
+            'project_id' => $defaultProjectId,
         ]);
     }
 
@@ -506,6 +506,10 @@ class ImportController extends Controller
 
         // Map Spanish label → key
         $labelMap = [
+            'escuela / proyecto'                => 'proyecto',
+            'escuela/proyecto'                  => 'proyecto',
+            'escuela proyecto'                  => 'proyecto',
+            'proyecto'                          => 'proyecto',
             'tipo'                              => 'tipo',
             'programa'                          => 'programa',
             'asignatura'                        => 'asignatura',
@@ -579,7 +583,7 @@ class ImportController extends Controller
     }
 
     /** Validate a single row. Returns array of error objects (may be empty). */
-    private function validateRow(array $row, int $rowNum, array $usersByEmail): array
+    private function validateRow(array $row, int $rowNum, array $usersByEmail, ?int $defaultProjectId = null): array
     {
         $errors = [];
 
@@ -587,6 +591,10 @@ class ImportController extends Controller
             if (empty($row[$col] ?? '')) {
                 $errors[] = ['row' => $rowNum, 'field' => $col, 'message' => "El campo '{$col}' es obligatorio."];
             }
+        }
+
+        if (empty($row['proyecto'] ?? '') && $defaultProjectId === null) {
+            $errors[] = ['row' => $rowNum, 'field' => 'proyecto', 'message' => "El campo 'proyecto' es obligatorio (o selecciona una Escuela/Proyecto en la pantalla)."];
         }
 
         $dateCols = array_merge(['fecha_inicio'], array_values(self::COMMITMENT_COLS));
@@ -608,8 +616,15 @@ class ImportController extends Controller
     }
 
     /** Persist a validated row inside an existing DB transaction. */
-    private function persistRow(array $row, int $projectId, int $userId, array $usersByEmail, array $academicLevelsByName = []): void
+    private function persistRow(array $row, ?int $defaultProjectId, int $userId, array $usersByEmail, array $academicLevelsByName = []): void
     {
+        $projectId = !empty($row['proyecto'])
+            ? Project::firstOrCreate(
+                ['name' => trim($row['proyecto'])],
+                ['created_by' => $userId, 'status' => 'in_progress']
+            )->id
+            : $defaultProjectId;
+
         $program = AcademicProgram::firstOrCreate(
             ['name' => $row['programa'], 'project_id' => $projectId],
             ['created_by' => $userId]
@@ -681,6 +696,7 @@ class ImportController extends Controller
     private function previewRecord(array $row): array
     {
         return [
+            'proyecto'       => $row['proyecto']               ?? '',
             'programa'       => $row['programa']               ?? '',
             'asignatura'     => $row['asignatura']             ?? '',
             'semana_modulo'  => $row['semana_modulo']          ?? '',

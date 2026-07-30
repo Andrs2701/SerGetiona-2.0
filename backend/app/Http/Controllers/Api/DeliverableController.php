@@ -8,6 +8,7 @@ use App\Models\AcademicProgram;
 use App\Models\AuditLog;
 use App\Models\Deliverable;
 use App\Models\FlowTemplate;
+use App\Models\Project;
 use App\Models\RoleActivity;
 use App\Models\Subject;
 use App\Models\User;
@@ -174,6 +175,8 @@ class DeliverableController extends Controller
             'ciclo'                         => 'nullable|in:0,1,2,3,4,NA',
             'program_name'                  => 'nullable|string|max:255',
             'subject_name'                  => 'nullable|string|max:255',
+            'project_id'                    => 'nullable|exists:projects,id',
+            'project_name'                  => 'nullable|string|max:255',
             'complexity_level_id'           => 'nullable|exists:complexity_levels,id',
             'academic_level_id'             => 'nullable|exists:academic_levels,id',
             'activities'                    => 'nullable|array',
@@ -184,17 +187,26 @@ class DeliverableController extends Controller
 
         $userId = $request->user()->id;
 
-        // ── Move to different program / subject ───────────────────────────────
-        if (!empty($data['program_name']) || !empty($data['subject_name'])) {
+        // ── Move to different program / subject / Escuela-Proyecto ────────────
+        if (!empty($data['program_name']) || !empty($data['subject_name']) || !empty($data['project_id']) || !empty($data['project_name'])) {
             $currentSubject = $deliverable->subject()->with('academicProgram')->first();
             $currentProgram = $currentSubject?->academicProgram;
+
+            $targetProjectId = !empty($data['project_id'])
+                ? (int) $data['project_id']
+                : (!empty($data['project_name'])
+                    ? Project::firstOrCreate(
+                        ['name' => trim($data['project_name'])],
+                        ['created_by' => $userId, 'status' => 'in_progress']
+                    )->id
+                    : $currentProgram?->project_id);
 
             $newProgramName = $data['program_name'] ?? $currentProgram?->name;
             $newSubjectName = $data['subject_name'] ?? $currentSubject?->name;
 
-            if ($currentProgram && $newProgramName !== $currentProgram->name) {
+            if (!$currentProgram || $newProgramName !== $currentProgram->name || $targetProjectId != $currentProgram->project_id) {
                 $newProgram = AcademicProgram::firstOrCreate(
-                    ['name' => $newProgramName, 'project_id' => $currentProgram->project_id],
+                    ['name' => $newProgramName, 'project_id' => $targetProjectId],
                     ['created_by' => $userId]
                 );
             } else {
