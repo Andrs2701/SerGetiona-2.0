@@ -223,7 +223,7 @@ function TabResumen({
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Salud de Proyectos</h3>
                 <span className="ml-auto flex items-center gap-2">
                   <HealthBadge level={health.portfolio_level} score={health.portfolio_score} size="sm" />
-                  <InfoTooltip title="Salud de Proyectos" text="Puntaje 0-100 por Escuela/Proyecto: 100 menos penalizaciones por actividades vencidas, entregables atrasados, integrantes del equipo sobrecargados y desviación de cronograma en entregas tardías. Verde ≥80, amarillo ≥60, rojo por debajo. El puntaje de portafolio es el promedio de todos los proyectos activos." />
+                  <InfoTooltip title="Salud de Proyectos" text="Qué tan bien va cada Escuela/Proyecto, en una escala de 0 a 100. Empieza en 100 y baja si hay actividades vencidas, entregables atrasados, gente del equipo sobrecargada o entregas que llegaron tarde. Verde = va bien (80+), amarillo = alerta (60-79), rojo = crítico (menos de 60). El número de arriba es el promedio de todos los proyectos activos." />
                 </span>
               </div>
               <div className="space-y-2.5">
@@ -249,7 +249,7 @@ function TabResumen({
                 <Gauge size={16} className="text-gray-400" />
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Capacidad del Equipo</h3>
                 <span className="text-[10px] text-gray-400 ml-auto">Resumen rápido</span>
-                <InfoTooltip title="Capacidad del Equipo" text="Carga semanal de cada persona = suma de puntos de complejidad de sus actividades pendientes (no aprobadas/entregadas) con fecha de compromiso hasta el fin de esta semana — las vencidas siguen sumando hasta que se entreguen. Utilización % = puntos activos / capacidad semanal de la persona (pts). No es solo 'trabajo nuevo de esta semana': incluye todo lo atrasado que aún debe." />
+                <InfoTooltip title="Capacidad del Equipo" text="Cuánto trabajo tiene pendiente el equipo esta semana. Cada actividad pesa según su complejidad, y lo vencido sigue sumando hasta que se entrega — por eso no es solo 'lo nuevo de esta semana', sino todo lo que aún se debe. Utilización % = carga pendiente / capacidad semanal de cada persona." />
               </div>
               <div className="flex items-center gap-4 mb-4">
                 <p className={`text-2xl font-bold ${capacity.summary.status === 'overloaded' ? 'text-red-600' : capacity.summary.status === 'high' ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -279,7 +279,7 @@ function TabResumen({
             <BarChart3 size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Distribución por Estado</h3>
             <span className="text-[10px] text-gray-400 ml-auto">Clic para filtrar</span>
-            <InfoTooltip title="Distribución por Estado" text="Cantidad de entregables activos en cada estado del flujo (no iniciado, en proceso, aprobado, con observaciones, etc.), sobre el total de entregables. Clic en una barra filtra el Gantt de Seguimiento y la pestaña de Producción por ese estado." />
+            <InfoTooltip title="Distribución por Estado" text="Cuántos entregables hay en cada estado del flujo (no iniciado, en proceso, aprobado, con observaciones...), sobre el total. Clic en una barra para filtrar el Gantt de Seguimiento y la pestaña de Producción por ese estado." />
           </div>
           <div className="space-y-2.5">
             {Object.entries(STATUS_INFO)
@@ -305,7 +305,7 @@ function TabResumen({
             <Users size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance por Rol</h3>
             <span className="text-[10px] text-gray-400 ml-auto">% completado</span>
-            <InfoTooltip title="Avance por Rol" text="Para cada rol del flujo (Experto, Pedagogía, Diseño, Audiovisual, Ingeniería, Calidad): % = actividades aprobadas de ese rol / total de actividades de ese rol (excluyendo las marcadas 'no aplica'). Entre paréntesis, cuántas de esas actividades están vencidas." />
+            <InfoTooltip title="Avance por Rol" text="Para cada rol del flujo (Experto, Pedagogía, Diseño, Audiovisual, Ingeniería, Calidad): qué % de sus actividades ya están aprobadas (sin contar las marcadas 'no aplica'). Entre paréntesis, cuántas de esas actividades están vencidas." />
           </div>
           {roleDetail.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">Sin datos</p> : (
             <div className="space-y-3">
@@ -346,7 +346,7 @@ function TabResumen({
           <div className="flex-1 space-y-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance global de la organización</p>
-              <InfoTooltip title="Avance global de la organización" text="% de cumplimiento = entregables finalizados / total de entregables, contando todas las Escuelas/Proyectos activos. Es el mismo dato que alimenta el anillo: clic en el anillo lleva al listado completo de entregables." />
+              <InfoTooltip title="Avance global de la organización" text="Qué % de todos los entregables, de todas las Escuelas/Proyectos activos, ya están finalizados. Es el mismo dato que muestra el anillo; clic en el anillo lleva al listado completo de entregables." />
             </div>
             <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
               <div className="flex justify-between"><span>Total entregables</span><span className="font-semibold">{d.total_deliverables}</span></div>
@@ -360,7 +360,7 @@ function TabResumen({
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Avance por programa</h3>
-            <InfoTooltip title="Avance por programa" text="% de cumplimiento por Programa = entregables finalizados / total de entregables del programa. Ordenado de mayor a menor avance; el conteo de vencidas cuenta actividades con fecha de compromiso pasada aún sin aprobar/entregar." />
+            <InfoTooltip title="Avance por programa" text="Qué % de los entregables de cada Programa ya están finalizados, de mayor a menor. 'Vencidas' cuenta actividades cuya fecha de compromiso ya pasó sin aprobarse ni entregarse." />
           </div>
           {programs.length === 0 ? <p className="text-sm text-gray-400 text-center py-6">Sin datos</p> : (
             <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
@@ -1561,7 +1561,7 @@ function TabCapacidad({
           <Gauge size={16} className="text-gray-400" />
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Utilización Global del Equipo</h3>
           <button onClick={() => router.push('/capacidad')} className="ml-auto text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Módulo completo →</button>
-          <InfoTooltip title="Utilización Global del Equipo" text="Ocupación utilizada = suma de puntos de complejidad de actividades pendientes de todo el equipo con fecha de compromiso hasta fin de esta semana (las vencidas siguen sumando). Ocupación total = capacidad semanal sumada de todos los usuarios activos. Utilización % = utilizada / total; sobrecargado(s) son quienes superan el umbral configurado." />
+          <InfoTooltip title="Utilización Global del Equipo" text="Lo mismo que 'Capacidad del Equipo' del Resumen, con más detalle: ocupación utilizada = carga pendiente de todo el equipo esta semana (incluye lo vencido); ocupación total = capacidad semanal sumada de todos los usuarios activos. Sobrecargado = quien supera el umbral configurado." />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
@@ -1644,7 +1644,7 @@ function TabCapacidad({
               </button>
             ))}
           </div>
-          <InfoTooltip title="Distribución de Carga" text="Los mismos puntos de capacidad semanal agrupados por usuario, rol o Escuela/Proyecto según el selector. 'Carga' cuenta actividades pendientes asignadas; 'Vencidas' y 'Completadas' se muestran aparte, no se suman a la utilización." />
+          <InfoTooltip title="Distribución de Carga" text="La misma carga semanal del equipo, agrupada por usuario, rol o Escuela/Proyecto según el botón que elijas arriba. 'Vencidas' y 'Completadas' son solo informativas — no afectan el % de utilización." />
         </div>
 
         {groupBy === 'user' && <DistribucionPorUsuario users={users} workload={workload} />}
@@ -1876,7 +1876,7 @@ function TabProduccion({
           <div className="flex items-center gap-2 mb-4">
             <Package size={16} className="text-indigo-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Tipo de Recurso</h3>
-            <InfoTooltip title="Producción por Tipo de Recurso" text="Suma de la cantidad registrada en la bitácora de Producción (no del estado del flujo), agrupada por tipo de recurso (ej. video, guía, evaluación) y el rol que lo produce. Respeta los filtros de Escuela/Proyecto y Rol de esta pestaña." />
+            <InfoTooltip title="Producción por Tipo de Recurso" text="Cuántos recursos se han registrado en la bitácora de Producción (Producción > Registrar) — no el estado de las actividades — agrupados por tipo (video, guía, evaluación...) y el rol que los produjo. Respeta los filtros de arriba." />
           </div>
           <div className="space-y-2.5">
             {(data.by_type ?? []).map(t => (
@@ -1899,7 +1899,7 @@ function TabProduccion({
           <div className="flex items-center gap-2 mb-4">
             <Users size={16} className="text-blue-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Rol</h3>
-            <InfoTooltip title="Producción por Rol" text="Registros y cantidad total producida en la bitácora de Producción, agrupados por rol del flujo (Experto, Pedagogía, Diseño, Audiovisual, Ingeniería, Calidad)." />
+            <InfoTooltip title="Producción por Rol" text="Cuántos recursos ha registrado cada rol del flujo (Experto, Pedagogía, Diseño, Audiovisual, Ingeniería, Calidad) en la bitácora de Producción." />
           </div>
           <div className="space-y-2.5">
             {(data.by_role ?? []).map(r => {
@@ -1928,7 +1928,7 @@ function TabProduccion({
           <div className="flex items-center gap-2 mb-4">
             <Users size={16} className="text-emerald-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Responsable</h3>
-            <InfoTooltip title="Producción por Responsable" text="Top 10 usuarios por cantidad total producida en la bitácora de Producción (suma de 'quantity' de sus registros), sin importar cuántas actividades tengan pendientes." />
+            <InfoTooltip title="Producción por Responsable" text="Los 10 usuarios que más recursos han registrado en la bitácora de Producción, de mayor a menor — sin importar cuántas actividades tengan pendientes." />
           </div>
           <div className="space-y-2">
             {(data.by_user ?? []).slice(0, 10).map((u, i) => (
@@ -1955,7 +1955,7 @@ function TabProduccion({
           <div className="flex items-center gap-2 mb-4">
             <FolderKanban size={16} className="text-amber-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Proyecto</h3>
-            <InfoTooltip title="Producción por Proyecto" text="Cantidad total producida en la bitácora de Producción, agrupada por Escuela/Proyecto y ordenada de mayor a menor." />
+            <InfoTooltip title="Producción por Proyecto" text="Cuántos recursos se han registrado en la bitácora de Producción, agrupados por Escuela/Proyecto y ordenados de mayor a menor." />
           </div>
           <div className="space-y-2">
             {(data.by_project ?? []).map((p, i) => {
@@ -1983,7 +1983,7 @@ function TabProduccion({
         <div className="flex items-center gap-2 mb-4">
           <Gauge size={16} className="text-violet-400" />
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Producción por Nivel de Complejidad</h3>
-          <InfoTooltip title="Producción por Nivel de Complejidad" text="Cantidad total y número de registros de la bitácora de Producción, agrupados por el nivel de complejidad del entregable. 'Sin nivel' agrupa registros cuyo entregable no tiene nivel asignado." />
+          <InfoTooltip title="Producción por Nivel de Complejidad" text="Cuántos recursos se han registrado en la bitácora de Producción, agrupados por el nivel de complejidad del entregable. 'Sin nivel' son entregables que no tienen nivel asignado." />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {(data.by_level ?? []).map(l => (
@@ -2039,7 +2039,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Volumen por Etapa del Flujo</h3>
-            <InfoTooltip title="Volumen por Etapa del Flujo" text="Para cada rol del flujo: total de actividades y su composición (aprobadas / activas / vencidas). % completado = actividades aprobadas de ese rol / total de actividades de ese rol." />
+            <InfoTooltip title="Volumen por Etapa del Flujo" text="Para cada rol del flujo: cuántas actividades tiene en total y cómo están repartidas entre aprobadas, activas y vencidas. % completado = aprobadas / total de ese rol." />
           </div>
           <div className="space-y-3">
             {[...roleDetail].sort((a, b) => b.total - a.total).map(r => {
@@ -2074,7 +2074,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Composición por Estado</h3>
-            <InfoTooltip title="Composición por Estado" text="% de entregables en cada estado del flujo sobre el total de entregables — el mismo dato que 'Distribución por Estado' del Resumen, en formato de anillo." />
+            <InfoTooltip title="Composición por Estado" text="Qué % de los entregables está en cada estado — el mismo dato que 'Distribución por Estado' del Resumen, mostrado como anillo." />
           </div>
           <ResponsiveDonut
             data={Object.entries(byStatus).filter(([,v]) => v > 0).map(([k, v]) => ({ key: k, label: STATUS_INFO[k]?.label ?? k, value: v, color: STATUS_INFO[k]?.color ?? '#9ca3af' }))}
@@ -2089,7 +2089,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-emerald-500" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Programas con mayor avance</h3>
-            <InfoTooltip title="Programas con mayor avance" text="Top 6 Programas por % de cumplimiento = entregables finalizados / total de entregables del programa, de mayor a menor." />
+            <InfoTooltip title="Programas con mayor avance" text="Los 6 Programas con mayor % de entregables finalizados." />
           </div>
           {[...programs].sort((a, b) => b.compliance_percentage - a.compliance_percentage).slice(0, 6).map((p, i) => (
             <div key={p.id} onClick={() => router.push(`/entregables?filter=program_${p.id}`)}
@@ -2110,7 +2110,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <XCircle size={16} className="text-red-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Programas con menor avance</h3>
-            <InfoTooltip title="Programas con menor avance" text="6 Programas con menor % de cumplimiento = entregables finalizados / total de entregables del programa. Útil para priorizar dónde intervenir primero." />
+            <InfoTooltip title="Programas con menor avance" text="Los 6 Programas con menor % de entregables finalizados — para saber dónde intervenir primero." />
           </div>
           {[...programs].sort((a, b) => a.compliance_percentage - b.compliance_percentage).slice(0, 6).map((p, i) => (
             <div key={p.id} onClick={() => router.push(`/entregables?filter=program_${p.id}`)}
@@ -2134,7 +2134,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-emerald-500" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Asignaturas con mayor avance</h3>
-            <InfoTooltip title="Asignaturas con mayor avance" text="Top 6 Asignaturas por % de cumplimiento = entregables finalizados / total de entregables de la asignatura, de mayor a menor." />
+            <InfoTooltip title="Asignaturas con mayor avance" text="Las 6 Asignaturas con mayor % de entregables finalizados." />
           </div>
           {stats.subjects_breakdown && [...stats.subjects_breakdown].sort((a, b) => b.compliance_percentage - a.compliance_percentage).slice(0, 6).map((s, i) => (
             <div key={s.id} onClick={() => router.push(`/entregables?filter=subject_${s.id}`)}
@@ -2157,7 +2157,7 @@ function TabReportes({
           <div className="flex items-center gap-2 mb-4">
             <XCircle size={16} className="text-red-400" />
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Asignaturas con menor avance</h3>
-            <InfoTooltip title="Asignaturas con menor avance" text="6 Asignaturas con menor % de cumplimiento = entregables finalizados / total de entregables de la asignatura. Útil para priorizar dónde intervenir primero." />
+            <InfoTooltip title="Asignaturas con menor avance" text="Las 6 Asignaturas con menor % de entregables finalizados — para saber dónde intervenir primero." />
           </div>
           {stats.subjects_breakdown && [...stats.subjects_breakdown].sort((a, b) => a.compliance_percentage - b.compliance_percentage).slice(0, 6).map((s, i) => (
             <div key={s.id} onClick={() => router.push(`/entregables?filter=subject_${s.id}`)}
