@@ -33,8 +33,8 @@ interface NavItem {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   roles: UserRole[];
   badgeKey?: 'overdue' | 'collab';
-  /** Además de `roles`, un rol sin acceso fijo puede entrar si la Matriz de Permisos se lo otorga. */
-  permission?: { module: string; action: string };
+  /** Además de `roles`, un rol sin acceso fijo puede entrar si tiene CUALQUIERA de estos permisos. */
+  permissions?: Array<{ module: string; action: string }>;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -63,7 +63,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Entregables',
     icon: FileText,
     roles: ['admin', 'coordinator'],
-    permission: { module: 'entregables', action: 'view' },
+    permissions: [
+      { module: 'entregables', action: 'view' },
+      { module: 'entregables', action: 'manage' },
+    ],
   },
   {
     href: '/decisiones',
@@ -158,7 +161,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
   }, [user]);
 
   const navItems = ALL_NAV_ITEMS.filter((item) =>
-    item.roles.includes(role) || (item.permission && can(user, item.permission.module, item.permission.action))
+    item.roles.includes(role) || (item.permissions ?? []).some((p) => can(user, p.module, p.action))
   );
 
   const sidebarInner = (

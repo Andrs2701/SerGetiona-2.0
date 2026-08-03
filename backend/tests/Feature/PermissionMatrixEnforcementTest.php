@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Deliverable;
+use App\Models\RoleActivity;
 use App\Models\SystemPermission;
 use App\Models\Subject;
 use App\Models\User;
+use App\Models\VisibilityRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -115,5 +117,43 @@ class PermissionMatrixEnforcementTest extends TestCase
         $after = $this->actingAs($engineer, 'sanctum')->getJson('/api/auth/me');
         $after->assertOk();
         $this->assertContains('entregables.manage', $after->json('data.permissions'));
+    }
+
+    /**
+     * Regresión: index() tenía su propia lista fija de roles ("operativos ven
+     * solo lo asignado") que ignoraba el Alcance de Visibilidad de
+     * Configuración — un admin podía marcar "Ve todo" para un rol ahí y el
+     * listado de entregables seguía sin mostrarle más que lo suyo.
+     */
+    public function test_deliverables_index_respects_visibility_rule_scope(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+        $otherEngineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $mine = Deliverable::factory()->create(['name' => 'Mío']);
+        RoleActivity::factory()->create([
+            'deliverable_id' => $mine->id, 'role' => 'engineering', 'responsible_id' => $engineer->id,
+        ]);
+
+        $notMine = Deliverable::factory()->create(['name' => 'De otro']);
+        RoleActivity::factory()->create([
+            'deliverable_id' => $notMine->id, 'role' => 'engineering', 'responsible_id' => $otherEngineer->id,
+        ]);
+
+        // Por defecto (assigned_only): solo ve el suyo.
+        $before = $this->actingAs($engineer, 'sanctum')->getJson('/api/deliverables');
+        $before->assertOk();
+        $namesBefore = collect($before->json())->pluck('name');
+        $this->assertTrue($namesBefore->contains('Mío'));
+        $this->assertFalse($namesBefore->contains('De otro'));
+
+        // Al cambiar su Alcance de Visibilidad a "all", ve todos.
+        VisibilityRule::updateOrCreate(['role_slug' => 'engineering'], ['scope' => 'all']);
+
+        $after = $this->actingAs($engineer, 'sanctum')->getJson('/api/deliverables');
+        $after->assertOk();
+        $namesAfter = collect($after->json())->pluck('name');
+        $this->assertTrue($namesAfter->contains('Mío'));
+        $this->assertTrue($namesAfter->contains('De otro'));
     }
 }

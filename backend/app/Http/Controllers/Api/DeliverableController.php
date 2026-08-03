@@ -19,8 +19,7 @@ use Illuminate\Http\Request;
 
 class DeliverableController extends Controller
 {
-    private const OPERATIONAL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
-    private const ALL_ROLES         = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+    private const ALL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
 
     // ─── GET /deliverables ────────────────────────────────────────────────────
 
@@ -34,7 +33,10 @@ class DeliverableController extends Controller
             'academicLevel',
         ]);
 
-        if (in_array($user->role, self::OPERATIONAL_ROLES)) {
+        // Mismo criterio que show()/flow()/timeline(): el Alcance de Visibilidad
+        // de Configuración decide quién ve todo vs. solo lo asignado — antes esta
+        // lista usaba su propia lista fija de roles e ignoraba ese ajuste.
+        if (!ResourceAccess::isManager($user)) {
             $query->whereHas('roleActivities', fn($q) => $q->where('responsible_id', $user->id));
         }
 
