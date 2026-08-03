@@ -508,10 +508,17 @@ interface ObservationItem {
   created_at: string;
 }
 
-function ObservationsPanel({ activityId }: { activityId: number }) {
+function ObservationsPanel({
+  activityId,
+  pendingText, setPendingText,
+  refreshKey,
+}: {
+  activityId: number;
+  pendingText: string; setPendingText: (t: string) => void;
+  refreshKey: number;
+}) {
   const [observations, setObservations] = useState<ObservationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
   const fetchObservations = useCallback(() => {
@@ -523,15 +530,19 @@ function ObservationsPanel({ activityId }: { activityId: number }) {
 
   useEffect(() => {
     fetchObservations();
-  }, [fetchObservations]);
+  }, [fetchObservations, refreshKey]);
 
+  // Envío inmediato (sin esperar a "Guardar cambios"), para cuando la usuaria
+  // solo quiere dejar una observación sin tocar el resto del formulario. Si
+  // en cambio deja texto pendiente y da clic en "Guardar cambios", ese botón
+  // también la envía — ver handleSave en el componente principal.
   async function handleSend() {
-    if (!text.trim()) return;
+    if (!pendingText.trim()) return;
     setSending(true);
     try {
-      const newObs = await api.post<ObservationItem>(`/activities/${activityId}/observations`, { observation: text.trim() });
+      const newObs = await api.post<ObservationItem>(`/activities/${activityId}/observations`, { observation: pendingText.trim() });
       setObservations(p => [...p, newObs]);
-      setText('');
+      setPendingText('');
     } catch { /* ignore */ }
     setSending(false);
   }
@@ -559,15 +570,16 @@ function ObservationsPanel({ activityId }: { activityId: number }) {
         ))}
       </div>
       <div className="flex gap-2">
-        <input value={text} onChange={e => setText(e.target.value)}
+        <input value={pendingText} onChange={e => setPendingText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Escribe una observación en el historial..."
           className="flex-1 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 bg-white dark:bg-gray-700"/>
-        <button onClick={handleSend} disabled={sending || !text.trim()}
+        <button onClick={handleSend} disabled={sending || !pendingText.trim()}
           className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex-shrink-0">
           <Send size={12}/>
         </button>
       </div>
+      <p className="text-[10px] text-gray-400 dark:text-gray-500 -mt-1">Se guarda al presionar Enter o con "Guardar cambios" de abajo.</p>
     </div>
   );
 }
@@ -620,6 +632,7 @@ export default function ActivityDetailPanel({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingObservation, setPendingObservation] = useState('');
 
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [prodDate, setProdDate] = useState(new Date().toISOString().split('T')[0]);
@@ -665,6 +678,7 @@ export default function ActivityDetailPanel({
     setTotalResourceTypes(0);
     setPendingUrl('');
     setPendingTitle('');
+    setPendingObservation('');
     setExistingLogsCount(0);
     setExistingLinksCount(0);
     setRefreshKey(k => k + 1);
@@ -695,6 +709,7 @@ export default function ActivityDetailPanel({
 
   const hasPendingLink = pendingUrl.trim() !== '' && pendingTitle.trim() !== '';
   const hasLink = existingLinksCount > 0 || hasPendingLink;
+  const hasPendingObservation = pendingObservation.trim() !== '';
   const prodStep = isProdRole ? 2 : undefined;
   const linkStep = isProdRole ? 3 : 2;
 
@@ -739,6 +754,16 @@ export default function ActivityDetailPanel({
         });
         setPendingUrl('');
         setPendingTitle('');
+      }
+
+      // Antes, escribir una observación y cambiar el estado exigía dos clics
+      // separados (uno para "Enviar" la observación, otro para "Guardar
+      // cambios" del estado) — ahora un solo "Guardar cambios" hace ambos.
+      if (hasPendingObservation) {
+        await api.post(`/activities/${activity.id}/observations`, {
+          observation: pendingObservation.trim(),
+        });
+        setPendingObservation('');
       }
 
       if (isManager && priorityState !== (deliverable.priority ?? activity.priority ?? 'media')) {
@@ -905,7 +930,12 @@ export default function ActivityDetailPanel({
 
                 <div>
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Observaciones</p>
-                  <ObservationsPanel activityId={activity.id} />
+                  <ObservationsPanel
+                    activityId={activity.id}
+                    pendingText={pendingObservation}
+                    setPendingText={setPendingObservation}
+                    refreshKey={refreshKey}
+                  />
                 </div>
               </div>
 

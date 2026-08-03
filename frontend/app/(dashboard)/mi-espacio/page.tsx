@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search, X, ChevronDown, ChevronUp, ChevronRight,
   Clock, XCircle, CheckCircle2, AlertTriangle, Shield,
@@ -482,6 +482,9 @@ export default function MiEspacioPage() {
   const [selectedAct, setSelectedAct] = useState<WorkspaceActivity | null>(null);
   const searchParams = useSearchParams();
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  // Recuerda qué highlightId ya abrió el panel una vez, para no repetirlo en
+  // cada poll de 60s (ver bug de abajo).
+  const openedHighlightIdRef = useRef<number | null>(null);
 
   // Filters
   const [search, setSearch]               = useState('');
@@ -525,9 +528,17 @@ export default function MiEspacioPage() {
 
   useEffect(() => {
     if (!highlightId || activities.length === 0) return;
+    // El poll de 60s (loadWorkspace) trae `activities` con una referencia
+    // nueva aunque el contenido no cambie, y este efecto depende de
+    // `activities` — sin este guard, se re-ejecutaba en cada poll y volvía a
+    // abrir/pisar `selectedAct` con la actividad del highlight original,
+    // aunque la usuaria ya hubiera abierto otra entrega y estuviera
+    // escribiendo en ella (perdía lo que llevaba sin guardar).
+    if (openedHighlightIdRef.current === highlightId) return;
     // Search ALL activities so completed/filtered-out ones are still found
     const act = activities.find(a => a.id === highlightId);
     if (act) {
+      openedHighlightIdRef.current = highlightId;
       // Auto-open the detail panel for the linked activity
       setSelectedAct(act);
       setTimeout(() => {
