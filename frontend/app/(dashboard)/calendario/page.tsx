@@ -42,7 +42,7 @@ interface AllActivity {
   role_label: string;
   responsible_id?: number;
   responsible_name?: string;
-  commitment_date: string;
+  commitment_date: string | null;
   actual_delivery_date?: string;
   status: string;
   date_status: string;
@@ -241,9 +241,11 @@ function AllActivityCard({
         <span className={clsx('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', badge.cls)}>
           {badge.label}
         </span>
-        <span className="text-xs text-gray-400">
-          {new Date(a.commitment_date + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
-        </span>
+        {a.commitment_date && (
+          <span className="text-xs text-gray-400">
+            {new Date(a.commitment_date + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+          </span>
+        )}
       </div>
       {a.project_id > 0 && (
         <button
@@ -969,6 +971,7 @@ export default function CalendarioPage() {
   const allActByDate = useMemo(() => {
     const map: Record<string, AllActivity[]> = {};
     for (const a of allActivities) {
+      if (!a.commitment_date) continue;
       const key = a.commitment_date.slice(0, 10);
       if (!map[key]) map[key] = [];
       map[key].push(a);
