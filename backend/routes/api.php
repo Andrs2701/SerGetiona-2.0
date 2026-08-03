@@ -158,6 +158,11 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         Route::delete('resource-types/{resourceType}', [ResourceTypeController::class, 'destroy']);
     });
 
+    // Lista liviana para elegir responsables (id/nombre/rol) — abierta a
+    // cualquier autenticado. Debe ir antes del apiResource de abajo para que
+    // "assignable" no se intente resolver como {user} en GET /users/{user}.
+    Route::get('/users/assignable', [UserController::class, 'assignable']);
+
     // Usuarios: lectura para gestión de asignaciones; escritura solo admin.
     Route::apiResource('users', UserController::class)->only(['index', 'show'])
         ->middleware('role:admin,coordinator');

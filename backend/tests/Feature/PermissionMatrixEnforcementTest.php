@@ -156,4 +156,35 @@ class PermissionMatrixEnforcementTest extends TestCase
         $this->assertTrue($namesAfter->contains('Mío'));
         $this->assertTrue($namesAfter->contains('De otro'));
     }
+
+    /**
+     * Regresión: al editar un entregable, el selector de responsables se
+     * llenaba desde GET /users (solo admin/coordinator) — un rol con
+     * entregables.manage pero sin permiso de Usuarios recibía 403 en
+     * silencio y el picker quedaba vacío, sin mostrar a nadie.
+     */
+    public function test_assignable_users_endpoint_is_open_to_any_authenticated_role(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+        $active = User::factory()->create(['name' => 'Activo', 'role' => 'pedagogy', 'is_active' => true]);
+        $inactive = User::factory()->create(['name' => 'Inactivo', 'role' => 'pedagogy', 'is_active' => false]);
+
+        // GET /users (el listado completo) sigue restringido.
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/users')->assertStatus(403);
+
+        // GET /users/assignable no lo está.
+        $response = $this->actingAs($engineer, 'sanctum')->getJson('/api/users/assignable');
+        $response->assertOk();
+
+        $rows = collect($response->json('data'));
+        $names = $rows->pluck('name');
+        $this->assertTrue($names->contains('Activo'));
+        $this->assertFalse($names->contains('Inactivo'));
+
+        // Solo campos seguros/mínimos — nada de email/teléfono.
+        $this->assertEqualsCanonicalizing(
+            ['id', 'name', 'role', 'position', 'department', 'photo_url', 'covering_roles'],
+            array_keys($rows->first())
+        );
+    }
 }

@@ -878,7 +878,7 @@ function InfoField({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void; onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void }) {
+function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity, onEdit, canEdit }: { deliverable: Deliverable; defaultTab?: PanelTab; onClose: () => void; onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void; onEdit?: (deliverable: Deliverable) => void; canEdit?: boolean }) {
   const [tab, setTab] = useState<PanelTab>(defaultTab);
   const [flow, setFlow] = useState<DeliverableFlow | null>(null);
   const [loadingFlow, setLoadingFlow] = useState(false);
@@ -901,7 +901,15 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
             <h2 className="font-bold text-gray-900 text-sm">{deliverable.subject_name ?? '—'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{deliverable.name}</p>
           </div>
-          <button onClick={onClose} className="shrink-0 p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          <div className="flex items-center gap-1 shrink-0">
+            {canEdit && onEdit && (
+              <button onClick={() => onEdit(deliverable)} title="Editar entregable"
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#194276]">
+                <Pencil size={16} />
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+          </div>
         </div>
         <div className="flex border-b border-gray-100 px-4 sm:px-5 overflow-x-auto">
           {(['info', 'evidencias', 'timeline'] as PanelTab[]).map(t => (
@@ -1446,7 +1454,7 @@ export default function EntregablesPage() {
   useEffect(() => {
     api.get<Array<{ id: number; name: string }>>(ENDPOINTS.PROJECTS)
       .then(r => setProjects(Array.isArray(r) ? r : [])).catch(() => {});
-    api.get<User[]>(ENDPOINTS.USERS)
+    api.get<User[]>(ENDPOINTS.USERS_ASSIGNABLE)
       .then(r => setUsers(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
@@ -1468,10 +1476,17 @@ export default function EntregablesPage() {
     if (openedDeliverableIdRef.current === deliverableId || data.length === 0) return;
     const target = data.find(d => d.id === deliverableId);
     if (target) {
-      setPanel({ deliverable: target, tab: 'info' });
+      // ?edit=1 (usado desde el Calendario) abre directo el formulario de
+      // edición en vez del panel de solo lectura — así se puede actualizar
+      // la fecha de compromiso sin un clic adicional.
+      if (searchParams.get('edit') === '1' && isManager) {
+        setFormPanel({ mode: 'edit', deliverable: target });
+      } else {
+        setPanel({ deliverable: target, tab: 'info' });
+      }
       openedDeliverableIdRef.current = deliverableId;
     }
-  }, [searchParams, data]);
+  }, [searchParams, data, isManager]);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
@@ -1920,7 +1935,16 @@ export default function EntregablesPage() {
       )}
 
       {/* ── Panels & Modals ───────────────────────────────────────────────── */}
-      {panel && <SidePanel deliverable={panel.deliverable} defaultTab={panel.tab} onClose={() => setPanel(null)} onSelectActivity={handleSelectActivity} />}
+      {panel && (
+        <SidePanel
+          deliverable={panel.deliverable}
+          defaultTab={panel.tab}
+          onClose={() => setPanel(null)}
+          onSelectActivity={handleSelectActivity}
+          canEdit={isManager}
+          onEdit={(d) => { setPanel(null); setFormPanel({ mode: 'edit', deliverable: d }); }}
+        />
+      )}
 
       {selectedActivity && selectedActivityDeliverable && (
         <ActivityDetailPanel

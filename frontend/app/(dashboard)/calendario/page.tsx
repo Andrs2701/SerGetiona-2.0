@@ -867,7 +867,9 @@ export default function CalendarioPage() {
   const handleEdit = (activityId: number, deliverableId?: number) => {
     if (canViewAllCalendar) {
       if (deliverableId) {
-        router.push(`/entregables?deliverable=${deliverableId}`);
+        // edit=1: abre directo el formulario de edición (no el panel de solo
+        // lectura) para poder actualizar la fecha de compromiso sin un paso más.
+        router.push(`/entregables?deliverable=${deliverableId}&edit=1`);
       } else {
         router.push('/entregables');
       }

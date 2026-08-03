@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PublicUserResource;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\User;
@@ -33,6 +34,22 @@ class UserController extends Controller
         }
 
         return UserResource::collection($users->get());
+    }
+
+    /**
+     * Lista liviana (id, nombre, rol, cobertura) para elegir responsables al
+     * crear/editar un entregable — abierta a cualquier autenticado, a
+     * diferencia de index() que requiere el permiso de Usuarios. Quien puede
+     * gestionar entregables ya puede asignar cualquier responsable_id por
+     * backend; sin este endpoint no tenía de dónde elegir el nombre.
+     */
+    public function assignable()
+    {
+        $users = User::where('is_active', true)
+            ->with(['roleCoverages' => fn ($q) => $q->active()])
+            ->get();
+
+        return PublicUserResource::collection($users);
     }
 
     public function store(Request $request)

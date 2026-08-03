@@ -20,6 +20,9 @@ class PublicUserResource extends JsonResource
             'position' => $this->position,
             'department' => $this->department,
             'photo_url' => $this->photo_url,
+            'covering_roles' => $this->relationLoaded('roleCoverages')
+                ? $this->roleCoverages->pluck('covering_role')->values()->all()
+                : $this->activeCoveringRoles(),
         ];
     }
 }

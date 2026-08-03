@@ -157,6 +157,7 @@ export const ENDPOINTS = {
 
   // Users
   USERS: '/users',
+  USERS_ASSIGNABLE: '/users/assignable',
   USER: (id: number) => `/users/${id}`,
   USER_RESET_LINK: (id: number) => `/users/${id}/reset-link`,
   USER_ROLE_COVERAGES: (id: number) => `/users/${id}/role-coverages`,
