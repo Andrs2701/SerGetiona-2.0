@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   ChevronLeft, ChevronRight, Calendar, Clock,
   XCircle, CheckCircle2, AlertTriangle, ExternalLink,
-  LayoutGrid, Users, Plus,
+  LayoutGrid, Users, Plus, Eye, Pencil,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, ENDPOINTS } from '@/lib/api';
@@ -211,22 +211,20 @@ function AllActivityCard({
   a,
   todayStr,
   onNavigate,
+  onView,
   onEdit,
 }: {
   a: AllActivity;
   todayStr: string;
   onNavigate: (id: number) => void;
+  onView: (activityId: number, deliverableId?: number) => void;
   onEdit: (activityId: number, deliverableId?: number) => void;
 }) {
   const badge = allActivityStatusBadge(a, todayStr);
   const initial = a.responsible_name ? a.responsible_name.charAt(0).toUpperCase() : '?';
 
   return (
-    <div
-      onClick={() => onEdit(a.id, a.deliverable_id)}
-      className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:border-indigo-200 hover:bg-indigo-50/5 cursor-pointer transition-all hover:shadow-sm"
-      title="Haz clic para ver/editar esta entrega"
-    >
+    <div className="border border-gray-100 rounded-lg p-3 space-y-1.5 hover:shadow-sm transition-all">
       <div className="flex items-center gap-2">
         <span className="w-6 h-6 rounded-full bg-[#194276] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
           {initial}
@@ -248,17 +246,28 @@ function AllActivityCard({
           </span>
         )}
       </div>
-      {a.project_id > 0 && (
+      <div className="flex items-center gap-3 flex-wrap pt-0.5">
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onNavigate(a.project_id);
-          }}
-          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold pt-0.5 hover:underline"
+          onClick={() => onView(a.id, a.deliverable_id)}
+          className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 font-semibold hover:underline"
         >
-          <ExternalLink size={11} /> Ver proyecto
+          <Eye size={11} /> Ver entrega
         </button>
-      )}
+        <button
+          onClick={() => onEdit(a.id, a.deliverable_id)}
+          className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold hover:underline"
+        >
+          <Pencil size={11} /> Editar entrega
+        </button>
+        {a.project_id > 0 && (
+          <button
+            onClick={() => onNavigate(a.project_id)}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-semibold hover:underline"
+          >
+            <ExternalLink size={11} /> Ver proyecto
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -692,6 +701,7 @@ function DayView({
   eventByDate,
   decisionsByDate,
   onNavigate,
+  onView,
   onEdit,
   showAll,
   todayStr,
@@ -702,6 +712,7 @@ function DayView({
   eventByDate: Record<string, CalendarEvent[]>;
   decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
+  onView: (activityId: number, deliverableId?: number) => void;
   onEdit: (activityId: number, deliverableId?: number) => void;
   showAll: boolean;
   todayStr: string;
@@ -770,7 +781,7 @@ function DayView({
             </p>
             <div className="space-y-3">
               {dayAllActs.map((a) => (
-                <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onEdit={onEdit} />
+                <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onView={onView} onEdit={onEdit} />
               ))}
             </div>
           </div>
@@ -788,6 +799,7 @@ function SelectedDayPanel({
   eventByDate,
   decisionsByDate,
   onNavigate,
+  onView,
   onEdit,
   onClose,
   showAll,
@@ -799,6 +811,7 @@ function SelectedDayPanel({
   eventByDate: Record<string, CalendarEvent[]>;
   decisionsByDate: Record<string, CalendarDecision[]>;
   onNavigate: (id: number) => void;
+  onView: (activityId: number, deliverableId?: number) => void;
   onEdit: (activityId: number, deliverableId?: number) => void;
   onClose: () => void;
   showAll: boolean;
@@ -837,7 +850,7 @@ function SelectedDayPanel({
           <ActivityCard key={act.id} act={act} onNavigate={onNavigate} onEdit={onEdit} />
         ))}
         {showAll && dayAllActs.map((a) => (
-          <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onEdit={onEdit} />
+          <AllActivityCard key={`${a.id}-${a.role}`} a={a} todayStr={todayStr} onNavigate={onNavigate} onView={onView} onEdit={onEdit} />
         ))}
         {dayActs.length === 0 && dayAllActs.length === 0 && dayEvts.length === 0 && dayDecisions.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-4">Sin actividades.</p>
@@ -864,11 +877,24 @@ export default function CalendarioPage() {
     }
   };
 
+  // "Ver entrega" — abre el panel de solo lectura (info + línea de tiempo).
+  const handleView = (activityId: number, deliverableId?: number) => {
+    if (canViewAllCalendar) {
+      if (deliverableId) {
+        router.push(`/entregables?deliverable=${deliverableId}`);
+      } else {
+        router.push('/entregables');
+      }
+    } else {
+      router.push(`/mi-espacio?open=${activityId}`);
+    }
+  };
+
+  // "Editar entrega" — edit=1 abre directo el formulario de edición (info,
+  // responsable y fechas por rol) en vez del panel de solo lectura.
   const handleEdit = (activityId: number, deliverableId?: number) => {
     if (canViewAllCalendar) {
       if (deliverableId) {
-        // edit=1: abre directo el formulario de edición (no el panel de solo
-        // lectura) para poder actualizar la fecha de compromiso sin un paso más.
         router.push(`/entregables?deliverable=${deliverableId}&edit=1`);
       } else {
         router.push('/entregables');
@@ -1261,6 +1287,7 @@ export default function CalendarioPage() {
               eventByDate={eventByDate}
               decisionsByDate={decisionsByDate}
               onNavigate={(id) => navigate(id)}
+              onView={handleView}
               onEdit={handleEdit}
               showAll={showAll}
               todayStr={todayStr}
@@ -1277,6 +1304,7 @@ export default function CalendarioPage() {
                 eventByDate={eventByDate}
                 decisionsByDate={decisionsByDate}
                 onNavigate={(id) => navigate(id)}
+                onView={handleView}
                 onEdit={handleEdit}
                 onClose={() => setSelectedDay(null)}
                 showAll={showAll}
