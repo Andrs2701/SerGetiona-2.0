@@ -13,6 +13,7 @@ import type { WorkspaceActivity, CalendarEvent, Role } from '@/lib/types';
 import { ROLE_STATUS_LABELS, ROLE_LABELS } from '@/lib/types';
 import { COMPLETED_STATUSES } from '@/lib/statusGroups';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { can } from '@/lib/permissions';
 import Modal from '@/components/Modal';
 
 const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEvent['type'], string> = {
@@ -851,9 +852,12 @@ export default function CalendarioPage() {
   const router = useRouter();
   const { user } = useAuthContext();
   const isAdminOrCoord = user?.role === 'admin' || user?.role === 'coordinator';
+  // Además de admin/coordinator, un rol al que la Matriz de Permisos le otorgue
+  // "calendario.view_all" puede ver y navegar por las entregas de todo el equipo.
+  const canViewAllCalendar = isAdminOrCoord || can(user, 'calendario', 'view_all');
 
   const navigate = (projectId: number) => {
-    if (isAdminOrCoord) {
+    if (canViewAllCalendar) {
       router.push('/programas');
     } else {
       router.push('/mi-espacio');
@@ -861,7 +865,7 @@ export default function CalendarioPage() {
   };
 
   const handleEdit = (activityId: number, deliverableId?: number) => {
-    if (isAdminOrCoord) {
+    if (canViewAllCalendar) {
       if (deliverableId) {
         router.push(`/entregables?deliverable=${deliverableId}`);
       } else {
@@ -946,13 +950,13 @@ export default function CalendarioPage() {
 
   // All activities (showAll mode) — uses dedicated endpoint
   useEffect(() => {
-    if (!showAll || !isAdminOrCoord) return;
+    if (!showAll || !canViewAllCalendar) return;
     setLoadingAll(true);
     api.get<AllActivity[]>(ENDPOINTS.CALENDAR_ALL_ACTIVITIES)
       .then((data) => setAllActivitiesDirect(Array.isArray(data) ? data : []))
       .catch(() => setAllActivitiesDirect([]))
       .finally(() => setLoadingAll(false));
-  }, [showAll, isAdminOrCoord]);
+  }, [showAll, canViewAllCalendar]);
 
   const allActivities = allActivitiesDirect;
 
@@ -1063,7 +1067,7 @@ export default function CalendarioPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Calendario</h1>
         <div className="flex items-center gap-3 flex-wrap">
           {/* Toggle mis actividades / todas */}
-          {isAdminOrCoord && (
+          {canViewAllCalendar && (
             <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-sm">
               <button
                 onClick={() => setShowAll(false)}

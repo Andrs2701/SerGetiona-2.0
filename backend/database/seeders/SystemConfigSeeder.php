@@ -86,6 +86,27 @@ class SystemConfigSeeder extends Seeder
                 'allowed_roles' => ['admin', 'coordinator'],
                 'description' => 'Crear, eliminar o asignar usuarios a canales.'
             ],
+            [
+                'module' => 'entregables',
+                'action' => 'view',
+                'view_path' => '/entregables',
+                'allowed_roles' => ['admin', 'coordinator'],
+                'description' => 'Mostrar el enlace de Entregables en el menú (el acceso a los datos ya está abierto a todo usuario autenticado, filtrado por su propio alcance).'
+            ],
+            [
+                'module' => 'entregables',
+                'action' => 'manage',
+                'view_path' => null,
+                'allowed_roles' => ['admin', 'coordinator'],
+                'description' => 'Crear, editar o eliminar entregables.'
+            ],
+            [
+                'module' => 'calendario',
+                'action' => 'view_all',
+                'view_path' => null,
+                'allowed_roles' => ['admin', 'coordinator'],
+                'description' => 'Ver en el Calendario las entregas de todo el equipo, no solo las propias.'
+            ],
         ];
 
         foreach ($permissions as $p) {

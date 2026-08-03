@@ -46,4 +46,25 @@ class SystemPermission extends Model
 
         return in_array($role, $perm->allowed_roles ?? [], true);
     }
+
+    /**
+     * Todos los permisos "module.action" que tiene un rol, para exponerlos
+     * de una vez al usuario autenticado (UserResource) en vez de consultar
+     * isAllowed() una vez por permiso desde el frontend.
+     *
+     * @return string[]
+     */
+    public static function allowedFor(string $role): array
+    {
+        $roleRecord = SystemRole::where('slug', $role)->first();
+        if ($roleRecord && !$roleRecord->is_active) {
+            return [];
+        }
+
+        return self::all()
+            ->filter(fn ($p) => $role === 'admin' || in_array($role, $p->allowed_roles ?? [], true))
+            ->map(fn ($p) => "{$p->module}.{$p->action}")
+            ->values()
+            ->all();
+    }
 }

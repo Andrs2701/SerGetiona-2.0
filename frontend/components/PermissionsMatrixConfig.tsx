@@ -12,12 +12,15 @@ const MODULE_LABELS: Record<string, string> = {
   configuracion: 'Configuración',
   reportes: 'Reportes',
   colaboracion: 'Colaboración',
+  entregables: 'Entregables',
+  calendario: 'Calendario',
 };
 
 const ACTION_LABELS: Record<string, string> = {
   view: 'Ver',
   manage: 'Gestionar',
   manage_channels: 'Administrar canales',
+  view_all: 'Ver todas',
 };
 
 export default function PermissionsMatrixConfig() {

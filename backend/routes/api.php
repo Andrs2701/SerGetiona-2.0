@@ -57,7 +57,7 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::delete('/calendar-events/{event}', [CalendarController::class, 'destroy'])->middleware('role:admin,coordinator');
     Route::post('/calendar/suggest-dates', [CalendarController::class, 'suggestDates']);
     Route::get('/calendar/my-deliverables', [CalendarController::class, 'myDeliverables']);
-    Route::get('/calendar/all-activities', [CalendarController::class, 'allActivities'])->middleware('role:admin,coordinator');
+    Route::get('/calendar/all-activities', [CalendarController::class, 'allActivities'])->middleware('permission:calendario,view_all');
 
     // Workspace personal
     Route::get('/my-workspace', [WorkspaceController::class, 'index']);
@@ -80,7 +80,7 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         ->except(['index', 'show'])->middleware('role:admin,coordinator');
     Route::apiResource('deliverables', DeliverableController::class)->only(['index', 'show']);
     Route::apiResource('deliverables', DeliverableController::class)
-        ->except(['index', 'show'])->middleware('role:admin,coordinator');
+        ->except(['index', 'show'])->middleware('permission:entregables,manage');
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
     Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
     Route::get('activities/{activity}/timeline', [RoleActivityController::class, 'timeline']);
@@ -93,7 +93,7 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::get('deliverables/{deliverable}/evidence', [EvidenceLinkController::class, 'byDeliverable']);
     Route::post('role-activities/{activity}/evidence', [EvidenceLinkController::class, 'store']);
     Route::delete('evidence/{link}', [EvidenceLinkController::class, 'destroy']);
-    Route::post('deliverables/{deliverable}/apply-template', [DeliverableController::class, 'applyFlowTemplate'])->middleware('role:admin,coordinator');
+    Route::post('deliverables/{deliverable}/apply-template', [DeliverableController::class, 'applyFlowTemplate'])->middleware('permission:entregables,manage');
     Route::get('deliverables/{deliverable}/comments', [CommentController::class, 'index']);
     Route::post('deliverables/{deliverable}/comments', [CommentController::class, 'store']);
 

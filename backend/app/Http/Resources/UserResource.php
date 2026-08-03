@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\SystemPermission;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,6 +17,9 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role,
             'is_active' => $this->is_active,
+            // Permisos "modulo.accion" que la Matriz de Permisos le otorga hoy al
+            // rol de este usuario (se computa igual en login, /auth/me y listados).
+            'permissions' => SystemPermission::allowedFor($this->role),
             'phone' => $this->phone,
             'position' => $this->position,
             'department' => $this->department,

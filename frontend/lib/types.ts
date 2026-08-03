@@ -54,6 +54,8 @@ export interface User {
   online_threshold_seconds?: number;
   /** Roles operativos que cubre temporalmente hoy (vacaciones/incapacidades), además de `role`. */
   covering_roles?: string[];
+  /** Permisos "modulo.accion" que la Matriz de Permisos le otorga hoy a su rol. */
+  permissions?: string[];
 }
 
 export interface RoleCoverage {

@@ -86,12 +86,9 @@ class CalendarController extends Controller
 
     public function allActivities(Request $request)
     {
-        $user = $request->user();
-
-        if (!in_array($user->role, ['admin', 'coordinator'])) {
-            return response()->json(['message' => 'Forbidden.'], 403);
-        }
-
+        // Autorización real vía middleware ('permission:calendario,view_all' en
+        // routes/api.php) — la Matriz de Permisos decide quién puede entrar aquí,
+        // no un chequeo fijo de rol.
         $roleLabelMap = [
             'expert'      => 'Experto',
             'pedagogy'    => 'Pedagogía',

@@ -19,6 +19,7 @@ import { TableSkeleton } from '@/components/LoadingSkeleton';
 import DeliverableTimelineView from '@/components/DeliverableTimelineView';
 import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { can } from '@/lib/permissions';
 import ActivityDetailPanel from '@/components/ActivityDetailPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -518,9 +519,11 @@ interface DeliverableFormPanelProps {
   projects: Array<{ id: number; name: string }>; users: User[]; programs: string[];
   onClose: () => void; onSave: (updated?: Deliverable) => void;
   addToast: (msg: string, type: 'success' | 'error') => void;
+  /** ¿Puede crear una Escuela/Proyecto nueva desde aquí? (permiso proyectos.gestionar) */
+  canCreateProject: boolean;
 }
 
-function DeliverableFormPanel({ mode, deliverable, projects, users, programs, onClose, onSave, addToast }: DeliverableFormPanelProps) {
+function DeliverableFormPanel({ mode, deliverable, projects, users, programs, onClose, onSave, addToast, canCreateProject }: DeliverableFormPanelProps) {
   const [form, setForm] = useState<DeliverableFormData>(() => {
     if (mode === 'edit' && deliverable) {
       return {
@@ -684,7 +687,7 @@ function DeliverableFormPanel({ mode, deliverable, projects, users, programs, on
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
                   <option value="">Selecciona una Escuela / Proyecto...</option>
                   {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
-                  <option value="__new__">+ Crear Escuela / Proyecto nuevo</option>
+                  {canCreateProject && <option value="__new__">+ Crear Escuela / Proyecto nuevo</option>}
                 </select>
               )}
             </div>
@@ -1402,7 +1405,12 @@ type FormMode = { mode: 'create'; deliverable?: Deliverable } | { mode: 'edit'; 
 export default function EntregablesPage() {
   const searchParams = useSearchParams();
   const { user } = useAuthContext();
-  const isManager = user?.role === 'admin' || user?.role === 'coordinator';
+  const isAdminOrCoord = user?.role === 'admin' || user?.role === 'coordinator';
+  const isManager = isAdminOrCoord || can(user, 'entregables', 'manage');
+  // Crear una Escuela/Proyecto nueva y la Carga Masiva son capacidades más
+  // sensibles que editar entregables sueltos — requieren permiso propio
+  // (proyectos.gestionar), no solo entregables.manage.
+  const canManageProjects = isAdminOrCoord || can(user, 'projects', 'manage');
 
   const [data, setData]         = useState<Deliverable[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -1707,18 +1715,21 @@ export default function EntregablesPage() {
           </div>
 
           {isManager && (
-            <>
-              <button onClick={() => setFormPanel({ mode: 'create' })}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-white rounded-lg"
-                style={{ background: '#194276' }}>
-                <Plus size={14} /> Nueva tarea
-              </button>
-              <button onClick={() => setShowImport(true)}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium border rounded-lg transition-colors"
-                style={{ borderColor: '#194276', color: '#194276' }}>
-                <Upload size={14} /> Carga Masiva
-              </button>
-            </>
+            <button onClick={() => setFormPanel({ mode: 'create' })}
+              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-white rounded-lg"
+              style={{ background: '#194276' }}>
+              <Plus size={14} /> Nueva tarea
+            </button>
+          )}
+          {/* Carga Masiva puede crear Escuelas/Proyectos nuevos y mutar muchos
+              entregables a la vez — capacidad más sensible, no cubierta por
+              entregables.manage. */}
+          {isAdminOrCoord && (
+            <button onClick={() => setShowImport(true)}
+              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium border rounded-lg transition-colors"
+              style={{ borderColor: '#194276', color: '#194276' }}>
+              <Upload size={14} /> Carga Masiva
+            </button>
           )}
 
           <button onClick={handleExport}
@@ -1930,6 +1941,7 @@ export default function EntregablesPage() {
           mode={formPanel.mode}
           deliverable={formPanel.deliverable}
           projects={projects} users={users} programs={programNames}
+          canCreateProject={canManageProjects}
           onClose={() => setFormPanel(null)}
           onSave={(updated) => {
             setFormPanel(null);
