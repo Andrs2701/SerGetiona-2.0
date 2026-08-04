@@ -343,20 +343,45 @@ class PermissionMatrixEnforcementTest extends TestCase
     /**
      * Project/AcademicProgram/Subject/Deliverable son SoftDeletes: un
      * ->delete() aquí nunca dispara el cascadeOnDelete() de la FK (eso solo
-     * corre con un DELETE real de SQL). Sin este bloqueo, "eliminar" un
-     * proyecto con contenido lo dejaría con deleted_at pero sus programas y
-     * entregables seguirían existiendo, ahora huérfanos e inaccesibles.
+     * corre con un DELETE real de SQL). Un programa/asignatura sin
+     * entregables no deja nada huérfano al borrarse junto con el proyecto
+     * — es justo el caso real reportado: un proyecto de prueba con un
+     * programa vacío que no se podía quitar de la pantalla.
      */
-    public function test_admin_cannot_delete_project_with_academic_programs(): void
+    public function test_admin_can_delete_project_with_empty_academic_program(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
         $project = \App\Models\Project::factory()->create();
-        \App\Models\AcademicProgram::factory()->create(['project_id' => $project->id]);
+        $program = \App\Models\AcademicProgram::factory()->create(['project_id' => $project->id]);
+        $subject = Subject::factory()->create(['academic_program_id' => $program->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/projects/{$project->id}")
+            ->assertStatus(200);
+
+        $this->assertSoftDeleted('projects', ['id' => $project->id]);
+        $this->assertSoftDeleted('academic_programs', ['id' => $program->id]);
+        $this->assertSoftDeleted('subjects', ['id' => $subject->id]);
+    }
+
+    /**
+     * En cambio, si esa asignatura sí tiene un entregable real, borrarlo
+     * en cascada lo dejaría inaccesible pero existente en la base de datos
+     * — se bloquea en vez de fingir un borrado completo.
+     */
+    public function test_admin_cannot_delete_project_with_real_deliverables(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $project = \App\Models\Project::factory()->create();
+        $program = \App\Models\AcademicProgram::factory()->create(['project_id' => $project->id]);
+        $subject = Subject::factory()->create(['academic_program_id' => $program->id]);
+        Deliverable::factory()->create(['subject_id' => $subject->id]);
 
         $this->actingAs($admin, 'sanctum')
             ->deleteJson("/api/projects/{$project->id}")
             ->assertStatus(409);
 
         $this->assertDatabaseHas('projects', ['id' => $project->id, 'deleted_at' => null]);
+        $this->assertDatabaseHas('academic_programs', ['id' => $program->id, 'deleted_at' => null]);
     }
 }

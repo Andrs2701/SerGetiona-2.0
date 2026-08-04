@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\ProjectCollection;
+use App\Models\AcademicProgram;
 use App\Models\Deliverable;
 use App\Models\Project;
+use App\Models\Subject;
 use App\Support\ResourceAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 use Illuminate\Validation\Rule;
 
@@ -129,18 +132,30 @@ class ProjectController extends Controller
         // Project/AcademicProgram/Subject/Deliverable son SoftDeletes: un
         // ->delete() aquí es un UPDATE (deleted_at), nunca dispara el
         // cascadeOnDelete() de la FK a nivel de base de datos (eso solo
-        // corre con un DELETE real). Si el proyecto ya tiene programas
-        // (y por lo tanto, transitivamente, asignaturas/entregables), un
-        // "eliminar" dejaría ese contenido huérfano pero invisible en vez
+        // corre con un DELETE real). Si hay algún entregable real bajo el
+        // proyecto, un "eliminar" lo dejaría huérfano pero invisible en vez
         // de borrarlo — se bloquea en vez de fingir una eliminación en
-        // cascada que no ocurre.
-        if ($project->academicPrograms()->count() > 0) {
+        // cascada que no ocurre. Si el proyecto solo tiene programas o
+        // asignaturas vacías (sin entregables), sí se pueden borrar junto
+        // con él: no queda nada huérfano porque no había nada debajo.
+        $programIds = $project->academicPrograms()->pluck('id');
+
+        $hasDeliverables = $programIds->isNotEmpty() && Deliverable::whereIn(
+            'subject_id',
+            Subject::whereIn('academic_program_id', $programIds)->pluck('id')
+        )->exists();
+
+        if ($hasDeliverables) {
             return response()->json([
-                'message' => 'No se puede eliminar: este proyecto tiene programas académicos asociados. Elimínalos primero.',
+                'message' => 'No se puede eliminar: este proyecto tiene entregables asociados. Elimínalos primero.',
             ], 409);
         }
 
-        $project->delete();
+        DB::transaction(function () use ($project, $programIds) {
+            Subject::whereIn('academic_program_id', $programIds)->delete();
+            AcademicProgram::whereIn('id', $programIds)->delete();
+            $project->delete();
+        });
 
         return response()->json(['message' => 'Proyecto eliminado correctamente.']);
     }

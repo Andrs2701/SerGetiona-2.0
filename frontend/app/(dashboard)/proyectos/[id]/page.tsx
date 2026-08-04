@@ -139,16 +139,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleDelete() {
-    const hasActivities = deliverables.length > 0;
-    const msg = hasActivities
-      ? '¡ADVERTENCIA! Esta Escuela / Proyecto contiene entregables y actividades asociadas. Si la eliminas, se borrarán todos los datos permanentemente en cascada. ¿Estás seguro de que deseas proceder?'
-      : '¿Estás seguro de que deseas eliminar esta Escuela / Proyecto?';
-    if (!window.confirm(msg)) return;
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta Escuela / Proyecto? Esta acción no se puede deshacer.')) return;
     try {
       await api.delete(ENDPOINTS.PROJECT(projectId));
       router.push('/proyectos');
-    } catch {
-      alert('Error al eliminar la Escuela / Proyecto.');
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : '';
+      const bodyMatch = raw.match(/HTTP \d+: ([\s\S]*)/);
+      let serverMessage = '';
+      if (bodyMatch) {
+        try {
+          serverMessage = JSON.parse(bodyMatch[1])?.message ?? '';
+        } catch {
+          // el cuerpo no era JSON — se usa el mensaje genérico de abajo
+        }
+      }
+      alert(serverMessage || 'Error al eliminar la Escuela / Proyecto.');
     }
   }
 
