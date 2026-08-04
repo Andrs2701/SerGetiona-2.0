@@ -88,4 +88,87 @@ class RoleActivityObserverTest extends TestCase
         $this->assertNotNull($secondAssignedAt);
         $this->assertTrue($secondAssignedAt->gt($firstAssignedAt));
     }
+
+    /**
+     * "Actividad creada" en la línea de tiempo nunca decía quién la creó
+     * porque ningún controlador seteaba created_by — se centraliza en el
+     * observer, igual que ya pasaba con assigned_at.
+     */
+    public function test_created_by_is_set_from_the_acting_user(): void
+    {
+        $subject     = Subject::factory()->create();
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $creator     = User::factory()->create(['role' => 'coordinator', 'is_active' => true]);
+
+        $this->actingAs($creator, 'sanctum');
+
+        $activity = RoleActivity::create([
+            'deliverable_id'  => $deliverable->id,
+            'role'            => 'pedagogy',
+            'checklist'       => RoleActivity::defaultChecklist('pedagogy'),
+        ]);
+
+        $this->assertSame($creator->id, $activity->fresh()->created_by);
+    }
+
+    /**
+     * Igual que assigned_at: assigned_by debe reflejar quién hizo la
+     * reasignación ACTUAL, no quién asignó al primer responsable.
+     */
+    public function test_assigned_by_is_set_on_creation_and_updated_on_reassignment(): void
+    {
+        $subject     = Subject::factory()->create();
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $userA       = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+        $userB       = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+        $creator     = User::factory()->create(['role' => 'coordinator', 'is_active' => true]);
+        $reassigner  = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+
+        $this->actingAs($creator, 'sanctum');
+        $activity = RoleActivity::create([
+            'deliverable_id'  => $deliverable->id,
+            'role'            => 'pedagogy',
+            'responsible_id'  => $userA->id,
+            'checklist'       => RoleActivity::defaultChecklist('pedagogy'),
+        ]);
+
+        $this->assertSame($creator->id, $activity->fresh()->assigned_by);
+
+        $this->actingAs($reassigner, 'sanctum');
+        $activity->update(['responsible_id' => $userB->id]);
+
+        $this->assertSame($reassigner->id, $activity->fresh()->assigned_by);
+    }
+
+    /**
+     * La Línea de tiempo mostraba "Actividad creada — {rol}" sin decir
+     * quién, y "Asignada a {responsable}" sin decir quién hizo la
+     * asignación — ambos ahora deben traer el nombre real.
+     */
+    public function test_deliverable_timeline_shows_creator_and_assigner_names(): void
+    {
+        $subject     = Subject::factory()->create();
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $creator     = User::factory()->create(['role' => 'coordinator', 'is_active' => true, 'name' => 'Coordinadora Uno']);
+        $responsible = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+
+        $this->actingAs($creator, 'sanctum');
+        RoleActivity::create([
+            'deliverable_id'  => $deliverable->id,
+            'role'            => 'pedagogy',
+            'responsible_id'  => $responsible->id,
+            'checklist'       => RoleActivity::defaultChecklist('pedagogy'),
+        ]);
+
+        $res = $this->actingAs($creator, 'sanctum')
+            ->getJson("/api/deliverables/{$deliverable->id}/timeline")
+            ->assertOk();
+
+        $events = collect($res->json('events'));
+        $created = $events->firstWhere('type', 'created');
+        $assigned = $events->firstWhere('type', 'assigned');
+
+        $this->assertSame('Coordinadora Uno', $created['user']);
+        $this->assertSame('Coordinadora Uno', $assigned['user']);
+    }
 }

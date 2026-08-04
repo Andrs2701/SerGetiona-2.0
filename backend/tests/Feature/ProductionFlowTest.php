@@ -94,6 +94,9 @@ class ProductionFlowTest extends TestCase
         $this->assertStringContainsString('Experto Temático', $notif->message);
         $this->assertStringContainsString('Estado actual', $notif->message);
         $this->assertStringContainsString('Fecha límite', $notif->message);
+
+        // Debe decir quién hizo la asignación, no solo qué se asignó.
+        $this->assertStringContainsString($this->coordinator->name, $notif->message);
     }
 
     public function test_quick_action_deliver_enables_next_role_and_notifies(): void

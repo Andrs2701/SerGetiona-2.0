@@ -51,8 +51,8 @@ class NotificationService
 
     public static function notifyTaskAssigned(RoleActivity $activity, User $user): void
     {
-        $activity->loadMissing('deliverable.subject.academicProgram.project');
-        
+        $activity->loadMissing('deliverable.subject.academicProgram.project', 'assignedBy');
+
         $deliverable = $activity->deliverable;
         $subject = $deliverable?->subject;
         $program = $subject?->academicProgram;
@@ -65,11 +65,14 @@ class NotificationService
 
         $roleLabel = self::translateRole($activity->role);
         $statusLabel = RoleActivityController::translateStatus($activity->status);
-        $commitmentDate = $activity->commitment_date 
-            ? (\Carbon\Carbon::parse($activity->commitment_date)->toDateString()) 
+        $commitmentDate = $activity->commitment_date
+            ? (\Carbon\Carbon::parse($activity->commitment_date)->toDateString())
             : 'N/A';
 
-        $message = "Se te ha asignado la actividad de rol '{$roleLabel}' en la asignatura '{$subjectName}' para el programa '{$programName}' (Proyecto: '{$projectName}'). Estado actual: '{$statusLabel}', Fecha límite: {$commitmentDate}.";
+        $assignedByName = $activity->assignedBy?->name;
+        $assignedByPhrase = $assignedByName ? " Asignado por: {$assignedByName}." : '';
+
+        $message = "Se te ha asignado la actividad de rol '{$roleLabel}' en la asignatura '{$subjectName}' para el programa '{$programName}' (Proyecto: '{$projectName}'). Estado actual: '{$statusLabel}', Fecha límite: {$commitmentDate}.{$assignedByPhrase}";
 
         self::notify(
             $user,

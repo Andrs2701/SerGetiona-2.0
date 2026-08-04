@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\RoleActivity;
 use App\Services\ProductionEventService;
+use Illuminate\Support\Facades\Auth;
 
 class RoleActivityObserver
 {
@@ -13,14 +14,25 @@ class RoleActivityObserver
      * controlador la seteaba, así que el evento "Asignada a X" del timeline
      * (DeliverableController::timeline(), que exige assigned_at) nunca
      * aparecía para ninguna actividad, sin importar cómo se hubiera creado.
+     *
+     * created_by/assigned_by: mismo problema — ningún controlador (creación
+     * manual, carga masiva, reasignación) los seteaba, así que "Actividad
+     * creada" en el timeline y la notificación de asignación nunca decían
+     * quién fue. Se centralizan aquí en vez de repetir Auth::id() en cada
+     * sitio que crea o reasigna una actividad.
      */
     public function creating(RoleActivity $activity): void
     {
+        if (is_null($activity->created_by)) {
+            $activity->created_by = Auth::id();
+        }
+
         if (is_null($activity->responsible_id)) {
             $activity->status               = 'not_applicable';
             $activity->actual_delivery_date = null;
         } elseif (is_null($activity->assigned_at)) {
             $activity->assigned_at = now();
+            $activity->assigned_by = $activity->assigned_by ?? Auth::id();
         }
     }
 
@@ -62,8 +74,11 @@ class RoleActivityObserver
             // Se actualiza en CADA reasignación, no solo la primera vez: el
             // timeline muestra "Asignada a {responsable actual}" junto a esta
             // fecha, así que debe reflejar cuándo quedó asignado el responsable
-            // de hoy, no el de la primera persona que tuvo el rol.
+            // de hoy, no el de la primera persona que tuvo el rol. Mismo
+            // criterio para assigned_by: quién hizo ESTA reasignación, no
+            // quién hizo la primera.
             $activity->assigned_at = now();
+            $activity->assigned_by = Auth::id();
         }
     }
 

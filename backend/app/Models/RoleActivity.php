@@ -14,6 +14,7 @@ class RoleActivity extends Model
         'role',
         'responsible_id',
         'assigned_by',
+        'created_by',
         'assigned_at',
         'commitment_date',
         'actual_start_date',
@@ -113,6 +114,11 @@ class RoleActivity extends Model
     public function assignedBy()
     {
         return $this->belongsTo(User::class, 'assigned_by');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function evidences()

@@ -411,7 +411,7 @@ class DeliverableController extends Controller
         $deliverable->loadMissing('subject.academicProgram.project');
         abort_unless(ResourceAccess::canAccessDeliverable($request->user(), $deliverable), 403);
 
-        $deliverable->load(['roleActivities.responsible']);
+        $deliverable->load(['roleActivities.responsible', 'roleActivities.creator', 'roleActivities.assignedBy']);
 
         $roleOrder = self::ALL_ROLES;
         $roleLabels = [
@@ -443,7 +443,7 @@ class DeliverableController extends Controller
             $allEvents[] = [
                 'type'       => 'created',
                 'label'      => "Actividad creada — {$roleLabel}",
-                'user'       => null,
+                'user'       => $activity->creator?->name,
                 'date'       => $activity->created_at?->toIso8601String(),
                 'role'       => $role,
                 'role_label' => $roleLabel,
@@ -453,7 +453,7 @@ class DeliverableController extends Controller
                 $allEvents[] = [
                     'type'       => 'assigned',
                     'label'      => "Asignada a {$activity->responsible?->name} — {$roleLabel}",
-                    'user'       => null,
+                    'user'       => $activity->assignedBy?->name,
                     'date'       => Carbon::parse($activity->assigned_at)->toIso8601String(),
                     'role'       => $role,
                     'role_label' => $roleLabel,
