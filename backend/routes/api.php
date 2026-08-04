@@ -66,9 +66,9 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::get('projects', [ProjectController::class, 'index']);
     Route::get('projects/{project}', [ProjectController::class, 'show']);
     Route::get('projects/{project}/audit', [ProjectController::class, 'audit']);
-    Route::post('projects', [ProjectController::class, 'store'])->middleware('role:admin,coordinator');
-    Route::put('projects/{project}', [ProjectController::class, 'update'])->middleware('role:admin,coordinator');
-    Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('role:admin,coordinator');
+    Route::post('projects', [ProjectController::class, 'store'])->middleware('permission:projects,manage');
+    Route::put('projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects,manage');
+    Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('permission:projects,manage');
 
     // Lectura abierta a autenticados (los controladores filtran por rol);
     // escritura solo gerencial

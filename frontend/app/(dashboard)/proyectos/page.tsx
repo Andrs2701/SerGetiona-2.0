@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Plus, Download, ChevronDown,
-  Calendar, Users2, FileText, TrendingUp, ArrowRight,
+  Calendar, Users2, FileText, TrendingUp, ArrowRight, Trash2,
   LayoutGrid, List, GitBranch,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -15,6 +15,8 @@ import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import { Skeleton } from '@/components/LoadingSkeleton';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { can } from '@/lib/permissions';
 
 const PROJECT_STATUSES: ProjectStatus[] = [
   'draft', 'pending_params', 'parameterized', 'in_progress', 'suspended', 'finished', 'cancelled',
@@ -60,11 +62,14 @@ function ComplianceBar({ value }: { value: number }) {
   );
 }
 
-function ProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
+function ProjectCard({ project, onClick, onDelete, canDelete }: { project: Project; onClick: () => void; onDelete?: () => void; canDelete?: boolean }) {
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex flex-col gap-4"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+      className="group bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex flex-col gap-4 cursor-pointer"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
@@ -76,7 +81,18 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
             <p className="text-xs text-gray-500 mt-1 line-clamp-1">{project.description}</p>
           )}
         </div>
-        <StatusBadge status={project.status} type="project" />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <StatusBadge status={project.status} type="project" />
+          {canDelete && onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              title="Eliminar Escuela / Proyecto"
+              className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progress */}
@@ -116,7 +132,52 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
           Ver detalle <ArrowRight size={12} />
         </span>
       </div>
-    </button>
+    </div>
+  );
+}
+
+function DeleteProjectConfirm({ project, onConfirm, onCancel, deleting }: { project: Project; onConfirm: () => void; onCancel: () => void; deleting: boolean }) {
+  // No hay eliminación en cascada real hacia programas/entregables (ver
+  // ProjectController::destroy) — se bloquea aquí en vez de prometer un
+  // borrado que dejaría contenido huérfano.
+  const hasContent = project.deliverables_count > 0 || project.programs_count > 0;
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onCancel} />
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Trash2 size={20} className="text-red-600" />
+          </div>
+          <h3 className="text-center font-semibold text-gray-900 mb-2">Eliminar Escuela / Proyecto</h3>
+          {hasContent ? (
+            <>
+              <p className="text-center text-sm text-gray-600 mb-3">
+                No puedes eliminar <strong>"{project.name}"</strong> todavía.
+              </p>
+              <p className="text-center text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                Tiene {project.programs_count} programa{project.programs_count !== 1 ? 's' : ''} académico{project.programs_count !== 1 ? 's' : ''} asociado{project.programs_count !== 1 ? 's' : ''}
+                {project.deliverables_count > 0 ? ` y ${project.deliverables_count} entregable${project.deliverables_count !== 1 ? 's' : ''}` : ''}. Elimínalos primero.
+              </p>
+              <button onClick={onCancel} className="w-full px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Entendido</button>
+            </>
+          ) : (
+            <>
+              <p className="text-center text-sm text-gray-600 mb-3">
+                ¿Seguro que deseas eliminar <strong>"{project.name}"</strong>?
+              </p>
+              <p className="text-center text-xs text-gray-400 mb-6">Esta acción no se puede deshacer.</p>
+              <div className="flex gap-3">
+                <button onClick={onCancel} disabled={deleting} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">Cancelar</button>
+                <button onClick={onConfirm} disabled={deleting} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
+                  {deleting ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -139,7 +200,7 @@ function ProjectCardSkeleton() {
 }
 
 // ── Table view ─────────────────────────────────────────────────────────────────
-function ProjectsTable({ projects, onRowClick }: { projects: Project[]; onRowClick: (id: number) => void }) {
+function ProjectsTable({ projects, onRowClick, onDelete, canDelete }: { projects: Project[]; onRowClick: (id: number) => void; onDelete?: (p: Project) => void; canDelete?: boolean }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
       <table className="w-full text-sm min-w-[640px]">
@@ -151,6 +212,7 @@ function ProjectsTable({ projects, onRowClick }: { projects: Project[]; onRowCli
             <th className="px-4 py-3">Entregables</th>
             <th className="px-4 py-3">Cumplimiento</th>
             <th className="px-4 py-3">Inicio</th>
+            {canDelete && <th className="px-4 py-3 w-10" />}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -166,6 +228,19 @@ function ProjectsTable({ projects, onRowClick }: { projects: Project[]; onRowCli
               <td className="px-4 py-3 text-gray-600 text-center">{p.deliverables_count}</td>
               <td className="px-4 py-3 w-32"><ComplianceBar value={p.compliance_percentage} /></td>
               <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.start_date ?? '—'}</td>
+              {canDelete && (
+                <td className="px-4 py-3">
+                  {onDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(p); }}
+                      title="Eliminar Escuela / Proyecto"
+                      className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -204,6 +279,8 @@ function ProjectsTimeline({ projects, onRowClick }: { projects: Project[]; onRow
 
 export default function ProyectosPage() {
   const router = useRouter();
+  const { user } = useAuthContext();
+  const canManageProjects = user?.role === 'admin' || user?.role === 'coordinator' || can(user, 'projects', 'manage');
   const [data, setData] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -214,6 +291,8 @@ export default function ProyectosPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [view, setView] = useState<PortfolioView>('cards');
   const [users, setUsers] = useState<User[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api
@@ -276,6 +355,20 @@ export default function ProyectosPage() {
       setSaving(false);
       setShowModal(false);
       setForm(emptyForm);
+    }
+  }
+
+  async function handleDelete(project: Project) {
+    setDeleting(true);
+    try {
+      await api.delete(ENDPOINTS.PROJECT(project.id));
+      setData((prev) => prev.filter((p) => p.id !== project.id));
+      setDeleteTarget(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      alert(msg.includes('403') ? 'No tienes permiso para eliminar esta Escuela/Proyecto.' : 'No se pudo eliminar. Intenta de nuevo.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -383,6 +476,8 @@ export default function ProyectosPage() {
                   key={project.id}
                   project={project}
                   onClick={() => router.push(`/proyectos/${project.id}`)}
+                  onDelete={() => setDeleteTarget(project)}
+                  canDelete={canManageProjects}
                 />
               ))}
             </div>
@@ -391,6 +486,8 @@ export default function ProyectosPage() {
             <ProjectsTable
               projects={filtered}
               onRowClick={(id) => router.push(`/proyectos/${id}`)}
+              onDelete={(project) => setDeleteTarget(project)}
+              canDelete={canManageProjects}
             />
           )}
           {view === 'timeline' && (
@@ -496,6 +593,15 @@ export default function ProyectosPage() {
           </div>
         </div>
       </Modal>
+
+      {deleteTarget && (
+        <DeleteProjectConfirm
+          project={deleteTarget}
+          deleting={deleting}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => handleDelete(deleteTarget)}
+        />
+      )}
     </div>
   );
 }

@@ -187,4 +187,72 @@ class PermissionMatrixEnforcementTest extends TestCase
             array_keys($rows->first())
         );
     }
+
+    /**
+     * "Proyectos · Gestionar" ya existía en la Matriz desde antes de esta
+     * sesión, pero las rutas de escritura de /projects seguían fijas a
+     * role:admin,coordinator — el checkbox no tenía ningún efecto real.
+     */
+    public function test_engineering_cannot_delete_project_by_default(): void
+    {
+        $project = \App\Models\Project::factory()->create();
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $this->actingAs($engineer, 'sanctum')
+            ->deleteJson("/api/projects/{$project->id}")
+            ->assertStatus(403);
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
+
+    public function test_engineering_can_delete_project_once_granted_projects_manage(): void
+    {
+        SystemPermission::where('module', 'projects')->where('action', 'manage')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $project = \App\Models\Project::factory()->create();
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $this->actingAs($engineer, 'sanctum')
+            ->deleteJson("/api/projects/{$project->id}")
+            ->assertStatus(200);
+
+        $this->assertSoftDeleted('projects', ['id' => $project->id]);
+    }
+
+    public function test_admin_and_coordinator_retain_project_management_by_default(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $coordinator = User::factory()->create(['role' => 'coordinator', 'is_active' => true]);
+        $projectForAdmin = \App\Models\Project::factory()->create();
+        $projectForCoordinator = \App\Models\Project::factory()->create();
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/projects/{$projectForAdmin->id}")
+            ->assertStatus(200);
+
+        $this->actingAs($coordinator, 'sanctum')
+            ->deleteJson("/api/projects/{$projectForCoordinator->id}")
+            ->assertStatus(200);
+    }
+
+    /**
+     * Project/AcademicProgram/Subject/Deliverable son SoftDeletes: un
+     * ->delete() aquí nunca dispara el cascadeOnDelete() de la FK (eso solo
+     * corre con un DELETE real de SQL). Sin este bloqueo, "eliminar" un
+     * proyecto con contenido lo dejaría con deleted_at pero sus programas y
+     * entregables seguirían existiendo, ahora huérfanos e inaccesibles.
+     */
+    public function test_admin_cannot_delete_project_with_academic_programs(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $project = \App\Models\Project::factory()->create();
+        \App\Models\AcademicProgram::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/projects/{$project->id}")
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'deleted_at' => null]);
+    }
 }

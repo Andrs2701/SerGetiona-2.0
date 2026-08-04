@@ -125,6 +125,20 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
+        // Project/AcademicProgram/Subject/Deliverable son SoftDeletes: un
+        // ->delete() aquí es un UPDATE (deleted_at), nunca dispara el
+        // cascadeOnDelete() de la FK a nivel de base de datos (eso solo
+        // corre con un DELETE real). Si el proyecto ya tiene programas
+        // (y por lo tanto, transitivamente, asignaturas/entregables), un
+        // "eliminar" dejaría ese contenido huérfano pero invisible en vez
+        // de borrarlo — se bloquea en vez de fingir una eliminación en
+        // cascada que no ocurre.
+        if ($project->academicPrograms()->count() > 0) {
+            return response()->json([
+                'message' => 'No se puede eliminar: este proyecto tiene programas académicos asociados. Elimínalos primero.',
+            ], 409);
+        }
+
         $project->delete();
 
         return response()->json(['message' => 'Proyecto eliminado correctamente.']);
