@@ -281,6 +281,17 @@ class DeliverableController extends Controller
 
     public function destroy(Deliverable $deliverable)
     {
+        // RoleActivity no usa SoftDeletes: si no se limpia aquí, un
+        // ->delete() (soft) del entregable deja sus actividades como filas
+        // reales huérfanas en la base de datos — ya no aparecen en las
+        // vistas que filtran con whereHas('deliverable'), pero SÍ las
+        // siguen contando las que no lo hacen (Distribución de Carga,
+        // Cumplimiento por rol/programa/proyecto), mostrando "vencidas"
+        // fantasma para usuarios que en realidad ya no tienen nada
+        // pendiente. Los hijos de role_activities (evidencias, registros
+        // de producción, observaciones) tienen cascadeOnDelete() real a
+        // nivel de FK, así que un DELETE de verdad aquí los limpia solo.
+        $deliverable->roleActivities()->delete();
         $deliverable->delete();
         return response()->json(['message' => 'Entregable eliminado correctamente.']);
     }

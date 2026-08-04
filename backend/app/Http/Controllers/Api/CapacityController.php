@@ -54,7 +54,8 @@ class CapacityController extends Controller
     {
         $today = now()->toDateString();
 
-        $activities = RoleActivity::with('deliverable.subject.academicProgram', 'deliverable.complexityLevel')
+        $activities = RoleActivity::whereHas('deliverable')
+            ->with('deliverable.subject.academicProgram', 'deliverable.complexityLevel')
             ->where('responsible_id', $user->id)
             ->whereNotIn('status', CapacityService::EXCLUDED_STATUSES)
             ->whereNotNull('commitment_date')

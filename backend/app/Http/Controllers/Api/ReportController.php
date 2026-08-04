@@ -27,7 +27,7 @@ class ReportController extends Controller
         $inReviewStatuses = ['delivered', 'in_review', 'in_testing', 'validating', 'editing', 'adjusting'];
         $today = now()->toDateString();
 
-        $activities = RoleActivity::whereNotNull('responsible_id')->get();
+        $activities = RoleActivity::whereNotNull('responsible_id')->whereHas('deliverable')->get();
 
         // Precargar todos los responsables de una sola consulta en vez de un
         // User::find() por cada uno dentro del map() (N+1).
@@ -140,6 +140,7 @@ class ReportController extends Controller
         $countByProgram = function ($query) {
             return $query
                 ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->whereNull('deliverables.deleted_at')
                 ->join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
                 ->select('subjects.academic_program_id', DB::raw('count(*) as total'))
                 ->groupBy('subjects.academic_program_id')
@@ -191,6 +192,7 @@ class ReportController extends Controller
         $countBySubject = function ($query) {
             return $query
                 ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->whereNull('deliverables.deleted_at')
                 ->select('deliverables.subject_id', DB::raw('count(*) as total'))
                 ->groupBy('deliverables.subject_id')
                 ->pluck('total', 'subject_id');
@@ -318,6 +320,7 @@ class ReportController extends Controller
         $completedList = implode("','", RoleActivity::COMPLETED_STATUSES);
 
         $roleStats = RoleActivity::where('status', '!=', 'not_applicable')
+            ->whereHas('deliverable')
             ->when($request->filled('project_id'), function ($q) use ($request) {
                 $q->whereHas('deliverable.subject.academicProgram', function ($q2) use ($request) {
                     $q2->where('project_id', $request->project_id);
@@ -361,6 +364,7 @@ class ReportController extends Controller
         $projectActCount = function ($query) {
             return $query
                 ->join('deliverables', 'role_activities.deliverable_id', '=', 'deliverables.id')
+                ->whereNull('deliverables.deleted_at')
                 ->join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
                 ->join('academic_programs', 'subjects.academic_program_id', '=', 'academic_programs.id')
                 ->select('academic_programs.project_id', DB::raw('count(*) as total'))
