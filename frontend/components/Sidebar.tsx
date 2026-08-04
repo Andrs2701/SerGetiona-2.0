@@ -15,6 +15,7 @@ import {
   X,
   FolderKanban,
   HelpCircle,
+  FileBarChart,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { USER_ROLE_LABELS } from "@/lib/types";
@@ -57,6 +58,10 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: 'Escuelas / Proyectos',
     icon: FolderKanban,
     roles: ['admin', 'coordinator'],
+    permissions: [
+      { module: 'projects', action: 'view' },
+      { module: 'projects', action: 'manage' },
+    ],
   },
   {
     href: '/entregables',
@@ -88,16 +93,32 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
   },
   {
+    href: '/reportes',
+    label: 'Reportes',
+    icon: FileBarChart,
+    roles: ['admin', 'coordinator'],
+    permissions: [
+      { module: 'reportes', action: 'view' },
+    ],
+  },
+  {
     href: '/usuarios',
     label: 'Usuarios',
     icon: Users,
     roles: ['admin', 'coordinator'],
+    permissions: [
+      { module: 'users', action: 'view' },
+      { module: 'users', action: 'manage' },
+    ],
   },
   {
     href: '/configuracion',
     label: 'Configuración',
     icon: Settings,
     roles: ['admin'],
+    permissions: [
+      { module: 'configuracion', action: 'view' },
+    ],
   },
   {
     href: '/ayuda',

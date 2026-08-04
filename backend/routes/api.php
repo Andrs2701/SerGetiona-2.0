@@ -113,7 +113,7 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::get('complexity-levels', [ComplexityLevelController::class, 'index']);
     // Niveles académicos (Pregrado/Posgrado/...) — lectura abierta, gestión solo admin
     Route::get('academic-levels', [AcademicLevelController::class, 'index']);
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('permission:configuracion,view')->group(function () {
         Route::post('complexity-levels', [ComplexityLevelController::class, 'store']);
         Route::put('complexity-levels/{level}', [ComplexityLevelController::class, 'update']);
         Route::delete('complexity-levels/{level}', [ComplexityLevelController::class, 'destroy']);
@@ -165,11 +165,11 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
 
     // Usuarios: lectura para gestión de asignaciones; escritura solo admin.
     Route::apiResource('users', UserController::class)->only(['index', 'show'])
-        ->middleware('role:admin,coordinator');
+        ->middleware('permission:users,view');
     Route::apiResource('users', UserController::class)->except(['index', 'show'])
-        ->middleware('role:admin');
+        ->middleware('permission:users,manage');
     Route::post('/users/{user}/reset-link', [UserController::class, 'generateResetLink'])
-        ->middleware('role:admin');
+        ->middleware('permission:users,manage');
 
     // Cobertura temporal de rol (vacaciones/incapacidades) — admin/coordinador
     Route::middleware('role:admin,coordinator')->group(function () {
@@ -178,7 +178,20 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         Route::delete('/role-coverages/{roleCoverage}', [RoleCoverageController::class, 'destroy']);
     });
 
-    // Reportes, importación y exportación — información gerencial
+    // Reportes — módulo "reportes" de la Matriz de Permisos.
+    Route::middleware('permission:reportes,view')->group(function () {
+        Route::get('reports/health', [HealthController::class, 'portfolio']);
+        Route::get('reports/executive-summary', [ReportController::class, 'executiveSummary']);
+        Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
+        Route::get('reports/compliance', [ReportController::class, 'compliance']);
+        Route::get('reports/workload', [ReportController::class, 'workload']);
+        Route::get('reports/overdue-list', [ReportController::class, 'overdueList']);
+        Route::get('reports/approaching-list', [ReportController::class, 'approachingList']);
+        Route::get('reports/production', [ProductionLogController::class, 'summary']);
+    });
+
+    // Capacidad, decisiones, importación y exportación — información gerencial
+    // sin permiso propio en la Matriz todavía; siguen fijas a admin/coordinator.
     Route::middleware('role:admin,coordinator')->group(function () {
         // Capacidad operativa
         Route::get('capacity', [CapacityController::class, 'index']);
@@ -191,16 +204,8 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         Route::apiResource('decisions', DecisionRecordController::class)
             ->parameters(['decisions' => 'decision']);
 
-        // Salud de proyectos y resumen ejecutivo
-        Route::get('reports/health', [HealthController::class, 'portfolio']);
+        // Salud de proyectos (vista de detalle de un proyecto puntual)
         Route::get('projects/{project}/health', [HealthController::class, 'project']);
-        Route::get('reports/executive-summary', [ReportController::class, 'executiveSummary']);
-
-        Route::get('reports/dashboard', [ReportController::class, 'dashboard']);
-        Route::get('reports/compliance', [ReportController::class, 'compliance']);
-        Route::get('reports/workload', [ReportController::class, 'workload']);
-        Route::get('reports/overdue-list', [ReportController::class, 'overdueList']);
-        Route::get('reports/approaching-list', [ReportController::class, 'approachingList']);
 
         Route::post('/import/deliverables', [ImportController::class, 'deliverables'])->middleware('throttle:10,1');
         Route::get('/import/template', [ImportController::class, 'template']);
@@ -208,9 +213,6 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         Route::get('/export/deliverables', [ExportController::class, 'deliverables'])->middleware('throttle:10,1');
         Route::get('/export/projects', [ExportController::class, 'projects'])->middleware('throttle:10,1');
         Route::get('/export/production', [ProductionLogController::class, 'export'])->middleware('throttle:10,1');
-
-        // Indicadores de producción
-        Route::get('reports/production', [ProductionLogController::class, 'summary']);
     });
 
     // Flujo secuencial de entregable

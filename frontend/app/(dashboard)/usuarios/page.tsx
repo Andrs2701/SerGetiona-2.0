@@ -14,6 +14,7 @@ import Modal from '@/components/Modal';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import Avatar from '@/components/Avatar';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { can } from '@/lib/permissions';
 
 function parseApiError(err: unknown): string {
   if (!(err instanceof Error)) return 'No se pudo guardar el usuario. Intenta de nuevo.';
@@ -98,7 +99,8 @@ export default function UsuariosPage() {
   const { user } = useAuthContext();
   const router = useRouter();
   
-  const isManagement = user?.role === 'admin';
+  const canViewUsers = user?.role === 'admin' || user?.role === 'coordinator' || can(user, 'users', 'view');
+  const isManagement = user?.role === 'admin' || can(user, 'users', 'manage');
   const canManageCoverage = user?.role === 'admin' || user?.role === 'coordinator';
 
   const [data, setData] = useState<User[]>([]);
@@ -157,7 +159,7 @@ export default function UsuariosPage() {
   }, []);
 
   useEffect(() => {
-    if (user && user.role !== 'admin' && user.role !== 'coordinator') {
+    if (user && !canViewUsers) {
       router.replace('/');
       return;
     }
@@ -175,10 +177,10 @@ export default function UsuariosPage() {
 
   // Polling cada 30s
   useEffect(() => {
-    if (!user || (user.role !== 'admin' && user.role !== 'coordinator')) return;
+    if (!user || !canViewUsers) return;
     const interval = setInterval(fetchUsersSilent, 30000);
     return () => clearInterval(interval);
-  }, [user, fetchUsersSilent]);
+  }, [user, canViewUsers, fetchUsersSilent]);
 
   function openCreate() {
     setEditUser(null);

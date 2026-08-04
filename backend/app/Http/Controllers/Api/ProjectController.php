@@ -14,15 +14,16 @@ use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
-    private const OPERATIONAL_ROLES = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
-
     public function index(Request $request)
     {
         $user = $request->user();
 
         $projectQuery = Project::withCount(['academicPrograms as programs_count']);
 
-        if (in_array($user->role, self::OPERATIONAL_ROLES)) {
+        // Antes filtraba por una lista fija de roles "operativos" e ignoraba
+        // el Alcance de Visibilidad de Configuración — igual regresión que ya
+        // se corrigió en DeliverableController::index().
+        if (!ResourceAccess::isManager($user)) {
             $projectQuery->whereHas('academicPrograms.subjects.deliverables.roleActivities', function ($q) use ($user) {
                 $q->where('responsible_id', $user->id);
             });

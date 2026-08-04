@@ -81,11 +81,10 @@ class SystemConfigurationTest extends TestCase
 
     public function test_admin_can_update_permission_matrix(): void
     {
-        $perm = SystemPermission::create([
-            'module' => 'reportes',
-            'action' => 'view',
-            'allowed_roles' => ['admin', 'coordinator'],
-        ]);
+        $perm = SystemPermission::firstOrCreate(
+            ['module' => 'reportes', 'action' => 'view'],
+            ['allowed_roles' => ['admin', 'coordinator']]
+        );
 
         $this->actingAs($this->admin, 'sanctum')
             ->putJson('/api/config/permissions', [

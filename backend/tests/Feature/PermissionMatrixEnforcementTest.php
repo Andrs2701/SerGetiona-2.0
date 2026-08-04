@@ -158,6 +158,110 @@ class PermissionMatrixEnforcementTest extends TestCase
     }
 
     /**
+     * Regresión: index() filtraba por una lista fija de "roles operativos" e
+     * ignoraba el Alcance de Visibilidad — igual bug que ya se corrigió para
+     * Entregables, pero en el listado de Escuelas/Proyectos.
+     */
+    public function test_projects_index_respects_visibility_rule_scope(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+        $otherEngineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $mine = \App\Models\Project::factory()->create(['name' => 'Mi Proyecto']);
+        $deliverableMine = Deliverable::factory()->create();
+        $deliverableMine->subject->academicProgram->update(['project_id' => $mine->id]);
+        RoleActivity::factory()->create([
+            'deliverable_id' => $deliverableMine->id, 'role' => 'engineering', 'responsible_id' => $engineer->id,
+        ]);
+
+        $notMine = \App\Models\Project::factory()->create(['name' => 'Proyecto De Otro']);
+        $deliverableNotMine = Deliverable::factory()->create();
+        $deliverableNotMine->subject->academicProgram->update(['project_id' => $notMine->id]);
+        RoleActivity::factory()->create([
+            'deliverable_id' => $deliverableNotMine->id, 'role' => 'engineering', 'responsible_id' => $otherEngineer->id,
+        ]);
+
+        // Por defecto (assigned_only): solo ve el proyecto donde tiene actividades asignadas.
+        $before = $this->actingAs($engineer, 'sanctum')->getJson('/api/projects');
+        $before->assertOk();
+        $namesBefore = collect($before->json('data'))->pluck('name');
+        $this->assertTrue($namesBefore->contains('Mi Proyecto'));
+        $this->assertFalse($namesBefore->contains('Proyecto De Otro'));
+
+        // Al cambiar su Alcance de Visibilidad a "all", ve todos los proyectos.
+        VisibilityRule::updateOrCreate(['role_slug' => 'engineering'], ['scope' => 'all']);
+
+        $after = $this->actingAs($engineer, 'sanctum')->getJson('/api/projects');
+        $after->assertOk();
+        $namesAfter = collect($after->json('data'))->pluck('name');
+        $this->assertTrue($namesAfter->contains('Mi Proyecto'));
+        $this->assertTrue($namesAfter->contains('Proyecto De Otro'));
+    }
+
+    /**
+     * "Usuarios · Ver/Gestionar" seguían fijas a role:admin,coordinator /
+     * role:admin — el checkbox de la Matriz no tenía efecto real.
+     */
+    public function test_engineering_gains_users_view_once_granted_via_matrix(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/users')->assertStatus(403);
+
+        SystemPermission::where('module', 'users')->where('action', 'view')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/users')->assertStatus(200);
+    }
+
+    /**
+     * "Reportes · Ver" seguía fija a role:admin,coordinator — el checkbox de
+     * la Matriz no tenía efecto real.
+     */
+    public function test_engineering_gains_reportes_view_once_granted_via_matrix(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/reports/compliance')->assertStatus(403);
+
+        SystemPermission::where('module', 'reportes')->where('action', 'view')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/reports/compliance')->assertStatus(200);
+    }
+
+    /**
+     * "Capacidad" y "Decisiones" comparten grupo de rutas con Reportes en el
+     * código pero no tienen fila propia en la Matriz — deben seguir fijas a
+     * admin/coordinator y NO abrirse al otorgar reportes.view a otro rol.
+     */
+    public function test_granting_reportes_view_does_not_leak_into_capacity_or_decisions(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+        SystemPermission::where('module', 'reportes')->where('action', 'view')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/capacity')->assertStatus(403);
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/decisions')->assertStatus(403);
+    }
+
+    /**
+     * "Configuración · Ver" seguía fija a role:admin — el checkbox de la
+     * Matriz no tenía efecto real.
+     */
+    public function test_engineering_gains_configuracion_view_once_granted_via_matrix(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/config/roles')->assertStatus(403);
+
+        SystemPermission::where('module', 'configuracion')->where('action', 'view')
+            ->update(['allowed_roles' => ['admin', 'engineering']]);
+
+        $this->actingAs($engineer, 'sanctum')->getJson('/api/config/roles')->assertStatus(200);
+    }
+
+    /**
      * Regresión: al editar un entregable, el selector de responsables se
      * llenaba desde GET /users (solo admin/coordinator) — un rol con
      * entregables.manage pero sin permiso de Usuarios recibía 403 en
