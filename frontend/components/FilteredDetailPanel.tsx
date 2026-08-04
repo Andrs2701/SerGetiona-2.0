@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, CheckCircle2, Users, BookOpen, CalendarDays, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { X, CheckCircle2, Users, BookOpen, CalendarDays, XCircle, AlertTriangle, Clock, Eye, Pencil } from 'lucide-react';
 import clsx from 'clsx';
 
 export interface PanelRow {
@@ -12,6 +12,8 @@ export interface PanelRow {
   days_diff?: number;
   status?: string;
   role?: string;
+  /** Cuando está presente, la fila muestra "Ver entrega"/"Editar entrega". */
+  deliverable_id?: number;
 }
 
 interface FilteredDetailPanelProps {
@@ -20,6 +22,8 @@ interface FilteredDetailPanelProps {
   rows: PanelRow[];
   loading: boolean;
   onClose: () => void;
+  onView?: (deliverableId: number) => void;
+  onEdit?: (deliverableId: number) => void;
 }
 
 export function formatDateStr(date?: string): string {
@@ -27,7 +31,7 @@ export function formatDateStr(date?: string): string {
   return new Date(date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default function FilteredDetailPanel({ isOpen, title, rows, loading, onClose }: FilteredDetailPanelProps) {
+export default function FilteredDetailPanel({ isOpen, title, rows, loading, onClose, onView, onEdit }: FilteredDetailPanelProps) {
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />}
@@ -105,6 +109,26 @@ export default function FilteredDetailPanel({ isOpen, title, rows, loading, onCl
                       <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 dark:bg-gray-700 rounded-full px-2 py-0.5">
                         <Clock size={10} /> {row.days_diff} días restantes
                       </span>
+                    )}
+                  </div>
+                )}
+                {row.deliverable_id !== undefined && (onView || onEdit) && (
+                  <div className="flex items-center gap-3 flex-wrap mt-2.5 pt-2.5 border-t border-gray-100 dark:border-gray-700">
+                    {onView && (
+                      <button
+                        onClick={() => onView(row.deliverable_id!)}
+                        className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 font-semibold hover:underline"
+                      >
+                        <Eye size={11} /> Ver entrega
+                      </button>
+                    )}
+                    {onEdit && (
+                      <button
+                        onClick={() => onEdit(row.deliverable_id!)}
+                        className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold hover:underline"
+                      >
+                        <Pencil size={11} /> Editar entrega
+                      </button>
                     )}
                   </div>
                 )}

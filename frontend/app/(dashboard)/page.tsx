@@ -2317,6 +2317,7 @@ function FilterBar({
 // ─── DashboardAdmin ───────────────────────────────────────────────────────────
 
 function DashboardAdmin() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<DashTab>('resumen');
   const [panelFilter, setPanelFilter] = useState<PanelFilter | null>(null);
   const [panelRows, setPanelRows] = useState<PanelRow[]>([]);
@@ -2389,6 +2390,7 @@ function DashboardAdmin() {
             days_diff: act.days_diff ?? 0,
             status: act.status,
             role: act.role,
+            deliverable_id: act.deliverable_id,
           }));
           setPanelRows(list);
 
@@ -2416,6 +2418,7 @@ function DashboardAdmin() {
               program: item.program_name ?? '—',
               subject: item.subject_name ?? '—',
               commitment_date: item.start_date ?? undefined,
+              deliverable_id: item.id,
             };
           }));
         }
@@ -2541,6 +2544,8 @@ function DashboardAdmin() {
         rows={panelRows}
         loading={loadingPanel}
         onClose={() => setPanelFilter(null)}
+        onView={(id) => router.push(`/entregables?deliverable=${id}`)}
+        onEdit={(id) => router.push(`/entregables?deliverable=${id}&edit=1`)}
       />
     </>
   );
