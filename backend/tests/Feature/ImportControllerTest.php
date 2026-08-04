@@ -80,6 +80,38 @@ class ImportControllerTest extends TestCase
         $this->assertSame($project->id, $deliverable->subject->academicProgram->project_id);
     }
 
+    /**
+     * Regresión: programa/asignatura/semana_modulo vienen de celdas de
+     * Excel digitadas a mano y no pasaban por trim() ni comparación
+     * insensible a mayúsculas — una fila con un espacio de más o distinta
+     * capitalización creaba un Programa/Asignatura/Entregable duplicado en
+     * paralelo, con nombre visualmente idéntico al ya existente.
+     */
+    public function test_import_treats_whitespace_and_case_variants_as_the_same_program_subject_and_deliverable(): void
+    {
+        $project = Project::factory()->create();
+
+        $csv = "programa,asignatura,semana_modulo,semestre,ciclo,tipo_contenido\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,I,1,Creacion\n"
+            . "especializacion en datos ,Estadistica ,Semana 1 ,I,1,Creacion\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('errors', []);
+
+        $this->assertSame(1, \App\Models\AcademicProgram::where('project_id', $project->id)->count());
+        $program = \App\Models\AcademicProgram::where('project_id', $project->id)->first();
+        $this->assertSame(1, \App\Models\Subject::where('academic_program_id', $program->id)->count());
+        $subject = \App\Models\Subject::where('academic_program_id', $program->id)->first();
+        $this->assertSame(1, Deliverable::where('subject_id', $subject->id)->count());
+    }
+
     public function test_import_fails_clearly_when_no_project_anywhere(): void
     {
         $csv = "programa,asignatura,semana_modulo,tipo_contenido\n"

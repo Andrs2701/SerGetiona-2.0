@@ -619,20 +619,15 @@ class ImportController extends Controller
     private function persistRow(array $row, ?int $defaultProjectId, int $userId, array $usersByEmail, array $academicLevelsByName = []): void
     {
         $projectId = !empty($row['proyecto'])
-            ? Project::firstOrCreate(
-                ['name' => trim($row['proyecto'])],
-                ['created_by' => $userId, 'status' => 'in_progress']
-            )->id
+            ? $this->firstOrCreateByName(Project::class, $row['proyecto'], [], ['status' => 'in_progress', 'created_by' => $userId])->id
             : $defaultProjectId;
 
-        $program = AcademicProgram::firstOrCreate(
-            ['name' => $row['programa'], 'project_id' => $projectId],
-            ['created_by' => $userId]
+        $program = $this->firstOrCreateByName(
+            AcademicProgram::class, $row['programa'], ['project_id' => $projectId], ['created_by' => $userId]
         );
 
-        $subject = Subject::firstOrCreate(
-            ['name' => $row['asignatura'], 'academic_program_id' => $program->id],
-            ['created_by' => $userId]
+        $subject = $this->firstOrCreateByName(
+            Subject::class, $row['asignatura'], ['academic_program_id' => $program->id], ['created_by' => $userId]
         );
 
         $tipoContenidoKey = mb_strtolower(trim($row['tipo_contenido'] ?? ''));
@@ -642,8 +637,10 @@ class ImportController extends Controller
             ? ($academicLevelsByName[$this->removeDiacritics($recordType)] ?? null)
             : null;
 
-        $deliverable = Deliverable::firstOrCreate(
-            ['subject_id' => $subject->id, 'name' => $row['semana_modulo']],
+        $deliverable = $this->firstOrCreateByName(
+            Deliverable::class,
+            $row['semana_modulo'],
+            ['subject_id' => $subject->id],
             [
                 'type'              => $mappedType,
                 'record_type'       => $recordType,
@@ -704,6 +701,27 @@ class ImportController extends Controller
         }
 
         RoleActivityController::recalculateGlobalStatus($deliverable);
+    }
+
+    /**
+     * Como firstOrCreate(), pero comparando 'name' sin distinguir mayúsculas
+     * ni espacios al inicio/final. Los valores de Proyecto/Programa/
+     * Asignatura/Entregable en Carga Masiva vienen de celdas de Excel
+     * digitadas a mano — sin esto, "Módulo 2" y "módulo 2 " (una fila más
+     * abajo, o en otra carga) se tratan como cosas distintas y crean una
+     * fila duplicada en paralelo con el nombre visualmente idéntico.
+     *
+     * @param class-string<\Illuminate\Database\Eloquent\Model> $modelClass
+     */
+    private function firstOrCreateByName(string $modelClass, string $rawName, array $scopeAttrs, array $createAttrs = [])
+    {
+        $name = trim($rawName);
+
+        $existing = $modelClass::where($scopeAttrs)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        return $existing ?? $modelClass::create([...$scopeAttrs, 'name' => $name, ...$createAttrs]);
     }
 
     /** Build a lightweight preview record (no DB writes). */
