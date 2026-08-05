@@ -19,6 +19,7 @@ class RoleActivity extends Model
         'commitment_date',
         'actual_start_date',
         'actual_delivery_date',
+        'first_delivered_at',
         'status',
         'notes',
         'checklist',
@@ -30,6 +31,7 @@ class RoleActivity extends Model
         'commitment_date'           => 'date',
         'actual_start_date'         => 'date',
         'actual_delivery_date'      => 'date',
+        'first_delivered_at'        => 'date',
         'checklist'                 => 'array',
         'production_not_applicable' => 'boolean',
     ];
@@ -58,9 +60,13 @@ class RoleActivity extends Model
     /**
      * Estados que excluyen a una actividad de contar como vencida: una vez
      * entregada/aprobada/no aplicable, deja de estar vencida sin importar
-     * cuánto tiempo tome la revisión posterior.
+     * cuánto tiempo tome la revisión posterior. adjustments_requested/
+     * with_findings también quedan afuera — significan "devuelto para
+     * corregir", no "nunca entregado" (refuerzo: el caso normal ya queda
+     * cubierto porque actual_delivery_date deja de borrarse al devolver
+     * con hallazgos, ver RoleActivityController::update()).
      */
-    public const NOT_OVERDUE_STATUSES = ['approved', 'delivered', 'not_applicable'];
+    public const NOT_OVERDUE_STATUSES = ['approved', 'delivered', 'not_applicable', 'adjustments_requested', 'with_findings'];
 
     /**
      * Actividades vencidas: con fecha de compromiso pasada, sin entrega registrada

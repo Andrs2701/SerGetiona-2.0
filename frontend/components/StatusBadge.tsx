@@ -55,6 +55,15 @@ interface StatusBadgeProps {
   type?: 'project' | 'global' | 'role';
   size?: 'sm' | 'md';
   className?: string;
+  /**
+   * Con ambas presentes: si ya entregó más de una vez (la fecha de esta
+   * entrega no es la primera), se muestra "Ajustes Realizados" en vez de
+   * "Entregado"/"Aprobado" — sigue siendo funcionalmente delivered/approved,
+   * solo cambia el texto para que quede claro que pasó por un ciclo de
+   * hallazgos. Sin estas props, el badge se comporta igual que siempre.
+   */
+  firstDeliveredAt?: string | null;
+  actualDeliveryDate?: string | null;
 }
 
 export default function StatusBadge({
@@ -62,6 +71,8 @@ export default function StatusBadge({
   type = 'global',
   size = 'sm',
   className,
+  firstDeliveredAt,
+  actualDeliveryDate,
 }: StatusBadgeProps) {
   let label = status;
   let colorClass = 'bg-gray-100 text-gray-700';
@@ -75,6 +86,13 @@ export default function StatusBadge({
   } else if (type === 'role') {
     label = ROLE_STATUS_LABELS[status] ?? status;
     colorClass = ROLE_STATUS_COLORS[status] ?? colorClass;
+
+    const wasReturned = (status === 'delivered' || status === 'approved')
+      && !!firstDeliveredAt && !!actualDeliveryDate
+      && firstDeliveredAt !== actualDeliveryDate;
+    if (wasReturned) {
+      label = 'Ajustes Realizados';
+    }
   }
 
   return (

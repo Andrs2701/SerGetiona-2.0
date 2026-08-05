@@ -126,6 +126,13 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
         const isNotStarted = r.status === 'not_started';
         const isNotApplicable = r.status === 'not_applicable';
         const statusColor = STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-500';
+        // "Ajustes Realizados": ya entregó más de una vez (pasó por un ciclo
+        // de hallazgos) — sigue siendo delivered/approved funcionalmente,
+        // solo cambia el texto para que quede claro que hubo una corrección.
+        const wasReturned = (r.status === 'delivered' || r.status === 'approved')
+          && !!r.first_delivered_at && !!r.actual_delivery_date
+          && r.first_delivered_at !== r.actual_delivery_date;
+        const roleStatusLabel = wasReturned ? 'Ajustes Realizados' : (ROLE_STATUS_LABELS[r.status] ?? r.status);
         return (
           <div key={r.role} className={clsx(
             "border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden transition-all duration-200",
@@ -141,7 +148,7 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
                 {r.responsible && <span className="text-[10px] text-gray-400 truncate">— {r.responsible.name}</span>}
               </div>
               <span className={clsx('text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0', statusColor)}>
-                {ROLE_STATUS_LABELS[r.status] ?? r.status}
+                {roleStatusLabel}
               </span>
             </div>
 
@@ -160,6 +167,11 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
                     <span className="flex items-center gap-1">
                       <CheckCircle2 size={11} className="text-emerald-500"/>
                       Entregado: <strong className="text-emerald-600 dark:text-emerald-400">{formatDate(r.actual_delivery_date)}</strong>
+                    </span>
+                  )}
+                  {wasReturned && r.first_delivered_at && (
+                    <span className="text-gray-400">
+                      (1ª entrega: {formatDate(r.first_delivered_at)})
                     </span>
                   )}
                 </div>
@@ -602,6 +614,7 @@ export default function ActivityDetailPanel({
     commitment_date?: string;
     actual_start_date?: string;
     actual_delivery_date?: string;
+    first_delivered_at?: string;
     responsible?: { id: number; name: string } | null;
     priority?: string;
   };
@@ -863,6 +876,8 @@ export default function ActivityDetailPanel({
                     ...(deliverable.ciclo    ? [['Ciclo',    deliverable.ciclo]]    : []),
                     ['Fecha límite', activity.commitment_date ? formatDate(activity.commitment_date) : '—'],
                     ...(activity.actual_delivery_date ? [['Entregado el', formatDate(activity.actual_delivery_date)]] : []),
+                    ...(activity.first_delivered_at && activity.actual_delivery_date && activity.first_delivered_at !== activity.actual_delivery_date
+                      ? [['1ª entrega', formatDate(activity.first_delivered_at)]] : []),
                   ].map(([label, value]) => (
                     <div key={label}>
                       <p className="text-gray-400 dark:text-gray-500 mb-0.5">{label}</p>

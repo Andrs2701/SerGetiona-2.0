@@ -62,6 +62,16 @@ class RoleActivityObserver
      */
     public function updating(RoleActivity $activity): void
     {
+        // first_delivered_at: se fija UNA sola vez, la primera vez que
+        // actual_delivery_date pasa de vacío a tener un valor, y nunca se
+        // vuelve a tocar — a diferencia de actual_delivery_date, que sí se
+        // sobreescribe (y hasta ahora se borraba) en cada ciclo de revisión.
+        // Sin esto, devolver una actividad con hallazgos hacía desaparecer
+        // de la interfaz la fecha en que el responsable entregó por primera vez.
+        if ($activity->isDirty('actual_delivery_date') && $activity->actual_delivery_date && is_null($activity->first_delivered_at)) {
+            $activity->first_delivered_at = $activity->actual_delivery_date;
+        }
+
         if (!$activity->isDirty('responsible_id')) return;
 
         if (is_null($activity->responsible_id)) {

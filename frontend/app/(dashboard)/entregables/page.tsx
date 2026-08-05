@@ -54,6 +54,8 @@ const ACTIVITY_STATUS_CFG: Record<string, { label: string; dot: string; text: st
   with_observations: { label: 'Observaciones', dot: 'bg-orange-500',  text: 'text-orange-700' },
   approved:          { label: 'Aprobado',      dot: 'bg-emerald-500', text: 'text-emerald-700' },
   not_applicable:    { label: 'No aplica',     dot: 'bg-gray-200',    text: 'text-gray-400' },
+  adjustments_requested: { label: 'Ajustes Solicitados', dot: 'bg-amber-500',  text: 'text-amber-700' },
+  with_findings:          { label: 'Con Hallazgos',      dot: 'bg-orange-500', text: 'text-orange-700' },
 };
 
 type QuickAction = 'approve' | 'request_adjustments';
@@ -106,10 +108,15 @@ function getApprovableActivity(d: Deliverable): RoleActivity | undefined {
   );
 }
 
+// Devuelta con hallazgos = "ya entregó, hay que corregir" — nunca cuenta como vencida,
+// ni siquiera si (caso raro) nunca tuvo su propia actual_delivery_date. Mismo criterio
+// que NOT_OVERDUE_STATUSES en el backend (RoleActivity.php).
+const NOT_OVERDUE_ROLE_STATUSES = ['not_applicable', 'approved', 'adjustments_requested', 'with_findings'];
+
 function isOverdue(d: Deliverable): boolean {
   if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
   return (d.role_activities ?? []).some(a => {
-    if (a.status === 'not_applicable' || a.status === 'approved' || a.actual_delivery_date) return false;
+    if (NOT_OVERDUE_ROLE_STATUSES.includes(a.status) || a.actual_delivery_date) return false;
     const days = daysUntil(a.commitment_date);
     return days !== null && days < 0;
   });
@@ -118,7 +125,7 @@ function isOverdue(d: Deliverable): boolean {
 function isApproaching(d: Deliverable): boolean {
   if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
   return (d.role_activities ?? []).some(a => {
-    if (a.status === 'not_applicable' || a.status === 'approved' || a.actual_delivery_date) return false;
+    if (NOT_OVERDUE_ROLE_STATUSES.includes(a.status) || a.actual_delivery_date) return false;
     const days = daysUntil(a.commitment_date);
     return days !== null && days >= 0 && days <= 5;
   });
@@ -183,12 +190,16 @@ function Toast({ toasts }: { toasts: ToastMsg[] }) {
 
 // ─── Activity status indicator ─────────────────────────────────────────────────
 
-function ActivityStatusBadge({ status }: { status: string }) {
+function ActivityStatusBadge({ status, firstDeliveredAt, actualDeliveryDate }: { status: string; firstDeliveredAt?: string | null; actualDeliveryDate?: string | null }) {
   const cfg = ACTIVITY_STATUS_CFG[status] ?? ACTIVITY_STATUS_CFG.not_started;
+  const wasReturned = (status === 'delivered' || status === 'approved')
+    && !!firstDeliveredAt && !!actualDeliveryDate
+    && firstDeliveredAt !== actualDeliveryDate;
+  const label = wasReturned ? 'Ajustes Realizados' : cfg.label;
   return (
     <span className="flex items-center gap-1 min-w-0">
       <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
-      <span className={clsx('text-[10px] font-semibold leading-tight', cfg.text)}>{cfg.label}</span>
+      <span className={clsx('text-[10px] font-semibold leading-tight', cfg.text)}>{label}</span>
     </span>
   );
 }
@@ -221,7 +232,7 @@ function RoleCell({ role, activity, onSelect, isCovering }: { role: Role; activi
   const isNA = !activity || activity.status === 'not_applicable';
   const colors = ROLE_CELL_COLORS[role];
   const days = daysUntil(activity?.commitment_date);
-  const overdueDate = !isNA && activity?.status !== 'approved' && !activity?.actual_delivery_date && days !== null && days < 0;
+  const overdueDate = !isNA && !!activity && !NOT_OVERDUE_ROLE_STATUSES.includes(activity.status) && !activity.actual_delivery_date && days !== null && days < 0;
 
   return (
     <div
@@ -258,7 +269,11 @@ function RoleCell({ role, activity, onSelect, isCovering }: { role: Role; activi
           </div>
 
           {/* Status */}
-          <ActivityStatusBadge status={activity?.status ?? 'not_started'} />
+          <ActivityStatusBadge
+            status={activity?.status ?? 'not_started'}
+            firstDeliveredAt={activity?.first_delivered_at}
+            actualDeliveryDate={activity?.actual_delivery_date}
+          />
 
           {/* Date */}
           <div className="flex items-center gap-1">
@@ -1018,8 +1033,9 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                 const isNA = act?.status === 'not_applicable';
                 const daysLeft = daysUntil(act?.commitment_date);
                 const isDelivered = !!act?.actual_delivery_date || act?.status === 'approved';
-                const isOverdue = !isDelivered && daysLeft !== null && daysLeft < 0;
-                const isApproaching = !isDelivered && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+                const isReturned = act?.status === 'adjustments_requested' || act?.status === 'with_findings';
+                const isOverdue = !isDelivered && !isReturned && daysLeft !== null && daysLeft < 0;
+                const isApproaching = !isDelivered && !isReturned && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
 
                 // Days difference between commitment and actual delivery
                 let deliveryDiffLabel: string | null = null;
@@ -1067,7 +1083,11 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                       </div>
                       <div className="flex items-center gap-1.5">
                         {deliveryBadge}
-                        <ActivityStatusBadge status={act?.status ?? 'not_started'} />
+                        <ActivityStatusBadge
+                          status={act?.status ?? 'not_started'}
+                          firstDeliveredAt={act?.first_delivered_at}
+                          actualDeliveryDate={act?.actual_delivery_date}
+                        />
                       </div>
                     </div>
                     <div className="text-xs text-gray-500 space-y-0.5">
@@ -1120,7 +1140,11 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                                     {ROLE_LABELS[r.role as Role] ?? r.role}
                                   </span>
                                 </div>
-                                <ActivityStatusBadge status={r.status} />
+                                <ActivityStatusBadge
+                                  status={r.status}
+                                  firstDeliveredAt={r.first_delivered_at}
+                                  actualDeliveryDate={r.actual_delivery_date}
+                                />
                               </div>
                               
                               {/* Recursos Producidos */}
@@ -1845,10 +1869,15 @@ export default function EntregablesPage() {
             </button>
           )}
 
-          <button onClick={handleExport}
-            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Download size={14} /> Exportar
-          </button>
+          {/* Exportar pega a /export/deliverables, fijo a role:admin,coordinator
+              en el backend (mismo grupo que Carga Masiva) — sin permiso propio
+              en la Matriz todavía. */}
+          {isAdminOrCoord && (
+            <button onClick={handleExport}
+              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <Download size={14} /> Exportar
+            </button>
+          )}
         </div>
       </div>
 
@@ -1949,7 +1978,9 @@ export default function EntregablesPage() {
                           const acts = d.role_activities ?? [];
                           const active = getActiveActivity(d);
                           const days = daysUntil(active?.commitment_date);
-                          const overdue = days !== null && days < 0 && !active?.actual_delivery_date && d.global_status !== 'finished';
+                          const overdue = days !== null && days < 0 && !active?.actual_delivery_date
+                            && !(active && NOT_OVERDUE_ROLE_STATUSES.includes(active.status))
+                            && d.global_status !== 'finished';
                           return (
                             <tr key={d.id} className={clsx(
                               'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',

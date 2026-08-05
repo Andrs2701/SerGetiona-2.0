@@ -273,7 +273,12 @@ class RoleActivityController extends Controller
                     if (empty($data['actual_delivery_date'])) {
                         $data['actual_delivery_date'] = Carbon::today()->toDateString();
                     }
-                } else {
+                } elseif (!in_array($data['status'], ['adjustments_requested', 'with_findings'], true)) {
+                    // Devolver con hallazgos significa "ya entregó, hay que
+                    // corregir" — no "nunca entregó". Borrar la fecha aquí
+                    // hacía que la actividad se viera "vencida" (todo cálculo
+                    // de vencida exige actual_delivery_date en null) y que la
+                    // fecha real de entrega desapareciera de la interfaz.
                     $data['actual_delivery_date'] = null;
                 }
             }
@@ -314,7 +319,8 @@ class RoleActivityController extends Controller
                         foreach ($siblingActivities as $sibling) {
                             $oldSiblingStatus = $sibling->status;
                             $sibling->status = 'adjustments_requested';
-                            $sibling->actual_delivery_date = null; // resetear fecha
+                            // Ya entregó — no se borra su fecha de entrega
+                            // (ver comentario equivalente más arriba en update()).
                             $sibling->save();
 
                             \App\Models\AuditLog::create([

@@ -109,6 +109,7 @@ export interface RoleActivity {
   commitment_date?: string;
   actual_start_date?: string;
   actual_delivery_date?: string;
+  first_delivered_at?: string;
   updated_at?: string;
   status: string;
   notes?: string;
@@ -647,6 +648,7 @@ export interface DeliverableFlowRole {
   notes?: string;
   commitment_date?: string;
   actual_delivery_date?: string;
+  first_delivered_at?: string;
   responsible?: { id: number; name: string };
   production: { resource_type: string; complexity_level?: string | null; total: number; logs: { quantity: number; produced_at?: string; producer?: string }[] }[];
   links: { id: number; type: string; title: string; url?: string; user?: { name: string }; created_at: string }[];

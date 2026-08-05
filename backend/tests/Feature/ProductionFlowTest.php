@@ -203,6 +203,64 @@ class ProductionFlowTest extends TestCase
         );
     }
 
+    public function test_findings_return_preserves_delivery_date_and_is_not_overdue(): void
+    {
+        $qaUser = User::factory()->create(['role' => 'qa', 'is_active' => true]);
+        $qaActivity = RoleActivity::factory()->create([
+            'deliverable_id' => $this->deliverable->id,
+            'role'           => 'qa',
+            'responsible_id' => $qaUser->id,
+            'status'         => 'in_review',
+        ]);
+
+        $this->expertActivity->update(['commitment_date' => now()->subDays(3)->toDateString()]);
+
+        // 1) El experto entrega por primera vez.
+        $this->actingAs($this->expert, 'sanctum')
+            ->putJson("/api/activities/{$this->expertActivity->id}", ['status' => 'delivered'])
+            ->assertOk();
+
+        $firstDelivery = $this->expertActivity->fresh();
+        $this->assertNotNull($firstDelivery->actual_delivery_date);
+        $firstDeliveryDate = $firstDelivery->actual_delivery_date->toDateString();
+        $this->assertEquals($firstDeliveryDate, $firstDelivery->first_delivered_at->toDateString());
+
+        // 2) QA devuelve la actividad del experto con hallazgos.
+        $this->actingAs($qaUser, 'sanctum')
+            ->putJson("/api/activities/{$qaActivity->id}", [
+                'status'       => 'adjustments_requested',
+                'adjust_roles' => ['expert'],
+            ])
+            ->assertOk();
+
+        $returned = $this->expertActivity->fresh();
+        $this->assertEquals('adjustments_requested', $returned->status);
+        // La fecha de la primera entrega no se borra.
+        $this->assertNotNull($returned->actual_delivery_date);
+        $this->assertEquals($firstDeliveryDate, $returned->actual_delivery_date->toDateString());
+        $this->assertEquals($firstDeliveryDate, $returned->first_delivered_at->toDateString());
+
+        // Aunque su fecha comprometida ya pasó, no debe contar como vencida.
+        $this->assertFalse(
+            RoleActivity::overdue()->whereKey($returned->id)->exists(),
+            'Una actividad devuelta con hallazgos no debe considerarse vencida.'
+        );
+
+        // 3) El experto corrige y vuelve a entregar (segunda entrega, otro día).
+        $this->travelTo(now()->addDay());
+        $this->actingAs($this->expert, 'sanctum')
+            ->putJson("/api/activities/{$this->expertActivity->id}", ['status' => 'delivered'])
+            ->assertOk();
+
+        $redelivered = $this->expertActivity->fresh();
+        $this->assertEquals('delivered', $redelivered->status);
+        $this->assertNotNull($redelivered->actual_delivery_date);
+        // La fecha "en vivo" avanza a la segunda entrega...
+        $this->assertNotEquals($firstDeliveryDate, $redelivered->actual_delivery_date->toDateString());
+        // ...pero la fecha de la primera entrega nunca cambia.
+        $this->assertEquals($firstDeliveryDate, $redelivered->first_delivered_at->toDateString());
+    }
+
     public function test_last_role_in_chain_has_no_next(): void
     {
         $qaUser     = User::factory()->create(['role' => 'qa', 'is_active' => true]);

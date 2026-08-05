@@ -35,7 +35,7 @@ final class ExecutiveSummaryService
         $isOverdue = fn ($a) => $a->commitment_date
             && $a->commitment_date->lt($today)
             && is_null($a->actual_delivery_date)
-            && !in_array($a->status, ['approved', 'delivered', 'not_applicable'], true);
+            && !in_array($a->status, RoleActivity::NOT_OVERDUE_STATUSES, true);
 
         $overdue = $activities->filter($isOverdue)->count();
 

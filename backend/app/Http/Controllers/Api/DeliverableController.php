@@ -363,6 +363,7 @@ class DeliverableController extends Controller
                 'notes'                => $act->notes,
                 'commitment_date'      => $act->commitment_date?->toDateString(),
                 'actual_delivery_date' => $act->actual_delivery_date?->toDateString(),
+                'first_delivered_at'   => $act->first_delivered_at?->toDateString(),
                 'responsible'          => $act->responsible ? ['id' => $act->responsible->id, 'name' => $act->responsible->name] : null,
                 'production'           => array_values($productionByType),
                 'links'                => $act->evidenceLinks->map(fn($link) => [
@@ -586,6 +587,7 @@ class DeliverableController extends Controller
                 'commitment_date'      => $a->commitment_date?->toDateString(),
                 'actual_start_date'    => $a->actual_start_date?->toDateString(),
                 'actual_delivery_date' => $a->actual_delivery_date?->toDateString(),
+                'first_delivered_at'   => $a->first_delivered_at?->toDateString(),
                 'updated_at'           => $a->updated_at?->toIso8601String(),
                 'notes'                => $a->notes,
                 'responsible'          => $a->responsible ? [
