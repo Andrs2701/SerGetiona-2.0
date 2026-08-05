@@ -138,7 +138,7 @@ class ChannelController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // ── Gestión de miembros (solo admin/coordinator vía middleware de ruta) ──
+    // ── Gestión de miembros (colaboracion.manage_channels vía middleware de ruta) ──
 
     public function members(Request $request, Channel $channel)
     {

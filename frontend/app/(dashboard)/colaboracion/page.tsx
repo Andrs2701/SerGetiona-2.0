@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
+import { can } from '@/lib/permissions';
 import { useAuth } from '@/hooks/useAuth';
 import type { Channel, ChannelMessage, ChannelMember, User } from '@/lib/types';
 import Modal from '@/components/Modal';
@@ -183,7 +184,7 @@ function MessageActions({
 function ColaboracionInner() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const isManager = user?.role === 'admin' || user?.role === 'coordinator';
+  const isManager = user?.role === 'admin' || user?.role === 'coordinator' || can(user, 'colaboracion', 'manage_channels');
 
   // Core state
   const [channels, setChannels] = useState<Channel[]>([]);

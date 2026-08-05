@@ -241,8 +241,8 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::put('/decisions/{decision}/status', [DecisionRecordController::class, 'updateStatus']);
     Route::get('/calendar/my-decisions', [CalendarController::class, 'myDecisions']);
 
-    // Administración de canales: solo admin/coordinator
-    Route::middleware('role:admin,coordinator')->group(function () {
+    // Administración de canales: gobernado por la Matriz de Permisos (colaboracion.manage_channels)
+    Route::middleware('permission:colaboracion,manage_channels')->group(function () {
         Route::post('channels', [ChannelController::class, 'store']);
         Route::put('channels/{channel}', [ChannelController::class, 'update']);
         Route::delete('channels/{channel}', [ChannelController::class, 'destroy']);
