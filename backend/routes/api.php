@@ -211,9 +211,14 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         Route::get('/import/template', [ImportController::class, 'template']);
 
         Route::get('/export/deliverables', [ExportController::class, 'deliverables'])->middleware('throttle:10,1');
-        Route::get('/export/projects', [ExportController::class, 'projects'])->middleware('throttle:10,1');
         Route::get('/export/production', [ProductionLogController::class, 'export'])->middleware('throttle:10,1');
     });
+
+    // Exportar Escuelas/Proyectos — mismo permiso que crear/editar/eliminar
+    // uno (projects.manage), en vez de admin/coordinator fijo, para que el
+    // botón "Exportar" del listado siga la Matriz igual que "Nueva Escuela / Proyecto".
+    Route::get('/export/projects', [ExportController::class, 'projects'])
+        ->middleware(['permission:projects,manage', 'throttle:10,1']);
 
     // Flujo secuencial de entregable
     Route::get('deliverables/{deliverable}/flow', [DeliverableController::class, 'flow']);

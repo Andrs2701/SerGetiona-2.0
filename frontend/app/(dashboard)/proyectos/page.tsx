@@ -379,39 +379,41 @@ export default function ProyectosPage() {
         subtitle="Gestión de escuelas y proyectos de producción académica"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Escuelas / Proyectos' }]}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          canManageProjects ? (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  <Download size={15} />
+                  <span className="hidden sm:inline">Exportar</span>
+                  <ChevronDown size={13} />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-44 py-1">
+                    <button
+                      onClick={() => {
+                        setShowExportMenu(false);
+                        downloadCsv('/export/projects?format=csv', 'proyectos.csv').catch(() => {});
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Exportar CSV
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
-                onClick={() => setShowExportMenu((v) => !v)}
-                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
-                <Download size={15} />
-                <span className="hidden sm:inline">Exportar</span>
-                <ChevronDown size={13} />
+                <Plus size={16} />
+                <span className="hidden sm:inline">Nueva Escuela / Proyecto</span>
+                <span className="sm:hidden">Nuevo</span>
               </button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-44 py-1">
-                  <button
-                    onClick={() => {
-                      setShowExportMenu(false);
-                      downloadCsv('/export/projects?format=csv', 'proyectos.csv').catch(() => {});
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    Exportar CSV
-                  </button>
-                </div>
-              )}
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Nueva Escuela / Proyecto</span>
-              <span className="sm:hidden">Nuevo</span>
-            </button>
-          </div>
+          ) : undefined
         }
       />
 

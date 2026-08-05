@@ -341,6 +341,31 @@ class PermissionMatrixEnforcementTest extends TestCase
     }
 
     /**
+     * /export/projects seguía fijo a role:admin,coordinator (no la Matriz)
+     * mientras que crear/editar/eliminar un proyecto ya sí seguían
+     * projects.manage — un rol al que se le otorgara el permiso podía
+     * gestionar proyectos pero seguía sin poder exportarlos, y viceversa,
+     * un admin/coordinator sin ese seed en un entorno nuevo se quedaba sin
+     * exportar. Mismo permiso para las cuatro acciones.
+     */
+    public function test_export_projects_follows_projects_manage_permission(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+        \App\Models\Project::factory()->create();
+
+        $this->actingAs($engineer, 'sanctum')
+            ->getJson('/api/export/projects?format=csv')
+            ->assertStatus(403);
+
+        SystemPermission::where('module', 'projects')->where('action', 'manage')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $this->actingAs($engineer, 'sanctum')
+            ->getJson('/api/export/projects?format=csv')
+            ->assertStatus(200);
+    }
+
+    /**
      * Project/AcademicProgram/Subject/Deliverable son SoftDeletes: un
      * ->delete() aquí nunca dispara el cascadeOnDelete() de la FK (eso solo
      * corre con un DELETE real de SQL). Un programa/asignatura sin
