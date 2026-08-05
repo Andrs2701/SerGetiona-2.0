@@ -22,6 +22,8 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import FilteredDetailPanel, { PanelRow } from '@/components/FilteredDetailPanel';
 import { isPastDue, isApproaching } from '@/lib/dateStatus';
+import { listIsoWeeksOfYear, formatIsoWeekLabel, isoWeekRange } from '@/lib/isoWeek';
+import { clsx } from 'clsx';
 
 const ADMIN_ROLES = ['admin', 'coordinator'] as const;
 
@@ -125,10 +127,11 @@ interface DashFilters {
   role: string;
   year: string;
   month: string;
+  week: string;
   type: string;
   academicLevel: string;
 }
-const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '', type: '', academicLevel: '' };
+const EMPTY_FILTERS: DashFilters = { programId: '', responsibleId: '', role: '', year: '', month: '', week: '', type: '', academicLevel: '' };
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function formatDateStr(date: string) {
@@ -2001,13 +2004,28 @@ function TabProduccion({
 }
 
 function TabReportes({
-  stats, health,
+  stats, health, filters, loading,
 }: {
   stats: DashboardStats | null;
   health: HealthReport | null;
+  filters?: DashFilters;
+  loading?: boolean;
 }) {
   const router = useRouter();
+  const activeFilterCount = filters ? Object.values(filters).filter(Boolean).length : 0;
+
+  if (loading) return <Card><p className="text-sm text-gray-400 text-center py-8">Cargando indicadores filtrados…</p></Card>;
   if (!stats) return <Card><p className="text-sm text-gray-400 text-center py-8">Sin datos.</p></Card>;
+
+  let filterSummary = '';
+  if (filters && activeFilterCount > 0) {
+    if (filters.week && filters.year) {
+      const { start, end } = isoWeekRange(Number(filters.year), Number(filters.week));
+      filterSummary = formatIsoWeekLabel({ year: Number(filters.year), week: Number(filters.week), start, end });
+    } else if (filters.month && filters.year) {
+      filterSummary = `${MONTHS_ES[Number(filters.month) - 1]} ${filters.year}`;
+    }
+  }
 
   const programs: ProgramBreakdown[] = stats.programs_breakdown ?? [];
   const roleDetail: ActivityByRoleDetail[] = stats.activities_by_role_detail ?? [];
@@ -2017,6 +2035,16 @@ function TabReportes({
 
   return (
     <div className="space-y-6">
+      {/* Aviso persistente mientras haya un filtro activo — para que estas
+          cifras nunca se confundan con el dato global real del portafolio. */}
+      {activeFilterCount > 0 && (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <Filter size={12} className="shrink-0" />
+          <span>
+            Estos indicadores están filtrados{filterSummary ? ` — ${filterSummary}` : ''} y NO reflejan el total del portafolio.
+          </span>
+        </div>
+      )}
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -2229,7 +2257,7 @@ function ResponsiveDonut({ data, total }: { data: { key: string; label: string; 
 const SELECT_CLS = 'text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 max-w-[160px]';
 
 function FilterBar({
-  filters, onChange, programs, users, academicLevels, activeCount, hideType,
+  filters, onChange, programs, users, academicLevels, activeCount, hideType, viewBy, onViewByChange, allowWeek = true,
 }: {
   filters: DashFilters;
   onChange: (partial: Partial<DashFilters>) => void;
@@ -2238,6 +2266,10 @@ function FilterBar({
   academicLevels: AcademicLevel[];
   activeCount: number;
   hideType?: boolean;
+  viewBy: 'month' | 'week';
+  onViewByChange: (v: 'month' | 'week') => void;
+  /** Producción todavía no soporta filtrar por semana en su propio endpoint — se oculta el interruptor ahí para no ofrecer un filtro que no hace nada. */
+  allowWeek?: boolean;
 }) {
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
@@ -2274,11 +2306,36 @@ function FilterBar({
           {[2024, 2025, 2026, 2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
         </select>
 
-        {/* Mes */}
-        <select value={filters.month} onChange={e => onChange({ month: e.target.value })} className={`${SELECT_CLS} max-w-[120px]`}>
-          <option value="">Mes</option>
-          {MONTHS_ES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
-        </select>
+        {/* Mes / Semana — mutuamente excluyentes, para no combinar filtros sin resultados */}
+        {allowWeek && (
+          <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs shrink-0">
+            <button
+              onClick={() => { onViewByChange('month'); onChange({ week: '' }); }}
+              className={clsx('px-2.5 py-1.5 font-medium transition-colors', viewBy === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}
+            >Mes</button>
+            <button
+              onClick={() => {
+                onViewByChange('week');
+                onChange({ month: '', ...(filters.year ? {} : { year: String(new Date().getFullYear()) }) });
+              }}
+              className={clsx('px-2.5 py-1.5 font-medium transition-colors', viewBy === 'week' ? 'bg-indigo-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}
+            >Semana</button>
+          </div>
+        )}
+
+        {allowWeek && viewBy === 'week' ? (
+          <select value={filters.week} onChange={e => onChange({ week: e.target.value })} className={`${SELECT_CLS} max-w-[220px]`}>
+            <option value="">Semana</option>
+            {listIsoWeeksOfYear(Number(filters.year) || new Date().getFullYear()).map(w => (
+              <option key={w.week} value={String(w.week)}>{formatIsoWeekLabel(w)}</option>
+            ))}
+          </select>
+        ) : (
+          <select value={filters.month} onChange={e => onChange({ month: e.target.value })} className={`${SELECT_CLS} max-w-[120px]`}>
+            <option value="">Mes</option>
+            {MONTHS_ES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
+          </select>
+        )}
 
         {/* Tipo de entregable — no aplica en Producción, que no filtra por tipo */}
         {!hideType && (
@@ -2298,7 +2355,7 @@ function FilterBar({
 
         {activeCount > 0 && (
           <button
-            onClick={() => onChange(EMPTY_FILTERS)}
+            onClick={() => { onViewByChange('month'); onChange(EMPTY_FILTERS); }}
             className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 font-medium transition-colors ml-auto">
             <X size={12} /> Limpiar filtros
           </button>
@@ -2307,7 +2364,7 @@ function FilterBar({
 
       {activeCount > 0 && (
         <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-2 pl-0.5">
-          {activeCount} filtro{activeCount > 1 ? 's' : ''} activo{activeCount > 1 ? 's' : ''} — el Gantt de Seguimiento y la pestaña de Producción reflejan esta selección.
+          {activeCount} filtro{activeCount > 1 ? 's' : ''} activo{activeCount > 1 ? 's' : ''} — el Gantt de Seguimiento, Producción y Reportes reflejan esta selección.
         </p>
       )}
     </div>
@@ -2330,6 +2387,8 @@ function DashboardAdmin() {
   const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filters, setFilters]   = useState<DashFilters>(EMPTY_FILTERS);
+  const [viewBy, setViewBy]     = useState<'month' | 'week'>('month');
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const fetchRows = useCallback(async (f: PanelFilter) => {
     setLoadingPanel(true);
@@ -2455,6 +2514,32 @@ function DashboardAdmin() {
     }).finally(() => setLoading(false));
   }, []);
 
+  // Fetch separado y aparte del que carga `stats` global (Resumen no se
+  // filtra a propósito) — solo corre cuando se está en Reportes y hay algún
+  // filtro activo; sin filtros, Reportes reutiliza `stats` sin pedir nada nuevo.
+  const [filteredStats, setFilteredStats] = useState<DashboardStats | null>(null);
+  const [loadingFilteredStats, setLoadingFilteredStats] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'reportes' || activeFilterCount === 0) return;
+    setLoadingFilteredStats(true);
+    const params: Record<string, string> = {};
+    if (filters.programId) params.program_id = filters.programId;
+    if (filters.responsibleId) params.responsible_id = filters.responsibleId;
+    if (filters.role) params.role = filters.role;
+    if (filters.year) params.year = filters.year;
+    if (filters.month) params.month = filters.month;
+    if (filters.week) params.week = filters.week;
+    if (filters.type) params.type = filters.type;
+    if (filters.academicLevel) params.academic_level_id = filters.academicLevel;
+    api.get<DashboardStats>(ENDPOINTS.DASHBOARD + '?' + new URLSearchParams(params).toString())
+      .then(setFilteredStats)
+      .catch(() => setFilteredStats(null))
+      .finally(() => setLoadingFilteredStats(false));
+  }, [activeTab, filters, activeFilterCount]);
+
+  const reportesStats = activeFilterCount > 0 ? filteredStats : stats;
+
   if (loading) return <div className="p-6"><StatsSkeleton /></div>;
   if (!stats)  return (
     <div className="p-6">
@@ -2464,7 +2549,6 @@ function DashboardAdmin() {
     </div>
   );
 
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const filterPrograms = (stats.programs_breakdown ?? []).map(p => ({ id: p.id, name: p.name }));
   const filterUsers = workload.map(u => ({ id: u.user_id, name: u.user_name, role: u.role }));
 
@@ -2494,7 +2578,7 @@ function DashboardAdmin() {
 
         {/* Filter bar — solo en las pestañas cuyos datos realmente se filtran.
             Resumen usa datos globales (no lee `filters`), así que no se muestra. */}
-        {(activeTab === 'seguimiento' || activeTab === 'produccion') && (
+        {(activeTab === 'seguimiento' || activeTab === 'produccion' || activeTab === 'reportes') && (
           <FilterBar
             filters={filters}
             onChange={partial => setFilters(prev => ({ ...prev, ...partial }))}
@@ -2503,6 +2587,9 @@ function DashboardAdmin() {
             academicLevels={academicLevels}
             activeCount={activeFilterCount}
             hideType={activeTab === 'produccion'}
+            viewBy={viewBy}
+            onViewByChange={setViewBy}
+            allowWeek={activeTab !== 'produccion'}
           />
         )}
 
@@ -2521,7 +2608,7 @@ function DashboardAdmin() {
             externalMonth={filters.month}
           />
         )}
-        {activeTab === 'reportes'    && <TabReportes stats={stats} health={health} />}
+        {activeTab === 'reportes'    && <TabReportes stats={reportesStats} health={health} filters={filters} loading={loadingFilteredStats} />}
       </div>
 
       <FilteredDetailPanel

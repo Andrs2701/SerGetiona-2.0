@@ -103,4 +103,64 @@ class ReportControllerTest extends TestCase
         $roleOverdueSum = collect($data['activities_by_role_detail'])->sum('overdue');
         $this->assertSame(1, $roleOverdueSum, 'La suma del desglose por rol debe coincidir con la tarjeta del dashboard.');
     }
+
+    /**
+     * El dashboard no tenía ningún filtro (ni siquiera Request en la firma).
+     * Esta prueba fija dos actividades vencidas en semanas distintas y exige
+     * que ?year=&week= reduzca la tarjeta "Vencidas" a solo la de esa semana,
+     * mientras que los conteos estructurales (proyectos/programas) no cambian.
+     */
+    public function test_dashboard_week_filter_scopes_activity_metrics_but_not_structural_counts(): void
+    {
+        $program = AcademicProgram::factory()->create();
+        $subject = Subject::factory()->create(['academic_program_id' => $program->id]);
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $responsible = User::factory()->create(['role' => 'expert', 'is_active' => true]);
+
+        // Vencida en la semana 12 de 2026 (16-22 mar) — hoy debe ser posterior a esa semana para que cuente como vencida.
+        RoleActivity::factory()->create([
+            'deliverable_id'  => $deliverable->id,
+            'responsible_id'  => $responsible->id,
+            'role'            => 'expert',
+            'status'          => 'in_progress',
+            'commitment_date' => '2026-03-18',
+        ]);
+
+        // Vencida en la semana 13 de 2026 (23-29 mar) — no debe contar al filtrar por semana 12.
+        RoleActivity::factory()->create([
+            'deliverable_id'  => $deliverable->id,
+            'responsible_id'  => $responsible->id,
+            'role'            => 'pedagogy',
+            'status'          => 'in_progress',
+            'commitment_date' => '2026-03-25',
+        ]);
+
+        $this->travelTo(\Carbon\Carbon::create(2026, 12, 1));
+
+        $unfiltered = $this->actingAs($this->admin, 'sanctum')->getJson('/api/reports/dashboard')->assertOk();
+        $this->assertSame(2, $unfiltered->json('overdue_activities'));
+
+        $filtered = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/reports/dashboard?year=2026&week=12')
+            ->assertOk();
+        $this->assertSame(1, $filtered->json('overdue_activities'));
+
+        // Conteos estructurales: no se acotan por semana (no tienen fecha de compromiso propia).
+        $this->assertSame($unfiltered->json('active_projects'), $filtered->json('active_projects'));
+        $this->assertSame($unfiltered->json('total_programs'), $filtered->json('total_programs'));
+    }
+
+    public function test_dashboard_rejects_week_and_month_combined(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/reports/dashboard?year=2026&week=12&month=3')
+            ->assertStatus(422);
+    }
+
+    public function test_dashboard_rejects_week_without_year(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/reports/dashboard?week=12')
+            ->assertStatus(422);
+    }
 }

@@ -54,11 +54,20 @@ class DeliverableController extends Controller
         if ($request->filled('responsible_id')) {
             $query->whereHas('roleActivities', fn($q) => $q->where('responsible_id', $request->responsible_id));
         }
-        if ($request->filled('year')) {
-            $query->whereHas('roleActivities', fn($q) => $q->whereYear('commitment_date', $request->year));
+        if ($request->filled('week') && $request->filled('month')) {
+            return response()->json(['message' => 'Los filtros de semana y mes no se pueden combinar.'], 422);
         }
-        if ($request->filled('month')) {
-            $query->whereHas('roleActivities', fn($q) => $q->whereMonth('commitment_date', $request->month));
+        if ($request->filled('week')) {
+            $request->validate(['week' => 'integer|min:1|max:53', 'year' => 'required|integer']);
+            [$weekStart, $weekEnd] = \App\Support\IsoWeek::range((int) $request->year, (int) $request->week);
+            $query->whereHas('roleActivities', fn($q) => $q->whereBetween('commitment_date', [$weekStart->toDateString(), $weekEnd->toDateString()]));
+        } else {
+            if ($request->filled('year')) {
+                $query->whereHas('roleActivities', fn($q) => $q->whereYear('commitment_date', $request->year));
+            }
+            if ($request->filled('month')) {
+                $query->whereHas('roleActivities', fn($q) => $q->whereMonth('commitment_date', $request->month));
+            }
         }
         if ($request->filled('type')) {
             $query->where('type', $request->type);

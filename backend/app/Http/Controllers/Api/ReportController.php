@@ -76,54 +76,139 @@ class ReportController extends Controller
         return response()->json(\App\Services\ExecutiveSummaryService::build());
     }
 
-    public function dashboard()
+    public function dashboard(Request $request)
     {
+        $request->validate([
+            'program_id'        => 'nullable|integer|exists:academic_programs,id',
+            'responsible_id'    => 'nullable|integer|exists:users,id',
+            'role'              => 'nullable|in:expert,pedagogy,design,audiovisual,engineering,qa',
+            'year'              => 'nullable|integer',
+            'month'             => 'nullable|integer|min:1|max:12',
+            'week'              => 'nullable|integer|min:1|max:53',
+            'type'              => 'nullable|in:creation,update,change_control',
+            'academic_level_id' => 'nullable|integer|exists:academic_levels,id',
+        ]);
+        if ($request->filled('week') && $request->filled('month')) {
+            return response()->json(['message' => 'Los filtros de semana y mes no se pueden combinar.'], 422);
+        }
+        if ($request->filled('week') && !$request->filled('year')) {
+            return response()->json(['message' => 'El filtro de semana requiere año.'], 422);
+        }
+
+        $hasActivityFilters = $request->filled('role') || $request->filled('responsible_id')
+            || $request->filled('year') || $request->filled('month') || $request->filled('week');
+        $hasDeliverableFilters = $request->filled('program_id') || $request->filled('type') || $request->filled('academic_level_id');
+
+        // Filtros a nivel de role_activities (rol, responsable, rango de
+        // fecha de compromiso) — columnas sin prefijo de tabla, así que
+        // sirve tanto sobre un builder normal de Eloquent como sobre uno
+        // que ya viene con joins agregados (los de $countByProgram/$countBySubject).
+        $applyActivityScalarFilters = function ($query) use ($request) {
+            if ($request->filled('role'))           $query->where('role', $request->role);
+            if ($request->filled('responsible_id')) $query->where('responsible_id', $request->responsible_id);
+            if ($request->filled('week')) {
+                [$start, $end] = \App\Support\IsoWeek::range((int) $request->year, (int) $request->week);
+                $query->whereBetween('commitment_date', [$start->toDateString(), $end->toDateString()]);
+            } else {
+                if ($request->filled('year'))  $query->whereYear('commitment_date', $request->year);
+                if ($request->filled('month')) $query->whereMonth('commitment_date', $request->month);
+            }
+            return $query;
+        };
+
+        // Filtros a nivel de deliverables (programa, tipo, nivel académico).
+        $applyDeliverableScalarFilters = function ($query) use ($request) {
+            if ($request->filled('program_id')) {
+                $query->whereHas('subject', fn ($q) => $q->where('academic_program_id', $request->program_id));
+            }
+            if ($request->filled('type'))              $query->where('type', $request->type);
+            if ($request->filled('academic_level_id')) $query->where('academic_level_id', $request->academic_level_id);
+            return $query;
+        };
+
+        // RoleActivity::whereHas('deliverable') + filtros de actividad +
+        // (si hay) filtros de entregable anidados.
+        $activityQuery = function () use ($applyActivityScalarFilters, $applyDeliverableScalarFilters, $hasDeliverableFilters) {
+            $query = $applyActivityScalarFilters(RoleActivity::whereHas('deliverable'));
+            if ($hasDeliverableFilters) {
+                $query->whereHas('deliverable', fn ($q) => $applyDeliverableScalarFilters($q));
+            }
+            return $query;
+        };
+
+        // Deliverable::query() + filtros de entregable + (si hay) filtros
+        // de actividad anidados.
+        $deliverableQuery = function () use ($applyDeliverableScalarFilters, $applyActivityScalarFilters, $hasActivityFilters) {
+            $query = $applyDeliverableScalarFilters(Deliverable::query());
+            if ($hasActivityFilters) {
+                $query->whereHas('roleActivities', fn ($q) => $applyActivityScalarFilters($q));
+            }
+            return $query;
+        };
+
+        // Para consultas de role_activities que YA vienen con un join manual
+        // a deliverables (los de $countByProgram/$countBySubject más abajo):
+        // aplica los filtros de actividad directamente, y si hay filtros de
+        // entregable (tipo, nivel académico), los agrega vía un whereHas
+        // anidado — así el denominador de "compliance por programa/asignatura"
+        // respeta los mismos filtros que ya respeta $deliverablesByProgram.
+        $applyActivityAndDeliverableFilters = function ($query) use ($applyActivityScalarFilters, $applyDeliverableScalarFilters, $hasDeliverableFilters) {
+            $applyActivityScalarFilters($query);
+            if ($hasDeliverableFilters) {
+                $query->whereHas('deliverable', fn ($q) => $applyDeliverableScalarFilters($q));
+            }
+            return $query;
+        };
+
         $projectsByStatus = Project::select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->get()
             ->pluck('count', 'status');
 
-        $deliverablesByStatus = Deliverable::select('global_status', DB::raw('count(*) as count'))
+        $deliverablesByStatus = $deliverableQuery()
+            ->select('global_status', DB::raw('count(*) as count'))
             ->groupBy('global_status')
             ->get()
             ->pluck('count', 'global_status');
 
-        $totalDeliverables = Deliverable::count();
-        $finishedDeliverables = Deliverable::where('global_status', 'finished')->count();
-        $withObservations = Deliverable::where('global_status', 'with_observations')->count();
-        $totalActivities = RoleActivity::whereHas('deliverable')
+        $totalDeliverables = $deliverableQuery()->count();
+        $finishedDeliverables = $deliverableQuery()->where('global_status', 'finished')->count();
+        $withObservations = $deliverableQuery()->where('global_status', 'with_observations')->count();
+        $totalActivities = $activityQuery()
             ->where('status', '!=', 'not_applicable')
             ->count();
-        $completedActivities = RoleActivity::whereHas('deliverable')
+        $completedActivities = $activityQuery()
             ->completed()
             ->count();
         $globalCompliance = $totalActivities > 0
             ? round(($completedActivities / $totalActivities) * 100, 2)
             : 0;
 
-        $activitiesByRole = RoleActivity::whereHas('deliverable')->select('role', DB::raw('count(*) as total'),
+        $activitiesByRole = $activityQuery()->select('role', DB::raw('count(*) as total'),
             DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"))
             ->groupBy('role')
             ->get();
 
         // "Activo" = no cerrado todavía (vive, se ejecuta y se cierra — ver
         // tooltip del KPI), no estrictamente "in_progress": un proyecto en
-        // draft/parameterized sigue siendo una iniciativa activa.
+        // draft/parameterized sigue siendo una iniciativa activa. Conteo
+        // estructural — no tiene fecha de compromiso propia, así que nunca
+        // se acota por semana/mes/año (ver plan).
         $activeProjects = Project::whereNotIn('status', ['finished', 'cancelled'])->count();
         $totalPrograms = \App\Models\AcademicProgram::count();
 
         // Overdue: definición única en RoleActivity::scopeOverdue(), reutilizada
         // en todo el dashboard para que las tarjetas y desgloses coincidan.
-        $overdueActivities = RoleActivity::overdue()->whereHas('deliverable')->count();
+        $overdueActivities = $activityQuery()->overdue()->count();
 
         // Approaching: actividades que vencen exactamente el mismo día de hoy
         // y aún no están entregadas o aprobadas.
         $todayStr = Carbon::today()->toDateString();
-        $approachingActivities = RoleActivity::whereNotNull('commitment_date')
+        $approachingActivities = $activityQuery()
+            ->whereNotNull('commitment_date')
             ->where('commitment_date', $todayStr)
             ->whereNull('actual_delivery_date')
             ->whereNotIn('status', ['approved', 'delivered', 'not_applicable'])
-            ->whereHas('deliverable')
             ->count();
 
         // Per-program breakdown — antes hacía ~5 consultas POR programa dentro
@@ -132,7 +217,8 @@ class ReportController extends Controller
         // calculados sin disparar consultas nuevas.
         $programs = \App\Models\AcademicProgram::with('project')->get();
 
-        $deliverablesByProgram = \App\Models\Deliverable::join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
+        $deliverablesByProgram = $deliverableQuery()
+            ->join('subjects', 'deliverables.subject_id', '=', 'subjects.id')
             ->select('subjects.academic_program_id', 'deliverables.global_status')
             ->get()
             ->groupBy('academic_program_id');
@@ -148,11 +234,11 @@ class ReportController extends Controller
         };
 
         $totalActsByProgram = $countByProgram(
-            RoleActivity::where('role_activities.status', '!=', 'not_applicable')
+            $applyActivityAndDeliverableFilters(RoleActivity::where('role_activities.status', '!=', 'not_applicable'))
         );
-        $completedActsByProgram = $countByProgram(RoleActivity::completed());
-        $overdueByProgram = $countByProgram(RoleActivity::overdue());
-        $activeByProgram = $countByProgram(RoleActivity::active());
+        $completedActsByProgram = $countByProgram($applyActivityAndDeliverableFilters(RoleActivity::query())->completed());
+        $overdueByProgram = $countByProgram($applyActivityAndDeliverableFilters(RoleActivity::query())->overdue());
+        $activeByProgram = $countByProgram($applyActivityAndDeliverableFilters(RoleActivity::query())->active());
 
         $programsBreakdown = $programs->map(function ($prog) use (
             $deliverablesByProgram, $totalActsByProgram, $completedActsByProgram, $overdueByProgram, $activeByProgram
@@ -185,7 +271,8 @@ class ReportController extends Controller
         // Per-subject breakdown
         $subjects = \App\Models\Subject::with('academicProgram.project')->get();
 
-        $deliverablesBySubject = \App\Models\Deliverable::select('subject_id', 'global_status')
+        $deliverablesBySubject = $deliverableQuery()
+            ->select('subject_id', 'global_status')
             ->get()
             ->groupBy('subject_id');
 
@@ -199,11 +286,11 @@ class ReportController extends Controller
         };
 
         $totalActsBySubject = $countBySubject(
-            RoleActivity::where('role_activities.status', '!=', 'not_applicable')
+            $applyActivityAndDeliverableFilters(RoleActivity::where('role_activities.status', '!=', 'not_applicable'))
         );
-        $completedActsBySubject = $countBySubject(RoleActivity::completed());
-        $overdueBySubject = $countBySubject(RoleActivity::overdue());
-        $activeBySubject = $countBySubject(RoleActivity::active());
+        $completedActsBySubject = $countBySubject($applyActivityAndDeliverableFilters(RoleActivity::query())->completed());
+        $overdueBySubject = $countBySubject($applyActivityAndDeliverableFilters(RoleActivity::query())->overdue());
+        $activeBySubject = $countBySubject($applyActivityAndDeliverableFilters(RoleActivity::query())->active());
 
         $subjectsBreakdown = $subjects->map(function ($sub) use (
             $deliverablesBySubject, $totalActsBySubject, $completedActsBySubject, $overdueBySubject, $activeBySubject
@@ -235,7 +322,7 @@ class ReportController extends Controller
 
         // Activities by role with more detail (for flow/bottleneck analysis)
         $inactiveList = implode("','", RoleActivity::INACTIVE_STATUSES);
-        $activitiesByRoleDetail = RoleActivity::whereHas('deliverable')->select(
+        $activitiesByRoleDetail = $activityQuery()->select(
                 'role',
                 DB::raw('count(*) as total'),
                 DB::raw("sum(case when status = 'approved' then 1 else 0 end) as approved"),
@@ -247,8 +334,7 @@ class ReportController extends Controller
         // overdue por rol usa el mismo scope que el resto del dashboard, no una
         // condición SQL propia, para que el desglose siempre sume igual que
         // la tarjeta "Vencidas" y que "Vencidos" por programa.
-        $overdueByRole = RoleActivity::overdue()
-            ->whereHas('deliverable')
+        $overdueByRole = $activityQuery()->overdue()
             ->select('role', DB::raw('count(*) as overdue'))
             ->groupBy('role')
             ->pluck('overdue', 'role');
@@ -259,9 +345,9 @@ class ReportController extends Controller
         });
 
         // Activities counts (for KPI cards)
-        $totalActivities    = RoleActivity::whereHas('deliverable')->count();
-        $finishedActivities = RoleActivity::whereHas('deliverable')->where('status', 'approved')->count();
-        $activeActivities   = RoleActivity::whereHas('deliverable')->active()->count();
+        $totalActivities    = $activityQuery()->count();
+        $finishedActivities = $activityQuery()->where('status', 'approved')->count();
+        $activeActivities   = $activityQuery()->active()->count();
 
         return response()->json([
             'active_projects'             => $activeProjects,

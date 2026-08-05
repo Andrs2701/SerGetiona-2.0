@@ -21,6 +21,7 @@ import { clsx } from 'clsx';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { can } from '@/lib/permissions';
 import ActivityDetailPanel from '@/components/ActivityDetailPanel';
+import { getIsoWeekOfDateString, listIsoWeeksOfYear, formatIsoWeekLabel } from '@/lib/isoWeek';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,43 @@ function isApproaching(d: Deliverable): boolean {
     const days = daysUntil(a.commitment_date);
     return days !== null && days >= 0 && days <= 5;
   });
+}
+
+function activityInWeek(a: RoleActivity, year: number, week: number): boolean {
+  if (!a.commitment_date) return false;
+  const w = getIsoWeekOfDateString(a.commitment_date);
+  return w.year === year && w.week === week;
+}
+
+function activityInMonth(a: RoleActivity, year: number, month: number): boolean {
+  if (!a.commitment_date) return false;
+  const d = new Date(a.commitment_date + 'T00:00:00');
+  return d.getFullYear() === year && d.getMonth() + 1 === month;
+}
+
+const MONTHS_ES_LOWER = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function dateSearchTokens(dateStr?: string | null): string[] {
+  if (!dateStr) return [];
+  const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.split(' ')[0];
+  const d = new Date(clean + 'T00:00:00');
+  if (isNaN(d.getTime())) return [];
+  const day = d.getDate(), month = d.getMonth() + 1, year = d.getFullYear();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return [
+    clean,
+    `${pad(day)}/${pad(month)}`,
+    `${pad(day)}/${pad(month)}/${year}`,
+    `${pad(day)}-${pad(month)}-${year}`,
+    `${day} ${MONTHS_ES_LOWER[month - 1]}`,
+    `${day} de ${MONTHS_ES_LOWER[month - 1]}`,
+    `${MONTHS_ES_LOWER[month - 1]} ${year}`,
+    MONTHS_ES_LOWER[month - 1],
+  ];
+}
+
+function matchesDateQuery(dateStr: string | undefined | null, q: string): boolean {
+  return dateSearchTokens(dateStr).some(t => t.includes(q));
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -1430,6 +1468,10 @@ export default function EntregablesPage() {
   const [filterCiclo, setFilterCiclo]           = useState('');
   const [filterAcademicLevel, setFilterAcademicLevel] = useState('');
   const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([]);
+  const [viewBy, setViewBy] = useState<'month' | 'week'>('week');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterWeek, setFilterWeek] = useState('');
 
   useEffect(() => {
     api.get<{ levels: AcademicLevel[] }>(ENDPOINTS.ACADEMIC_LEVELS)
@@ -1527,13 +1569,26 @@ export default function EntregablesPage() {
   const responsibles = useMemo(() => Array.from(new Set(
     data.flatMap(d => (d.role_activities ?? []).map(a => a.responsible?.name).filter(Boolean))
   )) as string[], [data]);
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    data.forEach(d => (d.role_activities ?? []).forEach(a => {
+      if (a.commitment_date) years.add(Number(a.commitment_date.slice(0, 4)));
+    }));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [data]);
 
   const COMPLETED_STATUSES = ['finished', 'cancelled'];
 
   const filtered = useMemo(() => data.filter(d => {
     if (search) {
-      const q = search.toLowerCase();
-      if (![d.name, d.subject_name, d.project_name, d.program_name].some(s => s?.toLowerCase().includes(q))) return false;
+      const q = search.toLowerCase().trim();
+      const textMatch = [d.name, d.subject_name, d.project_name, d.program_name, String(d.id)]
+        .some(s => s?.toLowerCase().includes(q));
+      const dateMatch = matchesDateQuery(d.start_date, q)
+        || (d.role_activities ?? []).some(a => matchesDateQuery(a.commitment_date, q));
+      const responsibleMatch = (d.role_activities ?? []).some(a => a.responsible?.name?.toLowerCase().includes(q));
+      if (!textMatch && !dateMatch && !responsibleMatch) return false;
     }
     if (filterProject && d.project_name !== filterProject) return false;
     if (filterStatus && d.global_status !== filterStatus) return false;
@@ -1541,11 +1596,17 @@ export default function EntregablesPage() {
     if (filterSemestre && d.semestre !== filterSemestre) return false;
     if (filterCiclo && d.ciclo !== filterCiclo) return false;
     if (filterAcademicLevel && String(d.academic_level_id ?? '') !== filterAcademicLevel) return false;
+    if (viewBy === 'week' && filterYear && filterWeek) {
+      if (!(d.role_activities ?? []).some(a => activityInWeek(a, Number(filterYear), Number(filterWeek)))) return false;
+    }
+    if (viewBy === 'month' && filterYear && filterMonth) {
+      if (!(d.role_activities ?? []).some(a => activityInMonth(a, Number(filterYear), Number(filterMonth)))) return false;
+    }
     if (onlyOverdue && !isOverdue(d)) return false;
     // Hide completed unless the user explicitly filtered for them or toggled showCompleted
     if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, onlyOverdue, showCompleted]);
+  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, viewBy, filterYear, filterMonth, filterWeek, onlyOverdue, showCompleted]);
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
@@ -1616,7 +1677,7 @@ export default function EntregablesPage() {
         <div className="relative min-w-full sm:min-w-[220px] flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar asignatura, módulo, proyecto..."
+            placeholder="Buscar por nombre, id, fecha o responsable..."
             className="pl-8 pr-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
         </div>
 
@@ -1637,6 +1698,43 @@ export default function EntregablesPage() {
           <option value="">Todos los responsables</option>
           {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
+
+        <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[85px]">
+          <option value="">Año</option>
+          {availableYears.map(y => <option key={y} value={String(y)}>{y}</option>)}
+        </select>
+
+        <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <button type="button" onClick={() => { setViewBy('month'); setFilterWeek(''); }}
+            className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'month' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
+          >Mes</button>
+          <button type="button" onClick={() => {
+              setViewBy('week');
+              setFilterMonth('');
+              if (!filterYear) setFilterYear(String(new Date().getFullYear()));
+            }}
+            className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'week' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
+          >Semana</button>
+        </div>
+
+        {viewBy === 'week' ? (
+          <select value={filterWeek} onChange={e => setFilterWeek(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[220px]">
+            <option value="">Semana (Todas)</option>
+            {listIsoWeeksOfYear(Number(filterYear) || new Date().getFullYear()).map(w => (
+              <option key={w.week} value={String(w.week)}>{formatIsoWeekLabel(w)}</option>
+            ))}
+          </select>
+        ) : (
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[120px]">
+            <option value="">Mes (Todos)</option>
+            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+              <option key={i + 1} value={String(i + 1)}>{m}</option>
+            ))}
+          </select>
+        )}
 
         {isManager && (
           <>
