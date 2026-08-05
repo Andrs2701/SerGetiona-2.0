@@ -158,6 +158,41 @@ class PermissionMatrixEnforcementTest extends TestCase
     }
 
     /**
+     * "projects.view" quedó sembrado abierto a los 8 roles por defecto —
+     * dejaba "Escuelas / Proyectos" visible en el menú de cualquier rol
+     * operativo (reportado en producción: un usuario Diseño veía el enlace
+     * y los botones de gestión) sin que un admin lo hubiera autorizado
+     * desde la Matriz. No es una ruta bloqueada (GET /projects ya se
+     * autoescopa por asignación vía ResourceAccess::isManager()) — esto
+     * solo controla si "projects.view" aparece en /auth/me, que es lo que
+     * el Sidebar usa para decidir si mostrar el enlace.
+     */
+    public function test_projects_view_is_not_granted_to_operational_roles_by_default(): void
+    {
+        $engineer = User::factory()->create(['role' => 'engineering', 'is_active' => true]);
+
+        $before = $this->actingAs($engineer, 'sanctum')->getJson('/api/auth/me');
+        $before->assertOk();
+        $this->assertNotContains('projects.view', $before->json('data.permissions'));
+
+        SystemPermission::where('module', 'projects')->where('action', 'view')
+            ->update(['allowed_roles' => ['admin', 'coordinator', 'engineering']]);
+
+        $after = $this->actingAs($engineer, 'sanctum')->getJson('/api/auth/me');
+        $after->assertOk();
+        $this->assertContains('projects.view', $after->json('data.permissions'));
+    }
+
+    public function test_admin_and_coordinator_retain_projects_view_by_default(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $coordinator = User::factory()->create(['role' => 'coordinator', 'is_active' => true]);
+
+        $this->assertContains('projects.view', $this->actingAs($admin, 'sanctum')->getJson('/api/auth/me')->json('data.permissions'));
+        $this->assertContains('projects.view', $this->actingAs($coordinator, 'sanctum')->getJson('/api/auth/me')->json('data.permissions'));
+    }
+
+    /**
      * Regresión: index() filtraba por una lista fija de "roles operativos" e
      * ignoraba el Alcance de Visibilidad — igual bug que ya se corrigió para
      * Entregables, pero en el listado de Escuelas/Proyectos.

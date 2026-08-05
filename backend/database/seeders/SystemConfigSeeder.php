@@ -41,7 +41,7 @@ class SystemConfigSeeder extends Seeder
                 'module' => 'projects',
                 'action' => 'view',
                 'view_path' => '/proyectos',
-                'allowed_roles' => ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+                'allowed_roles' => ['admin', 'coordinator'],
                 'description' => 'Ver listado y detalles de proyectos.'
             ],
             [

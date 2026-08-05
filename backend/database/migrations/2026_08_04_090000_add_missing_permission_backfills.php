@@ -23,7 +23,14 @@ return new class extends Migration
                 'module' => 'projects',
                 'action' => 'view',
                 'view_path' => '/proyectos',
-                'allowed_roles' => ['admin', 'coordinator', 'expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
+                // Solo admin/coordinator por defecto: el listado/menú de
+                // "Escuelas / Proyectos" es una vista gerencial, no algo que
+                // todo rol operativo deba ver de entrada — se otorga rol por
+                // rol desde la Matriz si hace falta. No confundir con el
+                // acceso de un rol operativo a SU proyecto asignado, que ya
+                // funciona aparte vía ResourceAccess::canAccessProject() sin
+                // depender de este permiso.
+                'allowed_roles' => ['admin', 'coordinator'],
                 'description' => 'Ver listado y detalles de proyectos.',
             ],
             [
