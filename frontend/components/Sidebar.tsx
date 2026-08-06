@@ -227,19 +227,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
             <Link
               key={href}
               href={href}
-              onClick={() => {
-                if (onMobileClose) onMobileClose();
-                if (href === '/entregables') {
-                  try {
-                    if (typeof window !== 'undefined' && window.location.search) {
-                      window.history.pushState(null, '', '/entregables');
-                    }
-                  } catch { /* ignore */ }
-                  if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('app:clean-params'));
-                  }
-                }
-              }}
+              onClick={onMobileClose}
               className={clsx(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active

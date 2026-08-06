@@ -7,7 +7,7 @@ import {
   Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
   BookOpen, FolderOpen, LayoutList, Table2, ExternalLink,
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
 import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus, DeliverableType, AcademicLevel } from '@/lib/types';
 import {
@@ -1476,6 +1476,7 @@ type FormMode = { mode: 'create'; deliverable?: Deliverable } | { mode: 'edit'; 
 
 export default function EntregablesPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuthContext();
   const isAdminOrCoord = user?.role === 'admin' || user?.role === 'coordinator';
   const isManager = isAdminOrCoord || can(user, 'entregables', 'manage');
@@ -1536,6 +1537,11 @@ export default function EntregablesPage() {
 
   const openTargetDeliverableOrActivity = useCallback((deliverableId: number | null, activityId: number | null) => {
     if (data.length === 0) return;
+    // Ya se abrió (y puede ya haberse cerrado) este mismo entregable — no
+    // volver a abrirlo de golpe si algo más (recarga de `data`, etc.) hace
+    // que este efecto se re-evalúe mientras la URL todavía no terminó de
+    // limpiarse (ver onClose de SidePanel/ActivityDetailPanel más abajo).
+    if (deliverableId && openedDeliverableIdRef.current === deliverableId) return;
 
     let targetDeliverable: Deliverable | undefined;
 
@@ -2114,6 +2120,12 @@ export default function EntregablesPage() {
           onClose={() => {
             setPanel(null);
             openedDeliverableIdRef.current = null;
+            // Sin esto la URL se queda en ?deliverable=X para siempre (un
+            // history.pushState manual no lo logra: useSearchParams no lo
+            // detecta) y cualquier recarga o revisita reabre el mismo panel.
+            if (searchParams.get('deliverable') || searchParams.get('activity')) {
+              router.replace('/entregables', { scroll: false });
+            }
           }}
           onSelectActivity={handleSelectActivity}
           canEdit={isManager}
@@ -2129,6 +2141,9 @@ export default function EntregablesPage() {
             setSelectedActivity(null);
             setSelectedActivityDeliverable(null);
             openedActivityIdRef.current = null;
+            if (searchParams.get('deliverable') || searchParams.get('activity')) {
+              router.replace('/entregables', { scroll: false });
+            }
           }}
           onStatusChange={() => {}}
           isManager={isManager}

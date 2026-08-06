@@ -150,9 +150,9 @@ export default function NotificacionesPage() {
     if (!n.read_at) markRead(n.id);
     const route = getNotifRoute(n, user?.role);
     if (route) {
-      try {
-        window.history.pushState(null, '', route);
-      } catch { /* ignore */ }
+      // Solo router.push (ver mismo comentario en Header.tsx): un
+      // history.pushState manual antes de esto confundía al router y useSearchParams
+      // se quedaba con el valor viejo.
       router.push(route);
       window.dispatchEvent(
         new CustomEvent('app:notif-clicked', {

@@ -238,9 +238,10 @@ export default function Header({
                         if (!n.read_at) markRead(n.id);
                         if (route) {
                           setNotifOpen(false);
-                          try {
-                            window.history.pushState(null, '', route);
-                          } catch { /* ignore */ }
+                          // Solo router.push: navega también cuando ya se está en la
+                          // misma ruta (cambia el query) y mantiene useSearchParams
+                          // sincronizado — un history.pushState manual antes de esto
+                          // hacía que el router creyera "ya estoy ahí" y no reaccionara.
                           router.push(route);
                           window.dispatchEvent(
                             new CustomEvent('app:notif-clicked', {

@@ -219,6 +219,7 @@ class WorkspaceController extends Controller
                 'commitment_date'           => $activity->commitment_date?->toDateString(),
                 'actual_start_date'         => $activity->actual_start_date?->toDateString(),
                 'actual_delivery_date'      => $activity->actual_delivery_date?->toDateString(),
+                'first_delivered_at'        => $activity->first_delivered_at?->toDateString(),
                 'production_not_applicable' => (bool) $activity->production_not_applicable,
                 'priority'                  => $deliverable?->priority ?? 'media',
                 'date_status'               => $dateStatus,
