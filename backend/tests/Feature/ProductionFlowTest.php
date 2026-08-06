@@ -278,4 +278,12 @@ class ProductionFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('next_role', null);
     }
+
+    public function test_deliverable_global_status_becomes_with_observations_when_activity_has_findings(): void
+    {
+        $this->expertActivity->update(['status' => 'adjustments_requested']);
+
+        $deliverable = $this->deliverable->fresh();
+        $this->assertEquals('with_observations', $deliverable->global_status);
+    }
 }

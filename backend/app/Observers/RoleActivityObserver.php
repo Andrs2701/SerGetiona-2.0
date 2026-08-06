@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Http\Controllers\Api\RoleActivityController;
 use App\Models\RoleActivity;
 use App\Services\ProductionEventService;
 use Illuminate\Support\Facades\Auth;
@@ -141,6 +142,10 @@ class RoleActivityObserver
                 reasonCode: request('reason_code'),
                 payload: request('adjust_roles') ? ['roles_a_ajustar' => request('adjust_roles')] : null
             );
+        }
+
+        if ($activity->isDirty('status') && $activity->deliverable) {
+            RoleActivityController::recalculateGlobalStatus($activity->deliverable);
         }
     }
 }

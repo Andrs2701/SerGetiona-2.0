@@ -754,17 +754,24 @@ class RoleActivityController extends Controller
             return;
         }
 
-        // 3. Si hay al menos una actividad en revisión/entregada (pero no aprobada por QA)
+        // 3. Si hay al menos una actividad devuelta con observaciones o hallazgos
+        $hasObservations = $activities->contains(function ($a) {
+            return in_array($a->status, ['adjustments_requested', 'with_findings'], true);
+        });
+
+        // 4. Si hay al menos una actividad en revisión/entregada (pero no aprobada por QA)
         $hasInReview = $activities->contains(function ($a) {
             return in_array($a->status, ['delivered', 'in_review'], true);
         });
 
-        // 4. Si hay actividades activas (cualquier estado diferente a aprobado o entregado/revisión)
+        // 5. Si hay actividades activas (cualquier estado diferente a aprobado o entregado/revisión)
         $hasActive = $activities->contains(function ($a) {
             return !in_array($a->status, ['approved', 'delivered', 'in_review'], true);
         });
 
-        if ($hasActive) {
+        if ($hasObservations) {
+            $deliverable->global_status = 'with_observations';
+        } elseif ($hasActive) {
             $deliverable->global_status = 'in_progress';
         } elseif ($hasInReview) {
             $deliverable->global_status = 'in_review';
