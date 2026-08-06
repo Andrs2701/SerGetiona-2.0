@@ -56,6 +56,94 @@ class ImportControllerTest extends TestCase
         $this->assertSame('not_started', $pedagogyActivity->status);
     }
 
+    /**
+     * Reporte real: un archivo sin columnas "semestre"/"ciclo" (no son
+     * obligatorias) pasaba "Validar" sin errores pero fallaba con HTTP 500
+     * ("Undefined array key semestre") al importar de verdad — persistRow()
+     * las leía con `?:` en vez de `??`/empty(), que sí tolera la clave ausente.
+     */
+    public function test_import_succeeds_without_optional_semestre_and_ciclo_columns(): void
+    {
+        $project = Project::factory()->create();
+
+        $csv = "programa,asignatura,semana_modulo,tipo_contenido\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,Creacion\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('imported', 1)
+            ->assertJsonPath('errors', []);
+
+        $deliverable = Deliverable::where('name', 'Semana 1')->first();
+        $this->assertNotNull($deliverable);
+        $this->assertNull($deliverable->semestre);
+        $this->assertNull($deliverable->ciclo);
+    }
+
+    public function test_import_accepts_dd_mm_yyyy_dates(): void
+    {
+        $project = Project::factory()->create();
+
+        $csv = "programa,asignatura,semana_modulo,semestre,ciclo,tipo_contenido,fecha_inicio,fecha_entrega_pedagogia,correo_responsable_pedagogia\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,I,1,Creacion,15/08/2026,20/08/2026,{$this->admin->email}\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('imported', 1)
+            ->assertJsonPath('errors', []);
+
+        $deliverable = Deliverable::where('name', 'Semana 1')->first();
+        $this->assertSame('2026-08-15', $deliverable->start_date?->toDateString());
+
+        $pedagogyActivity = $deliverable->roleActivities()->where('role', 'pedagogy')->first();
+        $this->assertSame('2026-08-20', $pedagogyActivity->commitment_date?->toDateString());
+    }
+
+    /**
+     * DateTime::createFromFormat('d/m/Y', ...) no rechaza valores fuera de
+     * rango por sí solo: "rueda" el mes/día hacia el siguiente (32/13/2026
+     * se vuelve silenciosamente 2027-02-01) en vez de fallar. Sin chequear
+     * DateTime::getLastErrors() esa fila se importaría con una fecha
+     * completamente distinta a la que el usuario escribió, sin ningún aviso.
+     */
+    public function test_import_rejects_impossible_calendar_date_with_clear_error(): void
+    {
+        $project = Project::factory()->create();
+
+        $csv = "programa,asignatura,semana_modulo,tipo_contenido,fecha_inicio\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,Creacion,32/13/2026\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=1', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('valid', 0)
+            ->assertJsonPath('invalid', 1);
+
+        $errors = $response->json('errors');
+        $this->assertCount(1, $errors);
+        $this->assertSame('fecha_inicio', $errors[0]['field']);
+        $this->assertStringContainsString('YYYY-MM-DD', $errors[0]['message']);
+
+        $this->assertNull(Deliverable::where('name', 'Semana 1')->first());
+    }
+
     public function test_import_resolves_project_from_row_column_without_any_default_selected(): void
     {
         $csv = "proyecto,programa,asignatura,semana_modulo,semestre,ciclo,tipo_contenido\n"

@@ -134,7 +134,7 @@ class ImportController extends Controller
         $sheet->setCellValue('A1',
             'INSTRUCCIONES: Completa los datos desde la fila 4. ' .
             'Columnas en ROJO son obligatorias. ' .
-            'Las fechas deben ir en formato YYYY-MM-DD (ej: 2026-08-15). ' .
+            'Las fechas deben ir en formato YYYY-MM-DD o DD/MM/YYYY (ej: 2026-08-15 o 15/08/2026). ' .
             'Los correos deben corresponder a usuarios registrados en SerGestiona. ' .
             'Si no seleccionas una Escuela/Proyecto en la pantalla de Carga Masiva, la columna "Escuela / Proyecto" es obligatoria.'
         );
@@ -340,9 +340,18 @@ class ImportController extends Controller
             if (!$validateOnly) {
                 DB::rollBack();
             }
+            // No exponer el mensaje técnico de PHP a secas (p. ej. "Undefined
+            // array key") — no le dice al usuario qué hacer. Se le da una
+            // acción concreta y el detalle técnico queda disponible para
+            // soporte, sin ser lo único que ve.
             return response()->json([
                 'imported' => 0,
-                'errors'   => [['row' => $rowNum, 'field' => 'general', 'message' => 'Error inesperado durante la importación: ' . $e->getMessage()]],
+                'errors'   => [['row' => $rowNum, 'field' => 'general', 'message' =>
+                    "No se pudo importar la fila {$rowNum} por un error inesperado. " .
+                    'Verifica que el archivo use las mismas columnas de la plantilla oficial ' .
+                    '(descárgala de nuevo si tienes dudas) y que los valores de cada celda tengan un formato válido. ' .
+                    "Detalle técnico: {$e->getMessage()}"
+                ]],
             ], 500);
         }
 
@@ -647,8 +656,8 @@ class ImportController extends Controller
                 'academic_level_id' => $academicLevelId,
                 'content_type'      => $row['tipo_contenido'] ?: null,
                 'global_status'     => 'unpublished',
-                'semestre'          => $row['semestre'] ?: null,
-                'ciclo'             => $row['ciclo'] ?: null,
+                'semestre'          => !empty($row['semestre']) ? $row['semestre'] : null,
+                'ciclo'             => !empty($row['ciclo']) ? $row['ciclo'] : null,
                 'start_date'        => !empty($row['fecha_inicio']) ? $this->parseDate($row['fecha_inicio']) : null,
                 'created_by'        => $userId,
             ]
@@ -746,9 +755,19 @@ class ImportController extends Controller
         $value = trim($value);
         if ($value === '') return null;
 
-        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d', 'd/m/y'] as $format) {
+        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d'] as $format) {
             $date = \DateTime::createFromFormat($format, $value);
-            if ($date !== false) return $date->format('Y-m-d');
+            if ($date === false) continue;
+
+            // createFromFormat "rueda" los valores fuera de rango en vez de
+            // fallar (32/13/2026 se vuelve silenciosamente 2027-02-01) —
+            // getLastErrors() es la única forma de detectarlo. En PHP 8.2+
+            // devuelve `false` (no un array) cuando no hubo problemas.
+            $errors = \DateTime::getLastErrors();
+            $hasProblems = $errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+            if (!$hasProblems) {
+                return $date->format('Y-m-d');
+            }
         }
 
         $timestamp = strtotime($value);
