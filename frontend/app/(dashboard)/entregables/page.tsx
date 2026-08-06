@@ -1516,6 +1516,7 @@ export default function EntregablesPage() {
   const [selectedActivity, setSelectedActivity] = useState<RoleActivity | null>(null);
   const [selectedActivityDeliverable, setSelectedActivityDeliverable] = useState<Deliverable | null>(null);
   const openedDeliverableIdRef = useRef<number | null>(null);
+  const openedActivityIdRef    = useRef<number | null>(null);
 
   useEffect(() => {
     api.get<Array<{ id: number; name: string }>>(ENDPOINTS.PROJECTS)
@@ -1531,26 +1532,55 @@ export default function EntregablesPage() {
     else if (filter.startsWith('status_')) setFilterStatus(filter.replace('status_', ''));
   }, [searchParams]);
 
-  // Depende de searchParams (no solo de `data`): una notificación puede
-  // navegar aquí con un ?deliverable= nuevo mientras la página ya está
-  // montada (mismo pathname), y Next no vuelve a correr efectos con deps
-  // vacías en ese caso — hay que reaccionar al cambio de query param.
+  // Maneja la navegación desde notificaciones, links o parámetros de URL
+  // (?deliverable=X o ?activity=Y) e independientemente del rol del usuario.
   useEffect(() => {
     const deliverableIdStr = searchParams.get('deliverable');
-    if (!deliverableIdStr) return;
-    const deliverableId = Number(deliverableIdStr);
-    if (openedDeliverableIdRef.current === deliverableId || data.length === 0) return;
-    const target = data.find(d => d.id === deliverableId);
-    if (target) {
-      // ?edit=1 (usado desde el Calendario) abre directo el formulario de
-      // edición en vez del panel de solo lectura — así se puede actualizar
-      // la fecha de compromiso sin un clic adicional.
-      if (searchParams.get('edit') === '1' && isManager) {
-        setFormPanel({ mode: 'edit', deliverable: target });
-      } else {
-        setPanel({ deliverable: target, tab: 'info' });
+    const activityIdStr    = searchParams.get('activity');
+
+    if (!deliverableIdStr && !activityIdStr) {
+      openedDeliverableIdRef.current = null;
+      openedActivityIdRef.current    = null;
+      return;
+    }
+
+    if (data.length === 0) return;
+
+    let targetDeliverable: Deliverable | undefined;
+    let targetActivity: RoleActivity | undefined;
+
+    if (deliverableIdStr) {
+      const dId = Number(deliverableIdStr);
+      targetDeliverable = data.find(d => d.id === dId);
+      if (activityIdStr && targetDeliverable) {
+        const aId = Number(activityIdStr);
+        targetActivity = (targetDeliverable.role_activities ?? []).find(a => a.id === aId);
       }
-      openedDeliverableIdRef.current = deliverableId;
+    } else if (activityIdStr) {
+      const aId = Number(activityIdStr);
+      for (const d of data) {
+        const act = (d.role_activities ?? []).find(a => a.id === aId);
+        if (act) {
+          targetDeliverable = d;
+          targetActivity = act;
+          break;
+        }
+      }
+    }
+
+    if (targetDeliverable) {
+      if (targetActivity) {
+        setSelectedActivity(targetActivity);
+        setSelectedActivityDeliverable(targetDeliverable);
+        openedActivityIdRef.current = targetActivity.id;
+      } else {
+        if (searchParams.get('edit') === '1' && isManager) {
+          setFormPanel({ mode: 'edit', deliverable: targetDeliverable });
+        } else {
+          setPanel({ deliverable: targetDeliverable, tab: 'info' });
+        }
+        openedDeliverableIdRef.current = targetDeliverable.id;
+      }
     }
   }, [searchParams, data, isManager]);
 
@@ -2068,7 +2098,10 @@ export default function EntregablesPage() {
         <SidePanel
           deliverable={panel.deliverable}
           defaultTab={panel.tab}
-          onClose={() => setPanel(null)}
+          onClose={() => {
+            setPanel(null);
+            openedDeliverableIdRef.current = null;
+          }}
           onSelectActivity={handleSelectActivity}
           canEdit={isManager}
           onEdit={(d) => { setPanel(null); setFormPanel({ mode: 'edit', deliverable: d }); }}
@@ -2082,6 +2115,7 @@ export default function EntregablesPage() {
           onClose={() => {
             setSelectedActivity(null);
             setSelectedActivityDeliverable(null);
+            openedActivityIdRef.current = null;
           }}
           onStatusChange={() => {}}
           isManager={isManager}

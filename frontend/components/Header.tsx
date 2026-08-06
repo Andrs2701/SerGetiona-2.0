@@ -236,7 +236,11 @@ export default function Header({
                       key={n.id}
                       onClick={() => {
                         if (!n.read_at) markRead(n.id);
-                        if (route) { setNotifOpen(false); router.push(route); }
+                        if (route) {
+                          setNotifOpen(false);
+                          const finalRoute = route + (route.includes('?') ? '&' : '?') + 't=' + Date.now();
+                          router.push(finalRoute);
+                        }
                       }}
                       className={clsx(
                         'px-4 py-3 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors',

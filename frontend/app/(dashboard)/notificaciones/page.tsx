@@ -149,7 +149,10 @@ export default function NotificacionesPage() {
   function handleClick(n: Notification) {
     if (!n.read_at) markRead(n.id);
     const route = getNotifRoute(n, user?.role);
-    if (route) router.push(route);
+    if (route) {
+      const finalRoute = route + (route.includes('?') ? '&' : '?') + 't=' + Date.now();
+      router.push(finalRoute);
+    }
   }
 
   const filtered = notifications.filter(n => matchesFilter(n, filter));
