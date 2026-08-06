@@ -641,7 +641,7 @@ class RoleActivityController extends Controller
             'type'  => 'created',
             'icon'  => 'plus',
             'label' => 'Actividad creada',
-            'user'  => null,
+            'user'  => $activity->creator?->name,
             'date'  => $activity->created_at?->toIso8601String(),
         ];
 
@@ -664,7 +664,7 @@ class RoleActivityController extends Controller
                 'type'  => 'assigned',
                 'icon'  => 'user',
                 'label' => 'Asignada a ' . ($activity->responsible?->name ?? 'responsable'),
-                'user'  => null,
+                'user'  => $activity->assignedBy?->name,
                 'date'  => Carbon::parse($activity->assigned_at)->toIso8601String(),
             ];
         }

@@ -171,4 +171,38 @@ class RoleActivityObserverTest extends TestCase
         $this->assertSame('Coordinadora Uno', $created['user']);
         $this->assertSame('Coordinadora Uno', $assigned['user']);
     }
+
+    /**
+     * Mismo caso que test_deliverable_timeline_shows_creator_and_assigner_names,
+     * pero contra GET /api/activities/{id}/timeline (RoleActivityController::
+     * timeline) — un endpoint hermano y distinto del de
+     * /api/deliverables/{id}/timeline, con su propio bug: 'created'/'assigned'
+     * quedaban con 'user' => null a secas en vez de leer creator()/assignedBy().
+     */
+    public function test_activity_timeline_shows_creator_and_assigner_names(): void
+    {
+        $subject     = Subject::factory()->create();
+        $deliverable = Deliverable::factory()->create(['subject_id' => $subject->id]);
+        $creator     = User::factory()->create(['role' => 'coordinator', 'is_active' => true, 'name' => 'Coordinadora Uno']);
+        $responsible = User::factory()->create(['role' => 'pedagogy', 'is_active' => true]);
+
+        $this->actingAs($creator, 'sanctum');
+        $activity = RoleActivity::create([
+            'deliverable_id'  => $deliverable->id,
+            'role'            => 'pedagogy',
+            'responsible_id'  => $responsible->id,
+            'checklist'       => RoleActivity::defaultChecklist('pedagogy'),
+        ]);
+
+        $res = $this->actingAs($creator, 'sanctum')
+            ->getJson("/api/activities/{$activity->id}/timeline")
+            ->assertOk();
+
+        $events = collect($res->json('events'));
+        $created = $events->firstWhere('type', 'created');
+        $assigned = $events->firstWhere('type', 'assigned');
+
+        $this->assertSame('Coordinadora Uno', $created['user']);
+        $this->assertSame('Coordinadora Uno', $assigned['user']);
+    }
 }
