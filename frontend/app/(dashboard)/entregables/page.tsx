@@ -1037,13 +1037,16 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                 const isOverdue = !isDelivered && !isReturned && daysLeft !== null && daysLeft < 0;
                 const isApproaching = !isDelivered && !isReturned && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
 
-                // Days difference between commitment and actual delivery
+                // Evaluate punctuality against initial delivery date (first_delivered_at) so resubmissions after adjustments don't get marked as late
+                const deliveryDateForPunctuality = act?.first_delivered_at ?? act?.actual_delivery_date;
                 let deliveryDiffLabel: string | null = null;
-                if (isDelivered && act?.actual_delivery_date && act?.commitment_date) {
+                let onTime = false;
+                if (isDelivered && deliveryDateForPunctuality && act?.commitment_date) {
                   const diff = Math.round(
-                    (new Date(act.actual_delivery_date + 'T00:00:00').getTime() - new Date(act.commitment_date + 'T00:00:00').getTime()) / 86400000
+                    (new Date(deliveryDateForPunctuality + 'T00:00:00').getTime() - new Date(act.commitment_date + 'T00:00:00').getTime()) / 86400000
                   );
-                  deliveryDiffLabel = diff <= 0
+                  onTime = diff <= 0;
+                  deliveryDiffLabel = onTime
                     ? `Entregado ${diff === 0 ? 'a tiempo' : `${Math.abs(diff)}d antes`}`
                     : `Entregado ${diff}d tarde`;
                 }
@@ -1052,7 +1055,6 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
                 const deliveryBadge = (() => {
                   if (isNA) return null;
                   if (isDelivered && deliveryDiffLabel) {
-                    const onTime = act?.actual_delivery_date && act?.commitment_date && act.actual_delivery_date <= act.commitment_date;
                     return (
                       <span className={clsx('text-[10px] font-medium px-1.5 py-0.5 rounded',
                         onTime ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'

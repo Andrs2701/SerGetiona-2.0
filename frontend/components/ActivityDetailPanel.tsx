@@ -163,15 +163,15 @@ function EvidenciasTab({ deliverableId }: { deliverableId: number }) {
                       Límite: <strong className="text-gray-600 dark:text-gray-300">{formatDate(r.commitment_date)}</strong>
                     </span>
                   )}
-                  {r.actual_delivery_date && (
+                  {(r.first_delivered_at || r.actual_delivery_date) && (
                     <span className="flex items-center gap-1">
                       <CheckCircle2 size={11} className="text-emerald-500"/>
-                      Entregado: <strong className="text-emerald-600 dark:text-emerald-400">{formatDate(r.actual_delivery_date)}</strong>
+                      Entregado: <strong className="text-emerald-600 dark:text-emerald-400">{formatDate(r.first_delivered_at ?? r.actual_delivery_date)}</strong>
                     </span>
                   )}
-                  {wasReturned && r.first_delivered_at && (
+                  {wasReturned && r.actual_delivery_date && r.first_delivered_at && r.first_delivered_at !== r.actual_delivery_date && (
                     <span className="text-gray-400">
-                      (1ª entrega: {formatDate(r.first_delivered_at)})
+                      (Ajustes reentregados: {formatDate(r.actual_delivery_date)})
                     </span>
                   )}
                 </div>

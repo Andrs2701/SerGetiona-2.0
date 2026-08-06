@@ -43,8 +43,9 @@ function computeAutoStatus(act: WorkspaceActivity): { label: string; cls: string
   if (act.status === 'not_applicable')
     return { label: 'No Aplica', cls: 'bg-gray-100 text-gray-500' };
   if (act.status === 'approved') {
-    if (act.actual_delivery_date && act.commitment_date)
-      return act.actual_delivery_date <= act.commitment_date
+    const delDate = act.first_delivered_at ?? act.actual_delivery_date;
+    if (delDate && act.commitment_date)
+      return delDate <= act.commitment_date
         ? { label: 'Entregada a tiempo',       cls: 'bg-emerald-100 text-emerald-700' }
         : { label: 'Entregada fuera de tiempo', cls: 'bg-amber-100  text-amber-700'  };
     return { label: 'Aprobada', cls: 'bg-emerald-100 text-emerald-700' };

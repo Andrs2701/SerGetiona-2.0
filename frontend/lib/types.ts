@@ -339,6 +339,7 @@ export interface WorkspaceActivity {
   commitment_date?: string;
   actual_start_date?: string;
   actual_delivery_date?: string;
+  first_delivered_at?: string;
   production_not_applicable?: boolean;
   priority?: 'alta' | 'media' | 'baja';
   date_status: DateStatus;
