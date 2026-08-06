@@ -79,7 +79,7 @@ class NotificationService
             'task_assigned',
             'Nueva actividad asignada',
             $message,
-            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $activity->deliverable_id]
         );
     }
 

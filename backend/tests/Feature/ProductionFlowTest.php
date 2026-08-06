@@ -97,6 +97,44 @@ class ProductionFlowTest extends TestCase
 
         // Debe decir quién hizo la asignación, no solo qué se asignó.
         $this->assertStringContainsString($this->coordinator->name, $notif->message);
+
+        // deliverable_id debe venir en el payload: es lo que getNotifRoute()
+        // (frontend/lib/notifications.ts) usa para armar /entregables?deliverable=X
+        // — sin esto, un gestor que hace clic en la notificación aterriza en
+        // /entregables sin nada abierto.
+        $this->assertSame($this->deliverable->id, $notif->data['deliverable_id']);
+    }
+
+    /**
+     * Regresión: date_changed, activity_modified, adjustments_requested y
+     * next_in_chain se armaban con un payload mínimo (solo entity_type/
+     * entity_id de la actividad) — sin deliverable_id, getNotifRoute() no
+     * podía construir /entregables?deliverable=X para un gestor y el clic
+     * en la notificación aterrizaba en /entregables sin abrir nada.
+     */
+    public function test_date_changed_and_next_in_chain_notifications_include_deliverable_id(): void
+    {
+        $this->actingAs($this->coordinator, 'sanctum')
+            ->putJson("/api/activities/{$this->expertActivity->id}", [
+                'commitment_date' => now()->addDays(10)->toDateString(),
+            ])
+            ->assertOk();
+
+        $dateChanged = Notification::where('user_id', $this->expert->id)
+            ->where('type', 'date_changed')
+            ->first();
+        $this->assertNotNull($dateChanged);
+        $this->assertSame($this->deliverable->id, $dateChanged->data['deliverable_id']);
+
+        $this->actingAs($this->expert, 'sanctum')
+            ->postJson("/api/activities/{$this->expertActivity->id}/quick-action", ['action' => 'deliver'])
+            ->assertOk();
+
+        $nextInChain = Notification::where('user_id', $this->pedagogue->id)
+            ->where('type', 'next_in_chain')
+            ->first();
+        $this->assertNotNull($nextInChain);
+        $this->assertSame($this->deliverable->id, $nextInChain->data['deliverable_id']);
     }
 
     public function test_quick_action_deliver_enables_next_role_and_notifies(): void

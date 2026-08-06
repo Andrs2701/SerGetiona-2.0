@@ -117,7 +117,7 @@ class RoleActivityController extends Controller
                     'next_in_chain',
                     'Tu turno en el flujo',
                     "El rol '{$currentLabel}' {$verb} su actividad en '{$deliverableName}'. Tu rol '{$nextLabel}' es el siguiente en el flujo.",
-                    ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id]
+                    ['entity_type' => 'RoleActivity', 'entity_id' => $nextActivity->id, 'deliverable_id' => $nextActivity->deliverable_id]
                 );
             }
 
@@ -342,7 +342,7 @@ class RoleActivityController extends Controller
                                     'status_changed',
                                     "Tu actividad requiere ajustes: {$deliverableName}",
                                     "Tu actividad de '{$roleLabel}' fue devuelta a Ajustes Solicitados por Calidad (QA). Observaciones de QA: " . ($activity->notes ?? 'Sin observaciones específicas.'),
-                                    ['entity_type' => 'RoleActivity', 'entity_id' => $sibling->id]
+                                    ['entity_type' => 'RoleActivity', 'entity_id' => $sibling->id, 'deliverable_id' => $sibling->deliverable_id]
                                 );
                             }
                         }
@@ -409,7 +409,7 @@ class RoleActivityController extends Controller
                         'date_changed',
                         'Fecha de compromiso actualizada',
                         "La fecha límite de tu actividad '{$activity->role}' en '{$deliverableName}' fue actualizada a {$activity->commitment_date}.",
-                        ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                        ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $activity->deliverable_id]
                     );
                 }
             }
@@ -426,7 +426,7 @@ class RoleActivityController extends Controller
                             'activity_modified',
                             'Tu actividad fue modificada',
                             "Se realizaron cambios en tu actividad '{$activity->role}' del entregable '{$deliverableName}'.",
-                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $activity->deliverable_id]
                         );
                     }
                 }
@@ -532,7 +532,7 @@ class RoleActivityController extends Controller
                             'adjustments_requested',
                             'Ajustes solicitados',
                             "Se han solicitado ajustes en el entregable '{$activity->deliverable?->name}'.",
-                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id]
+                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $activity->deliverable_id]
                         );
                     }
                 }
