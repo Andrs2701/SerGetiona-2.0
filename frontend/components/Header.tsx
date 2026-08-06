@@ -238,8 +238,15 @@ export default function Header({
                         if (!n.read_at) markRead(n.id);
                         if (route) {
                           setNotifOpen(false);
-                          const finalRoute = route + (route.includes('?') ? '&' : '?') + 't=' + Date.now();
-                          router.push(finalRoute);
+                          try {
+                            window.history.pushState(null, '', route);
+                          } catch { /* ignore */ }
+                          router.push(route);
+                          window.dispatchEvent(
+                            new CustomEvent('app:notif-clicked', {
+                              detail: { notification: n, route },
+                            })
+                          );
                         }
                       }}
                       className={clsx(

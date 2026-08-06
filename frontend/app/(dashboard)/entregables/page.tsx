@@ -1532,34 +1532,20 @@ export default function EntregablesPage() {
     else if (filter.startsWith('status_')) setFilterStatus(filter.replace('status_', ''));
   }, [searchParams]);
 
-  // Maneja la navegación desde notificaciones, links o parámetros de URL
-  // (?deliverable=X o ?activity=Y) e independientemente del rol del usuario.
-  useEffect(() => {
-    const deliverableIdStr = searchParams.get('deliverable');
-    const activityIdStr    = searchParams.get('activity');
-
-    if (!deliverableIdStr && !activityIdStr) {
-      openedDeliverableIdRef.current = null;
-      openedActivityIdRef.current    = null;
-      return;
-    }
-
+  const openTargetDeliverableOrActivity = useCallback((deliverableId: number | null, activityId: number | null) => {
     if (data.length === 0) return;
 
     let targetDeliverable: Deliverable | undefined;
     let targetActivity: RoleActivity | undefined;
 
-    if (deliverableIdStr) {
-      const dId = Number(deliverableIdStr);
-      targetDeliverable = data.find(d => d.id === dId);
-      if (activityIdStr && targetDeliverable) {
-        const aId = Number(activityIdStr);
-        targetActivity = (targetDeliverable.role_activities ?? []).find(a => a.id === aId);
+    if (deliverableId) {
+      targetDeliverable = data.find(d => d.id === deliverableId);
+      if (activityId && targetDeliverable) {
+        targetActivity = (targetDeliverable.role_activities ?? []).find(a => a.id === activityId);
       }
-    } else if (activityIdStr) {
-      const aId = Number(activityIdStr);
+    } else if (activityId) {
       for (const d of data) {
-        const act = (d.role_activities ?? []).find(a => a.id === aId);
+        const act = (d.role_activities ?? []).find(a => a.id === activityId);
         if (act) {
           targetDeliverable = d;
           targetActivity = act;
@@ -1582,7 +1568,46 @@ export default function EntregablesPage() {
         openedDeliverableIdRef.current = targetDeliverable.id;
       }
     }
-  }, [searchParams, data, isManager]);
+  }, [data, searchParams, isManager]);
+
+  // 1. Escucha eventos instantáneos en caliente cuando el usuario da clic en una notificación
+  useEffect(() => {
+    function handleNotifClick(e: Event) {
+      const customEvent = e as CustomEvent<{ notification?: { data?: Record<string, unknown> }; route?: string }>;
+      const { notification, route } = customEvent.detail ?? {};
+      const d = notification?.data ?? {};
+      let deliverableId = d.deliverable_id ?? (d.entity_type === 'Deliverable' ? d.entity_id : undefined);
+      let actId = d.activity_id ?? d.role_activity_id ?? (d.entity_type === 'RoleActivity' ? d.entity_id : undefined);
+
+      if (!deliverableId && !actId && route) {
+        try {
+          const urlObj = new URL(route, 'http://localhost');
+          if (urlObj.searchParams.has('deliverable')) deliverableId = urlObj.searchParams.get('deliverable');
+          if (urlObj.searchParams.has('activity')) actId = urlObj.searchParams.get('activity');
+        } catch { /* ignore */ }
+      }
+
+      if (deliverableId || actId) {
+        openTargetDeliverableOrActivity(deliverableId ? Number(deliverableId) : null, actId ? Number(actId) : null);
+      }
+    }
+
+    window.addEventListener('app:notif-clicked', handleNotifClick);
+    return () => window.removeEventListener('app:notif-clicked', handleNotifClick);
+  }, [openTargetDeliverableOrActivity]);
+
+  // 2. Maneja la carga inicial con parámetros de URL (?deliverable=X o ?activity=Y)
+  useEffect(() => {
+    const deliverableIdStr = searchParams.get('deliverable');
+    const activityIdStr    = searchParams.get('activity');
+
+    if (!deliverableIdStr && !activityIdStr) return;
+
+    openTargetDeliverableOrActivity(
+      deliverableIdStr ? Number(deliverableIdStr) : null,
+      activityIdStr ? Number(activityIdStr) : null
+    );
+  }, [searchParams, openTargetDeliverableOrActivity]);
 
   const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();

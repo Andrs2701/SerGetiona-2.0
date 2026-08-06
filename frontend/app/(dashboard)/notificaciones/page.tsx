@@ -150,8 +150,15 @@ export default function NotificacionesPage() {
     if (!n.read_at) markRead(n.id);
     const route = getNotifRoute(n, user?.role);
     if (route) {
-      const finalRoute = route + (route.includes('?') ? '&' : '?') + 't=' + Date.now();
-      router.push(finalRoute);
+      try {
+        window.history.pushState(null, '', route);
+      } catch { /* ignore */ }
+      router.push(route);
+      window.dispatchEvent(
+        new CustomEvent('app:notif-clicked', {
+          detail: { notification: n, route },
+        })
+      );
     }
   }
 
