@@ -30,11 +30,15 @@ class WorkspaceController extends Controller
         $user = $request->user();
         $role = $user->role;
 
-        if (in_array($role, ['admin', 'coordinator'])) {
-            return $this->adminWorkspace($user, $role);
+        $isManagerRole = in_array($role, ['admin', 'coordinator'], true);
+
+        if ($isManagerRole && RoleActivity::assignedTo($user->id)->exists()) {
+            return $this->operationalWorkspace($user, $role);
         }
 
-        return $this->operationalWorkspace($user, $role);
+        return $isManagerRole
+            ? $this->adminWorkspace($user, $role)
+            : $this->operationalWorkspace($user, $role);
     }
 
     private function adminWorkspace($user, $role)
@@ -95,6 +99,7 @@ class WorkspaceController extends Controller
         return response()->json([
             'user'  => new UserResource($user),
             'role'  => $role,
+            'view'  => 'admin',
             'stats' => [
                 'active_projects'        => $projects->count(),
                 'total_deliverables'     => $totalDeliverables,
@@ -108,6 +113,11 @@ class WorkspaceController extends Controller
                 'approaching'            => $approaching,
                 'pending'                => max(0, $totalDeliverables - $finishedDeliverables),
                 'history'                => $history,
+                'resources_total'        => 0,
+                'resources_weekly'       => 0,
+                'weekly_compliance'      => null,
+                'weekly_done'            => 0,
+                'weekly_total'           => 0,
                 // % de entregables terminados (distinto de la "compliance" por
                 // actividades que se usa en otros reportes — mide una cosa
                 // distinta a propósito, ver Fase B del plan de consistencia).
@@ -133,8 +143,8 @@ class WorkspaceController extends Controller
         // "vence hoy" del dashboard ejecutivo — no unificar.
         $approachingLimit = $today->copy()->addDays(5);
 
-        $activities = RoleActivity::where('responsible_id', $user->id)
-            ->whereHas('deliverable')          // exclude activities whose deliverable was (soft-)deleted
+        $activities = RoleActivity::assignedTo($user->id)
+
             ->with([
                 'deliverable.subject.academicProgram.project',
                 'deliverable.roleActivities.responsible',
@@ -310,6 +320,7 @@ class WorkspaceController extends Controller
         return response()->json([
             'user'                => new UserResource($user),
             'role'                => $role,
+            'view'                => 'operational',
             'stats'               => $stats,
             'activities'          => $mapped->values(),
             'calendar_activities' => $calendarActivities,

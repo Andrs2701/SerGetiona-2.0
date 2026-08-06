@@ -95,6 +95,20 @@ class RoleActivity extends Model
         return $query->whereNotIn('status', self::INACTIVE_STATUSES);
     }
 
+    /**
+     * Actividades reales asignadas a un usuario como responsable, excluyendo
+     * las de entregables (soft-)eliminados. La usan tanto
+     * WorkspaceController::index() (decide qué vista mostrar) como
+     * operationalWorkspace() (construye esa vista) — deben compartir
+     * exactamente el mismo filtro, o un usuario puede quedar enrutado a una
+     * vista personal que luego se renderiza vacía.
+     */
+    public function scopeAssignedTo($query, int $userId)
+    {
+        return $query->where('responsible_id', $userId)->whereHas('deliverable');
+    }
+
+
     public static function defaultChecklist(string $role): array
     {
         return match($role) {

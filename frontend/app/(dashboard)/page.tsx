@@ -17,7 +17,7 @@ import type {
   HealthReport, CapacitySummary, CapacityUser, Role, RoleActivity,
   ProductionSummary, AcademicLevel,
 } from '@/lib/types';
-import { ROLE_LABELS, ROLE_STATUS_LABELS } from '@/lib/types';
+import { ROLE_LABELS, ROLE_STATUS_LABELS, anyRoleLabel } from '@/lib/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import FilteredDetailPanel, { PanelRow } from '@/components/FilteredDetailPanel';
@@ -1692,7 +1692,7 @@ function DistribucionPorUsuario({ users, workload }: { users: CapacityUser[]; wo
                 </td>
                 <td className="py-2.5 pr-3">
                   <span className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                    {ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}
+                    {anyRoleLabel(u.role)}
                   </span>
                 </td>
                 <td className="py-2.5 pr-3 text-center text-gray-600 dark:text-gray-400">{wl ? wl.total : '—'}</td>
@@ -1940,7 +1940,7 @@ function TabProduccion({
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between text-xs mb-0.5">
                     <span className="text-gray-700 dark:text-gray-300 font-medium truncate">{u.user_name}</span>
-                    <span className="text-gray-400 dark:text-gray-500 shrink-0 ml-2">{ROLE_LABELS[u.user_role as keyof typeof ROLE_LABELS] ?? u.user_role}</span>
+                    <span className="text-gray-400 dark:text-gray-500 shrink-0 ml-2">{anyRoleLabel(u.user_role)}</span>
                   </div>
                   <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                     <div className="h-2 rounded-full bg-emerald-400" style={{ width: `${(Number(u.total) / maxByUser) * 100}%` }}/>

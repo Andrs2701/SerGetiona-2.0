@@ -265,6 +265,12 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   qa: 'Calidad',
 };
 
+export function anyRoleLabel(role: string): string {
+  return ROLE_LABELS[role as keyof typeof ROLE_LABELS]
+    ?? USER_ROLE_LABELS[role as keyof typeof USER_ROLE_LABELS]
+    ?? role;
+}
+
 export const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   creation: 'Creación',
   update: 'Actualización',
@@ -382,6 +388,7 @@ export interface WorkspaceStats {
 export interface Workspace {
   user: User;
   role: UserRole;
+  view?: 'operational' | 'admin';
   stats: WorkspaceStats;
   activities: WorkspaceActivity[];
   calendar_activities: WorkspaceActivity[];

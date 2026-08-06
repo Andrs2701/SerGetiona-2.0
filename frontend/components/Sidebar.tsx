@@ -35,6 +35,9 @@ interface NavItem {
   badgeKey?: 'overdue' | 'collab';
   /** Además de `roles`, un rol sin acceso fijo puede entrar si tiene CUALQUIERA de estos permisos. */
   permissions?: Array<{ module: string; action: string }>;
+  /** Visible además de roles/permissions cuando el usuario tiene tareas
+   *  reales asignadas, sin importar su rol base (ver WorkspaceController::index()). */
+  dynamicWhenAssigned?: boolean;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -51,6 +54,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: UserCircle,
     roles: ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'],
     badgeKey: 'overdue',
+    dynamicWhenAssigned: true,
   },
   {
     href: '/proyectos',
@@ -131,22 +135,24 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
   const [overdueCount, setOverdueCount] = useState<number>(0);
   const [collabUnread, setCollabUnread] = useState<number>(0);
   const [collabMentions, setCollabMentions] = useState(false);
+  const [hasPersonalWorkspace, setHasPersonalWorkspace] = useState(false);
 
   const role = (user?.role ?? 'admin') as UserRole;
   const isOperative = OPERATIVE_ROLES.includes(role);
 
   useEffect(() => {
-    if (!isOperative) return;
+    if (!user) return;
     api
-      .get<{ stats: { overdue: number } }>(ENDPOINTS.MY_WORKSPACE)
+      .get<{ view?: string; stats?: { overdue?: number } }>(ENDPOINTS.MY_WORKSPACE)
       .then((res) => {
-        const data = res as unknown as { stats: { overdue: number } };
+        const data = res as unknown as { view?: string; stats?: { overdue?: number } };
         if (data?.stats?.overdue !== undefined) {
           setOverdueCount(data.stats.overdue);
         }
+        setHasPersonalWorkspace(data?.view === 'operational');
       })
       .catch(() => {});
-  }, [isOperative]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -172,7 +178,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
   }, [user]);
 
   const navItems = ALL_NAV_ITEMS.filter((item) =>
-    item.roles.includes(role) || (item.permissions ?? []).some((p) => can(user, p.module, p.action))
+    item.roles.includes(role) ||
+    (item.permissions ?? []).some((p) => can(user, p.module, p.action)) ||
+    (item.dynamicWhenAssigned && hasPersonalWorkspace)
   );
 
   const sidebarInner = (
@@ -200,7 +208,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, desktopOpen
           let badgeActiveCls = '';
           let badgeInactiveCls = '';
 
-          if (badgeKey === 'overdue' && overdueCount > 0 && isOperative) {
+          if (badgeKey === 'overdue' && overdueCount > 0 && (isOperative || hasPersonalWorkspace)) {
             badgeCount = overdueCount;
             badgeActiveCls = 'bg-red-400 text-white';
             badgeInactiveCls = 'bg-red-100 text-red-600';

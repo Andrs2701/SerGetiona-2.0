@@ -107,9 +107,19 @@ final class CapacityService
     {
         $byUser = self::activeActivities()->groupBy('responsible_id');
 
-        $users = User::where('is_active', true)
+        $operationalUsers = User::where('is_active', true)
             ->whereNotIn('role', ['admin', 'coordinator'])
             ->get();
+
+        // Admin/coordinador con RoleActivity reales asignadas (p. ej. por
+        // cobertura de rol) sí cuenta en el seguimiento de carga — uno sin
+        // actividades reales sigue fuera, no tiene carga operativa que trackear.
+        $coveringManagers = User::where('is_active', true)
+            ->whereIn('role', ['admin', 'coordinator'])
+            ->whereHas('roleActivities', fn ($q) => $q->whereHas('deliverable'))
+            ->get();
+
+        $users = $operationalUsers->merge($coveringManagers);
 
         return $users
             ->map(fn ($u) => self::buildUserEntry($u, $byUser->get($u->id, collect())))
