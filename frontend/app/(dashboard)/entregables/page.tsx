@@ -339,9 +339,9 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
       {/* ── Header line ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
         {/* Subject + module */}
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-[200px] cursor-pointer group" onClick={onView}>
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-bold text-gray-900 leading-tight">{d.subject_name ?? '—'}</h3>
+            <h3 className="text-sm font-bold text-gray-900 group-hover:text-[#194276] group-hover:underline leading-tight transition-colors">{d.subject_name ?? '—'}</h3>
             <span className={clsx(
               'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide',
               d.type === 'creation' ? 'bg-indigo-100 text-indigo-600' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
@@ -358,7 +358,7 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-400 mt-0.5 leading-tight">{d.name}</p>
+          <p className="text-xs text-gray-500 group-hover:text-[#194276] mt-0.5 leading-tight transition-colors">{d.name}</p>
         </div>
 
         {/* Status badge */}
@@ -1536,39 +1536,25 @@ export default function EntregablesPage() {
     if (data.length === 0) return;
 
     let targetDeliverable: Deliverable | undefined;
-    let targetActivity: RoleActivity | undefined;
 
     if (deliverableId) {
       targetDeliverable = data.find(d => d.id === deliverableId);
-      if (activityId && targetDeliverable) {
-        targetActivity = (targetDeliverable.role_activities ?? []).find(a => a.id === activityId);
-      }
     } else if (activityId) {
       for (const d of data) {
-        const act = (d.role_activities ?? []).find(a => a.id === activityId);
-        if (act) {
+        if ((d.role_activities ?? []).some(a => a.id === activityId)) {
           targetDeliverable = d;
-          targetActivity = act;
           break;
         }
       }
     }
 
     if (targetDeliverable) {
-      if (targetActivity) {
-        setSelectedActivity(targetActivity);
-        setSelectedActivityDeliverable(targetDeliverable);
-        openedActivityIdRef.current = targetActivity.id;
-      } else {
-        if (searchParams.get('edit') === '1' && isManager) {
-          setFormPanel({ mode: 'edit', deliverable: targetDeliverable });
-        } else {
-          setPanel({ deliverable: targetDeliverable, tab: 'info' });
-        }
-        openedDeliverableIdRef.current = targetDeliverable.id;
-      }
+      // Siempre abre primero la vista de INFORMACIÓN (SidePanel), que contiene
+      // toda la información del entregable y la opción de Editar si requiere cambios.
+      setPanel({ deliverable: targetDeliverable, tab: 'info' });
+      openedDeliverableIdRef.current = targetDeliverable.id;
     }
-  }, [data, searchParams, isManager]);
+  }, [data]);
 
   // 1. Escucha eventos instantáneos en caliente cuando el usuario da clic en una notificación
   useEffect(() => {
