@@ -228,19 +228,23 @@ function ProgressExcNA({ activities, compact }: { activities: RoleActivity[]; co
 
 // ─── Role cell ─────────────────────────────────────────────────────────────────
 
-function RoleCell({ role, activity, onSelect, isCovering }: { role: Role; activity?: RoleActivity; onSelect?: () => void; isCovering?: boolean }) {
+function RoleCell({ role, activity, onSelect, isCovering, isManager }: { role: Role; activity?: RoleActivity; onSelect?: () => void; isCovering?: boolean; isManager?: boolean }) {
   const isNA = !activity || activity.status === 'not_applicable';
+  // Un admin/coordinador debe poder reabrir una actividad marcada "No aplica"
+  // por error — un usuario normal sigue bloqueado (ver authorizeActivity()
+  // en el backend, que ya lo impide de forma estructural).
+  const isClickable = !isNA || isManager;
   const colors = ROLE_CELL_COLORS[role];
   const days = daysUntil(activity?.commitment_date);
   const overdueDate = !isNA && !!activity && !NOT_OVERDUE_ROLE_STATUSES.includes(activity.status) && !activity.actual_delivery_date && days !== null && days < 0;
 
   return (
     <div
-      onClick={!isNA ? onSelect : undefined}
+      onClick={isClickable ? onSelect : undefined}
       className={clsx(
         'rounded-xl border p-3 flex flex-col gap-1.5 transition-all',
         isNA ? 'bg-gray-50 border-gray-100 opacity-40' : clsx(colors.bg, colors.border),
-        onSelect && !isNA && 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
+        onSelect && isClickable && 'cursor-pointer hover:shadow-md hover:scale-[1.01]'
       )}
     >
       {/* Role label */}
@@ -407,7 +411,7 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
       {/* ── Role grid: 2 cols mobile · 3 cols sm · 6 cols lg ─────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:grid-cols-6">
         {ROLES.map(role => (
-          <RoleCell key={role} role={role} activity={byRole[role]} isCovering={isCoveringRole(role, byRole[role])} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
+          <RoleCell key={role} role={role} activity={byRole[role]} isCovering={isCoveringRole(role, byRole[role])} isManager={isManager} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
         ))}
       </div>
 
@@ -1068,7 +1072,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
 
                 return (
                   <div key={role}
-                    onClick={!isNA && onSelectActivity && act ? () => onSelectActivity(act, deliverable) : undefined}
+                    onClick={(!isNA || canEdit) && onSelectActivity && act ? () => onSelectActivity(act, deliverable) : undefined}
                     className={clsx('rounded-lg border p-3 transition-all',
                       isNA ? 'border-gray-100 bg-gray-50 opacity-50' :
                       act?.status === 'approved' ? 'border-emerald-100 bg-emerald-50' :
