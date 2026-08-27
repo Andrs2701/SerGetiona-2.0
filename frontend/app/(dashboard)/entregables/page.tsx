@@ -5,7 +5,7 @@ import {
   Search, Eye, MessageCircle, FileText, CheckCircle2, RotateCcw,
   X, Download, ChevronDown, AlertCircle, Clock, Filter,
   Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
-  BookOpen, FolderOpen, LayoutList, Table2, ExternalLink,
+  BookOpen, FolderOpen, LayoutList, Table2, ExternalLink, ArrowUpDown,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
@@ -1514,6 +1514,7 @@ export default function EntregablesPage() {
   const [panel, setPanel]     = useState<PanelState | null>(null);
   const [toasts, setToasts]   = useState<ToastMsg[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('rows');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [formPanel, setFormPanel]     = useState<FormMode | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
@@ -1683,7 +1684,8 @@ export default function EntregablesPage() {
     // Hide completed unless the user explicitly filtered for them or toggled showCompleted
     if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  }), [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, viewBy, filterYear, filterMonth, filterWeek, onlyOverdue, showCompleted]);
+  }).sort((a, b) => sortOrder === 'desc' ? b.id - a.id : a.id - b.id),
+  [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, viewBy, filterYear, filterMonth, filterWeek, onlyOverdue, showCompleted, sortOrder]);
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
@@ -1713,6 +1715,27 @@ export default function EntregablesPage() {
       if (prev.has(key)) return new Set();
       return new Set([key]);
     });
+  }
+
+  const hasActiveFilters = !!(
+    search || filterProject || filterStatus || filterResponsible || filterSemestre ||
+    filterCiclo || filterAcademicLevel || filterYear || filterMonth || filterWeek ||
+    onlyOverdue || showCompleted
+  );
+
+  function clearFilters() {
+    setSearch('');
+    setFilterProject('');
+    setFilterStatus('');
+    setFilterResponsible('');
+    setFilterSemestre('');
+    setFilterCiclo('');
+    setFilterAcademicLevel('');
+    setFilterYear('');
+    setFilterMonth('');
+    setFilterWeek('');
+    setOnlyOverdue(false);
+    setShowCompleted(false);
   }
 
   async function handleQuickAction(d: Deliverable, action: QuickAction) {
@@ -1876,18 +1899,38 @@ export default function EntregablesPage() {
           )}
         </button>
 
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+          >
+            <RotateCcw size={12} /> Limpiar filtros
+          </button>
+        )}
+
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
 
-          {/* Collapse groups */}
-          <div className="flex flex-1 sm:flex-none items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
-            <button
-              onClick={() => setExpandedGroups(new Set())}
-              className="flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
-            >
-              Contraer programas
-            </button>
-          </div>
+          {/* Collapse groups — solo aplica a la vista Detallada, la Tabla ya no agrupa por programa */}
+          {viewMode === 'rows' && (
+            <div className="flex flex-1 sm:flex-none items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
+              <button
+                onClick={() => setExpandedGroups(new Set())}
+                className="flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Contraer programas
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+            title={sortOrder === 'asc' ? 'Más antiguo primero — clic para ordenar de más reciente a más antiguo' : 'Más reciente primero — clic para ordenar de más antiguo a más reciente'}
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2.5 py-2 sm:py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            <ArrowUpDown size={12} />
+            {sortOrder === 'asc' ? 'Más antiguo primero' : 'Más reciente primero'}
+          </button>
 
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button onClick={() => setViewMode('rows')} title="Vista detallada por roles"
@@ -1997,112 +2040,105 @@ export default function EntregablesPage() {
         </div>
       )}
 
-      {/* ── TABLE VIEW (secondary, compact) ──────────────────────────────── */}
+      {/* ── TABLE VIEW (secondary, compact, flat — sin agrupar por programa) ── */}
       {viewMode === 'grouped' && !loading && (
         <div className="space-y-3">
-          {grouped.length === 0 && (
+          {filtered.length === 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
               <Filter size={32} className="mx-auto mb-2 opacity-30" />
               No se encontraron entregables.
             </div>
           )}
-          {grouped.map(group => {
-            const tableKey = group.programName + '_table';
-            const isCollapsed = !expandedGroups.has(tableKey);
-            return (
-              <div key={group.programName} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <GroupHeader
-                  programName={group.programName} projectName={group.projectName} items={group.items}
-                  groupKey={tableKey} isCollapsed={isCollapsed}
-                  onToggle={() => toggleGroup(tableKey)}
-                />
-                {!isCollapsed && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[860px]">
-                      <thead className="bg-gray-50/80 border-b border-gray-100">
-                        <tr>
-                          {['Asignatura / Módulo','Tipo','Estado','Responsable activo','F. Compromiso','Avance (excl. N/A)','Acciones'].map(h => (
-                            <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.items.map(d => {
-                          const acts = d.role_activities ?? [];
-                          const active = getActiveActivity(d);
-                          const days = daysUntil(active?.commitment_date);
-                          const overdue = days !== null && days < 0 && !active?.actual_delivery_date
-                            && !(active && NOT_OVERDUE_ROLE_STATUSES.includes(active.status))
-                            && d.global_status !== 'finished';
-                          return (
-                            <tr key={d.id} className={clsx(
-                              'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
-                              overdue && 'border-l-4 border-l-red-500'
-                            )}>
-                              <td className="px-3 py-2.5 max-w-[200px]">
-                                <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
-                                  {(d.semestre || d.ciclo) && (
-                                    <span className="text-[9px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1 py-0.2 rounded whitespace-nowrap">
-                                      {d.semestre && `Sem ${d.semestre}`}
-                                      {d.semestre && d.ciclo && ' · '}
-                                      {d.ciclo && `Ciclo ${d.ciclo}`}
-                                    </span>
-                                  )}
-                                  {d.academic_level && (
-                                    <span className="text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded whitespace-nowrap">
-                                      {d.academic_level.name}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                                  d.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
-                              </td>
-                              <td className="px-3 py-2.5"><StatusBadge status={d.global_status} type="global" /></td>
-                              <td className="px-3 py-2.5 text-xs">
-                                {active ? (
-                                  <div>
-                                    <p className="font-medium text-gray-800 truncate max-w-[120px]">{active.responsible?.name ?? '—'}</p>
-                                    <p className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</p>
-                                  </div>
-                                ) : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="px-3 py-2.5 whitespace-nowrap">
-                                <span className={clsx('text-xs', overdue ? 'text-red-600 font-semibold' : 'text-gray-600')}>
-                                  {formatDate(active?.commitment_date)}
+          {filtered.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[980px]">
+                  <thead className="bg-gray-50/80 border-b border-gray-100">
+                    <tr>
+                      {['Programa','Asignatura / Módulo','Tipo','Estado','Responsable activo','F. Compromiso','Avance (excl. N/A)','Acciones'].map(h => (
+                        <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(d => {
+                      const acts = d.role_activities ?? [];
+                      const active = getActiveActivity(d);
+                      const days = daysUntil(active?.commitment_date);
+                      const overdue = days !== null && days < 0 && !active?.actual_delivery_date
+                        && !(active && NOT_OVERDUE_ROLE_STATUSES.includes(active.status))
+                        && d.global_status !== 'finished';
+                      return (
+                        <tr key={d.id} className={clsx(
+                          'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
+                          overdue && 'border-l-4 border-l-red-500'
+                        )}>
+                          <td className="px-3 py-2.5 max-w-[150px]">
+                            <p className="font-semibold text-gray-700 text-xs truncate">{d.program_name ?? '—'}</p>
+                            <p className="text-[10px] text-gray-400 truncate">{d.project_name ?? '—'}</p>
+                          </td>
+                          <td className="px-3 py-2.5 max-w-[200px]">
+                            <p className="font-semibold text-gray-900 text-xs truncate">{d.subject_name ?? '—'}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[10px] text-gray-400 truncate">{d.name}</p>
+                              {(d.semestre || d.ciclo) && (
+                                <span className="text-[9px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1 py-0.2 rounded whitespace-nowrap">
+                                  {d.semestre && `Sem ${d.semestre}`}
+                                  {d.semestre && d.ciclo && ' · '}
+                                  {d.ciclo && `Ciclo ${d.ciclo}`}
                                 </span>
-                                {overdue && <span className="ml-1 text-[9px] text-red-500 font-bold">({Math.abs(days!)}d)</span>}
-                              </td>
-                              <td className="px-3 py-2.5"><ProgressExcNA activities={acts} compact /></td>
-                              <td className="px-2 py-2.5">
-                                <div className="flex items-center gap-0.5">
-                                  <button title="Ver" onClick={() => setPanel({ deliverable: d, tab: 'info' })}
-                                    className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Eye size={13} /></button>
-                                  {isManager && (
-                                    <>
-                                      <button title="Editar" onClick={() => setFormPanel({ mode: 'edit', deliverable: d })}
-                                        className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Pencil size={13} /></button>
-                                      <button title="Eliminar" onClick={() => setDeleteTarget(d)}
-                                        className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
-                                    </>
-                                  )}
-                                  {/* Aprobación manual deshabilitada: Calidad (QA) la realiza automáticamente */}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                              )}
+                              {d.academic_level && (
+                                <span className="text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded whitespace-nowrap">
+                                  {d.academic_level.name}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={clsx('text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                              d.type === 'creation' ? 'bg-indigo-100 text-indigo-700' : d.type === 'change_control' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
+                          </td>
+                          <td className="px-3 py-2.5"><StatusBadge status={d.global_status} type="global" /></td>
+                          <td className="px-3 py-2.5 text-xs">
+                            {active ? (
+                              <div>
+                                <p className="font-medium text-gray-800 truncate max-w-[120px]">{active.responsible?.name ?? '—'}</p>
+                                <p className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</p>
+                              </div>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <span className={clsx('text-xs', overdue ? 'text-red-600 font-semibold' : 'text-gray-600')}>
+                              {formatDate(active?.commitment_date)}
+                            </span>
+                            {overdue && <span className="ml-1 text-[9px] text-red-500 font-bold">({Math.abs(days!)}d)</span>}
+                          </td>
+                          <td className="px-3 py-2.5"><ProgressExcNA activities={acts} compact /></td>
+                          <td className="px-2 py-2.5">
+                            <div className="flex items-center gap-0.5">
+                              <button title="Ver" onClick={() => setPanel({ deliverable: d, tab: 'info' })}
+                                className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Eye size={13} /></button>
+                              {isManager && (
+                                <>
+                                  <button title="Editar" onClick={() => setFormPanel({ mode: 'edit', deliverable: d })}
+                                    className="p-1.5 rounded-md text-gray-400 hover:text-[#194276] hover:bg-blue-50 transition-colors"><Pencil size={13} /></button>
+                                  <button title="Eliminar" onClick={() => setDeleteTarget(d)}
+                                    className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                                </>
+                              )}
+                              {/* Aprobación manual deshabilitada: Calidad (QA) la realiza automáticamente */}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-          })}
+            </div>
+          )}
           <div className="flex items-center gap-3 px-1">
             <p className="text-xs text-gray-400 flex items-center gap-1.5">
               <Clock size={11} /> {filtered.length} de {data.length} entregable{data.length !== 1 ? 's' : ''}
