@@ -1770,147 +1770,197 @@ export default function EntregablesPage() {
         title="Entregables"
         subtitle="Seguimiento por módulo con responsables, estados y fechas de compromiso por rol"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Entregables' }]}
+        actions={
+          <>
+            {/* Carga Masiva puede crear Escuelas/Proyectos nuevos y mutar muchos
+                entregables a la vez — capacidad más sensible, no cubierta por
+                entregables.manage. */}
+            {isAdminOrCoord && (
+              <button onClick={() => setShowImport(true)}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium border rounded-lg transition-colors"
+                style={{ borderColor: '#194276', color: '#194276' }}>
+                <Upload size={14} /> Carga Masiva
+              </button>
+            )}
+            {/* Exportar pega a /export/deliverables, fijo a role:admin,coordinator
+                en el backend (mismo grupo que Carga Masiva) — sin permiso propio
+                en la Matriz todavía. */}
+            {isAdminOrCoord && (
+              <button onClick={handleExport}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <Download size={14} /> Exportar
+              </button>
+            )}
+            {isManager && (
+              <button onClick={() => setFormPanel({ mode: 'create' })}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-white rounded-lg"
+                style={{ background: '#194276' }}>
+                <Plus size={14} /> Nueva tarea
+              </button>
+            )}
+          </>
+        }
       />
 
-      {/* ── Filter bar ────────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex flex-wrap items-center gap-2.5">
-        <div className="relative min-w-full sm:min-w-[220px] flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, id, fecha o responsable..."
-            className="pl-8 pr-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
-        </div>
+      {/* ── Filtros: fila 1 búsqueda/entidades, fila 2 periodo/académico ──── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2.5 pb-3">
+          <div className="relative min-w-full sm:min-w-[220px] flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nombre, id, fecha o responsable..."
+              className="pl-8 pr-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+          </div>
 
-        <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
-          <option value="">Todas las Escuelas / Proyectos</option>
-          {projectNames.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[140px]">
-          <option value="">Todos los estados</option>
-          {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-
-        <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
-          <option value="">Todos los responsables</option>
-          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-
-        <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[85px]">
-          <option value="">Año</option>
-          {availableYears.map(y => <option key={y} value={String(y)}>{y}</option>)}
-        </select>
-
-        <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-sm">
-          <button type="button" onClick={() => { setViewBy('month'); setFilterWeek(''); }}
-            className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'month' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
-          >Mes</button>
-          <button type="button" onClick={() => {
-              setViewBy('week');
-              setFilterMonth('');
-              if (!filterYear) setFilterYear(String(new Date().getFullYear()));
-            }}
-            className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'week' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
-          >Semana</button>
-        </div>
-
-        {viewBy === 'week' ? (
-          <select value={filterWeek} onChange={e => setFilterWeek(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[220px]">
-            <option value="">Semana (Todas)</option>
-            {listIsoWeeksOfYear(Number(filterYear) || new Date().getFullYear()).map(w => (
-              <option key={w.week} value={String(w.week)}>{formatIsoWeekLabel(w)}</option>
-            ))}
+          <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
+            <option value="">Todas las Escuelas / Proyectos</option>
+            {projectNames.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-        ) : (
-          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[120px]">
-            <option value="">Mes (Todos)</option>
-            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
-              <option key={i + 1} value={String(i + 1)}>{m}</option>
-            ))}
+
+          <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[150px]">
+            <option value="">Todos los responsables</option>
+            {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-        )}
 
-        {isManager && (
-          <>
-            <select value={filterSemestre} onChange={e => setFilterSemestre(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
-              <option value="">Semestre (Todos)</option>
-              <option value="I">Semestre I</option>
-              <option value="II">Semestre II</option>
-              <option value="III">Semestre III</option>
-              <option value="IV">Semestre IV</option>
-              <option value="V">Semestre V</option>
-              <option value="VI">Semestre VI</option>
-              <option value="VII">Semestre VII</option>
-              <option value="VIII">Semestre VIII</option>
-              <option value="IX">Semestre IX</option>
-              <option value="X">Semestre X</option>
-              <option value="NA">Semestre NA</option>
-            </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[140px]">
+            <option value="">Todos los estados</option>
+            {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
 
-            <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[100px]">
-              <option value="">Ciclo (Todos)</option>
-              <option value="0">Ciclo 0</option>
-              <option value="1">Ciclo 1</option>
-              <option value="2">Ciclo 2</option>
-              <option value="3">Ciclo 3</option>
-              <option value="4">Ciclo 4</option>
-              <option value="NA">Ciclo NA</option>
-            </select>
-
-            <select value={filterAcademicLevel} onChange={e => setFilterAcademicLevel(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
-              <option value="">Nivel (Todos)</option>
-              {academicLevels.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
-            </select>
-          </>
-        )}
-
-        <label className="flex min-h-10 items-center gap-1.5 cursor-pointer select-none">
-          <input type="checkbox" checked={onlyOverdue} onChange={e => setOnlyOverdue(e.target.checked)}
-            className="w-3.5 h-3.5 rounded border-gray-300 accent-red-500" />
-          <span className="text-sm text-gray-600 flex items-center gap-1">
-            <AlertCircle size={13} className="text-red-500" /> Solo vencidas
-          </span>
-        </label>
-
-        <button
-          onClick={() => setShowCompleted(p => !p)}
-          className={clsx(
-            'flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors',
-            showCompleted
-              ? 'bg-gray-100 border-gray-300 text-gray-700'
-              : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
-          )}
-        >
-          <CheckCircle2 size={12} className={showCompleted ? 'text-emerald-500' : 'text-gray-300'} />
-          {showCompleted ? 'Ocultar finalizados' : 'Ver finalizados'}
-          {!showCompleted && completedHiddenCount > 0 && (
-            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
-              {completedHiddenCount}
+          <label className="flex min-h-10 items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={onlyOverdue} onChange={e => setOnlyOverdue(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-300 accent-red-500" />
+            <span className="text-sm text-gray-600 flex items-center gap-1">
+              <AlertCircle size={13} className="text-red-500" /> Solo vencidas
             </span>
+          </label>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors sm:ml-auto"
+            >
+              <RotateCcw size={12} /> Limpiar filtros
+            </button>
           )}
-        </button>
+        </div>
 
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
-          >
-            <RotateCcw size={12} /> Limpiar filtros
-          </button>
-        )}
+        <div className="border-t border-gray-100 pt-3 flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Periodo</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+                className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[85px]">
+                <option value="">Año</option>
+                {availableYears.map(y => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
 
-        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
+              <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-sm">
+                <button type="button" onClick={() => { setViewBy('month'); setFilterWeek(''); }}
+                  className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'month' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
+                >Mes</button>
+                <button type="button" onClick={() => {
+                    setViewBy('week');
+                    setFilterMonth('');
+                    if (!filterYear) setFilterYear(String(new Date().getFullYear()));
+                  }}
+                  className={clsx('px-2.5 py-2 sm:py-1.5 font-medium transition-colors', viewBy === 'week' ? 'bg-[#194276] text-white' : 'text-gray-500 hover:bg-gray-50')}
+                >Semana</button>
+              </div>
+
+              {viewBy === 'week' ? (
+                <select value={filterWeek} onChange={e => setFilterWeek(e.target.value)}
+                  className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[220px]">
+                  <option value="">Semana (Todas)</option>
+                  {listIsoWeeksOfYear(Number(filterYear) || new Date().getFullYear()).map(w => (
+                    <option key={w.week} value={String(w.week)}>{formatIsoWeekLabel(w)}</option>
+                  ))}
+                </select>
+              ) : (
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+                  className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[120px]">
+                  <option value="">Mes (Todos)</option>
+                  {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                    <option key={i + 1} value={String(i + 1)}>{m}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
+          {isManager && (
+            <>
+              <div className="hidden sm:block border-l border-gray-200 self-stretch" />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Académico</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select value={filterSemestre} onChange={e => setFilterSemestre(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
+                    <option value="">Semestre (Todos)</option>
+                    <option value="I">Semestre I</option>
+                    <option value="II">Semestre II</option>
+                    <option value="III">Semestre III</option>
+                    <option value="IV">Semestre IV</option>
+                    <option value="V">Semestre V</option>
+                    <option value="VI">Semestre VI</option>
+                    <option value="VII">Semestre VII</option>
+                    <option value="VIII">Semestre VIII</option>
+                    <option value="IX">Semestre IX</option>
+                    <option value="X">Semestre X</option>
+                    <option value="NA">Semestre NA</option>
+                  </select>
+
+                  <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[100px]">
+                    <option value="">Ciclo (Todos)</option>
+                    <option value="0">Ciclo 0</option>
+                    <option value="1">Ciclo 1</option>
+                    <option value="2">Ciclo 2</option>
+                    <option value="3">Ciclo 3</option>
+                    <option value="4">Ciclo 4</option>
+                    <option value="NA">Ciclo NA</option>
+                  </select>
+
+                  <select value={filterAcademicLevel} onChange={e => setFilterAcademicLevel(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[125px]">
+                    <option value="">Nivel (Todos)</option>
+                    {academicLevels.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Control de vista y resultados ───────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
 
+          <button
+            onClick={() => setShowCompleted(p => !p)}
+            className={clsx(
+              'flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+              showCompleted
+                ? 'bg-gray-100 border-gray-300 text-gray-700'
+                : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+            )}
+          >
+            <CheckCircle2 size={12} className={showCompleted ? 'text-emerald-500' : 'text-gray-300'} />
+            {showCompleted ? 'Ocultar finalizados' : 'Ver finalizados'}
+            {!showCompleted && completedHiddenCount > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
+                {completedHiddenCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {/* Collapse groups — solo aplica a la vista Detallada, la Tabla ya no agrupa por programa */}
           {viewMode === 'rows' && (
             <div className="flex flex-1 sm:flex-none items-center gap-1 border border-gray-200 rounded-lg overflow-hidden text-xs">
@@ -1946,34 +1996,6 @@ export default function EntregablesPage() {
               {viewMode === 'grouped' && <span className="text-xs font-medium">Tabla</span>}
             </button>
           </div>
-
-          {isManager && (
-            <button onClick={() => setFormPanel({ mode: 'create' })}
-              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-white rounded-lg"
-              style={{ background: '#194276' }}>
-              <Plus size={14} /> Nueva tarea
-            </button>
-          )}
-          {/* Carga Masiva puede crear Escuelas/Proyectos nuevos y mutar muchos
-              entregables a la vez — capacidad más sensible, no cubierta por
-              entregables.manage. */}
-          {isAdminOrCoord && (
-            <button onClick={() => setShowImport(true)}
-              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium border rounded-lg transition-colors"
-              style={{ borderColor: '#194276', color: '#194276' }}>
-              <Upload size={14} /> Carga Masiva
-            </button>
-          )}
-
-          {/* Exportar pega a /export/deliverables, fijo a role:admin,coordinator
-              en el backend (mismo grupo que Carga Masiva) — sin permiso propio
-              en la Matriz todavía. */}
-          {isAdminOrCoord && (
-            <button onClick={handleExport}
-              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <Download size={14} /> Exportar
-            </button>
-          )}
         </div>
       </div>
 
