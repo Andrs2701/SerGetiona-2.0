@@ -1255,7 +1255,7 @@ function SidePanel({ deliverable, defaultTab = 'info', onClose, onSelectActivity
 // ─── Bulk Import Modal ────────────────────────────────────────────────────────
 
 interface ImportError { row: number; field: string; message: string; }
-interface ImportResult { imported?: number; valid?: number; invalid?: number; errors?: ImportError[]; preview?: Array<Record<string, string>>; project_id?: number; }
+interface ImportResult { imported?: number; updated?: number; valid?: number; invalid?: number; errors?: ImportError[]; preview?: Array<Record<string, string>>; project_id?: number; }
 
 function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
   projects: Array<{ id: number; name: string }>;
@@ -1272,6 +1272,7 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
   const [errors, setErrors]   = useState<ImportError[]>([]);
   const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
   const [dlTemplate, setDlTemplate] = useState(false);
+  const [updateExisting, setUpdateExisting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function buildForm() {
@@ -1280,6 +1281,7 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
     if (resolvedProjectId) form.append('project_id', resolvedProjectId);
     else if (projectMode === 'existing' && projectId) form.append('project_id', projectId);
     else if (projectMode === 'new' && newProjectName.trim()) form.append('project_name', newProjectName.trim());
+    if (updateExisting) form.append('update_existing', '1');
     return form;
   }
 
@@ -1399,6 +1401,16 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
                     <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
                   </div>
                 </div>
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={updateExisting} onChange={e => setUpdateExisting(e.target.checked)}
+                    className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 dark:border-slate-600" />
+                  <span className="text-sm text-gray-700 dark:text-slate-200">
+                    Actualizar fecha de compromiso y responsable si la tarea ya existe
+                    <span className="block text-xs text-gray-400 dark:text-slate-400 font-normal mt-0.5">
+                      Si un rol ya tiene fecha o responsable asignado, se reemplaza por el del archivo. No se sobrescribe la fecha en actividades ya entregadas.
+                    </span>
+                  </span>
+                </label>
                 {errors.length > 0 && (
                   <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
                     {errors.map((err, i) => <p key={i} className="text-xs text-red-700">{err.message}</p>)}
@@ -1437,7 +1449,10 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
                   <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Importación completada</h3>
-                <p className="text-sm text-gray-600"><span className="font-bold text-emerald-600">{result.imported}</span> entregable(s) importados.</p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-bold text-emerald-600">{result.imported}</span> entregable(s) importados.
+                  {!!result.updated && <> <span className="font-bold text-blue-600">{result.updated}</span> con datos actualizados.</>}
+                </p>
                 {errors.length > 0 && <p className="text-xs text-red-600 mt-2">{errors.length} fila(s) omitidas.</p>}
               </div>
             )}

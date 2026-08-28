@@ -259,8 +259,9 @@ class ImportController extends Controller
             'project_name' => 'nullable|string|max:255',
         ]);
 
-        $userId       = $request->user()->id;
-        $validateOnly = (bool) $request->query('validate_only', false);
+        $userId         = $request->user()->id;
+        $validateOnly   = (bool) $request->query('validate_only', false);
+        $updateExisting = $request->boolean('update_existing');
 
         // Resolve or create the DEFAULT project (used for rows that don't
         // bring their own "Escuela / Proyecto" column). Nullable: if the
@@ -304,6 +305,7 @@ class ImportController extends Controller
             ->all();
 
         $valid   = 0;
+        $updated = 0;
         $invalid = 0;
         $errors  = [];
         $preview = [];
@@ -331,7 +333,10 @@ class ImportController extends Controller
                 }
 
                 if (!$validateOnly) {
-                    $this->persistRow($row, $defaultProjectId, $userId, $usersByEmail, $academicLevelsByName);
+                    $rowUpdatedExisting = $this->persistRow($row, $defaultProjectId, $userId, $usersByEmail, $academicLevelsByName, $updateExisting);
+                    if ($rowUpdatedExisting) {
+                        $updated++;
+                    }
                 }
             }
 
@@ -340,7 +345,8 @@ class ImportController extends Controller
                     DB::commit();
                 } else {
                     DB::rollBack();
-                    $valid = 0; // Si hay errores, nada se insertó
+                    $valid   = 0; // Si hay errores, nada se insertó
+                    $updated = 0;
                 }
             }
         } catch (\Throwable $e) {
@@ -374,6 +380,7 @@ class ImportController extends Controller
 
         return response()->json([
             'imported'   => $valid,
+            'updated'    => $updated,
             'errors'     => $errors,
             'project_id' => $defaultProjectId,
         ]);
@@ -632,7 +639,7 @@ class ImportController extends Controller
     }
 
     /** Persist a validated row inside an existing DB transaction. */
-    private function persistRow(array $row, ?int $defaultProjectId, int $userId, array $usersByEmail, array $academicLevelsByName = []): void
+    private function persistRow(array $row, ?int $defaultProjectId, int $userId, array $usersByEmail, array $academicLevelsByName = [], bool $updateExisting = false): bool
     {
         $projectId = !empty($row['proyecto'])
             ? $this->firstOrCreateByName(Project::class, $row['proyecto'], [], ['status' => 'in_progress', 'created_by' => $userId])->id
@@ -670,6 +677,8 @@ class ImportController extends Controller
             ]
         );
 
+        $rowUpdatedExisting = false;
+
         foreach (self::COMMITMENT_COLS as $role => $dateCol) {
             $commitmentDate = !empty($row[$dateCol]) ? $this->parseDate($row[$dateCol]) : null;
 
@@ -694,29 +703,75 @@ class ImportController extends Controller
                 ]
             );
 
-            $justAssigned = false;
+            $justAssigned    = false;
+            $dateJustChanged = false;
             if (!$activity->wasRecentlyCreated) {
                 $updates = [];
-                if ($commitmentDate !== null && $activity->commitment_date === null) $updates['commitment_date'] = $commitmentDate;
+                $currentCommitmentDate = optional($activity->commitment_date)->format('Y-m-d');
+
+                if ($commitmentDate !== null && $currentCommitmentDate === null) {
+                    // Rellenar una fecha vacía: comportamiento de siempre, en
+                    // ambos modos (no es "sobrescribir", no notifica cambio).
+                    $updates['commitment_date'] = $commitmentDate;
+                } elseif (
+                    $updateExisting && $commitmentDate !== null && $commitmentDate !== $currentCommitmentDate
+                    && $activity->actual_delivery_date === null
+                ) {
+                    // Sobrescribir una fecha ya asignada: solo con el flag
+                    // activo, y nunca si ya se entregó (protege las métricas
+                    // de puntualidad de HealthService, que comparan
+                    // actual_delivery_date vs commitment_date en vivo).
+                    $updates['commitment_date'] = $commitmentDate;
+                    $dateJustChanged = true;
+                }
+
                 if ($responsibleId !== null && $activity->responsible_id === null) {
                     $updates['responsible_id'] = $responsibleId;
                     $justAssigned = true;
+                } elseif ($updateExisting && $responsibleId !== null && $responsibleId !== $activity->responsible_id) {
+                    $updates['responsible_id'] = $responsibleId;
+                    $justAssigned = true;
                 }
-                if (!empty($updates)) $activity->update($updates);
+
+                if (!empty($updates)) {
+                    $activity->update($updates);
+                    if ($dateJustChanged || isset($updates['responsible_id'])) {
+                        $rowUpdatedExisting = true;
+                    }
+                }
             }
 
-            // Notificar al responsable, igual que en la creación manual desde
-            // el formulario (DeliverableController::store()) — antes la carga
-            // masiva no avisaba a nadie de sus asignaciones nuevas.
+            // Notificar al responsable (asignación nueva o reasignación),
+            // igual que en la creación manual desde el formulario
+            // (DeliverableController::store()) y en
+            // RoleActivityController::update() líneas 353-359.
             if ($responsibleId && ($activity->wasRecentlyCreated || $justAssigned)) {
                 $responsibleUser = User::find($responsibleId);
                 if ($responsibleUser) {
                     \App\Services\NotificationService::notifyTaskAssigned($activity, $responsibleUser);
                 }
             }
+
+            // Notificar cambio de fecha solo cuando se sobrescribió un valor
+            // ya existente (no al asignarla por primera vez) — igual que
+            // RoleActivityController::update() líneas 403-415.
+            if ($dateJustChanged && $activity->responsible_id) {
+                $responsibleUser = User::find($activity->responsible_id);
+                if ($responsibleUser) {
+                    \App\Services\NotificationService::notify(
+                        $responsibleUser,
+                        'date_changed',
+                        'Fecha de compromiso actualizada',
+                        "La fecha límite de tu actividad '{$activity->role}' en '{$deliverable->name}' fue actualizada a {$activity->commitment_date->format('Y-m-d')}.",
+                        ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $activity->deliverable_id]
+                    );
+                }
+            }
         }
 
         RoleActivityController::recalculateGlobalStatus($deliverable);
+
+        return $rowUpdatedExisting;
     }
 
     /**
