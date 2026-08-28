@@ -125,7 +125,7 @@ export default function ImportModal({ open, onClose, projectId }: ImportModalPro
             </p>
           </div>
           <button
-            onClick={() => downloadCsv('/import/template', 'plantilla_entregables.csv')}
+            onClick={() => downloadCsv('/import/template', 'plantilla_sergestiona.xlsx')}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Download size={14} />

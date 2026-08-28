@@ -1760,7 +1760,7 @@ export default function EntregablesPage() {
   }
 
   async function handleExport() {
-    try { await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.csv'); addToast('Exportación iniciada.', 'success'); }
+    try { await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.xlsx'); addToast('Exportación iniciada.', 'success'); }
     catch { addToast('Error al exportar.', 'error'); }
   }
 

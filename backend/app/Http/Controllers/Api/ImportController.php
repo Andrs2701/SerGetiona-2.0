@@ -26,7 +26,7 @@ class ImportController extends Controller
     // Column definitions
     // ---------------------------------------------------------------
 
-    private const HEADERS = [
+    public const HEADERS = [
         'proyecto'                      => 'Escuela / Proyecto',
         'tipo'                          => 'Tipo',
         'programa'                      => 'Programa',
@@ -108,12 +108,20 @@ class ImportController extends Controller
         'otro'          => 'creation',
     ];
 
-    /** Institutional colors for the template Excel */
-    private const COLOR_HEADER_BG  = 'FF194276'; // #194276 dark blue
-    private const COLOR_HEADER_FG  = 'FFFFFFFF'; // white
+    /**
+     * Institutional colors for the template Excel — HEADERS, estos colores y
+     * COLUMN_WIDTHS son públicos porque ExportController los reutiliza tal
+     * cual para que el .xlsx de "Exportar" comparta estructura y colores con
+     * esta plantilla (mismo layout de columnas, mismo azul institucional).
+     */
+    public const COLOR_HEADER_BG   = 'FF194276'; // #194276 dark blue
+    public const COLOR_HEADER_FG   = 'FFFFFFFF'; // white
     private const COLOR_EXAMPLE_BG = 'FFE8EEF5'; // light blue tint
     private const COLOR_NOTE_BG    = 'FFFFFF00'; // light yellow
     private const COLOR_REQUIRED   = 'FFFF4444'; // red marker for required columns
+
+    /** Column widths, in the same order as HEADERS. */
+    public const COLUMN_WIDTHS = [22, 18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30];
 
     // ---------------------------------------------------------------
     // GET /api/import/template
@@ -217,9 +225,8 @@ class ImportController extends Controller
         $sheet->getRowDimension(4)->setRowHeight(18);
 
         // ── Column widths ────────────────────────────────────────────
-        $widths = [22, 18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30];
         $col = 1;
-        foreach ($widths as $w) {
+        foreach (self::COLUMN_WIDTHS as $w) {
             $sheet->getColumnDimensionByColumn($col)->setWidth($w);
             $col++;
         }

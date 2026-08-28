@@ -425,7 +425,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
               <button
                 onClick={() =>
-                  downloadCsv(`/export/deliverables?project_id=${projectId}&format=csv`, `entregables_proyecto_${projectId}.csv`).catch(() => {})
+                  downloadCsv(`/export/deliverables?project_id=${projectId}`, `entregables_proyecto_${projectId}.xlsx`).catch(() => {})
                 }
                 className="flex flex-1 sm:flex-none items-center justify-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 sm:py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
               >

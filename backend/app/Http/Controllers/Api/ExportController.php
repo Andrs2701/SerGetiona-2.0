@@ -7,6 +7,12 @@ use App\Models\Deliverable;
 use App\Models\Project;
 use App\Models\RoleActivity;
 use Illuminate\Http\Request;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 class ExportController extends Controller
 {
@@ -23,12 +29,18 @@ class ExportController extends Controller
     ];
 
     /**
-     * GET /api/export/deliverables?project_id=X&format=csv
+     * GET /api/export/deliverables?project_id=X
+     *
+     * Mismas columnas, colores y anchos que la plantilla de Carga Masiva
+     * (ver ImportController::HEADERS, COLOR_HEADER_BG, COLOR_HEADER_FG y
+     * COLUMN_WIDTHS) para que el archivo exportado se pueda editar y volver
+     * a subir por ese flujo.
      */
     public function deliverables(Request $request)
     {
         $query = Deliverable::with([
             'subject.academicProgram.project',
+            'academicLevel',
             'roleActivities.responsible',
         ]);
 
@@ -40,75 +52,100 @@ class ExportController extends Controller
 
         $deliverables = $query->get();
 
-        $date     = now()->format('Y-m-d');
-        $filename = "entregables_{$date}.csv";
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getProperties()
+            ->setTitle('Entregables SerGestiona')
+            ->setCreator('SerGestiona 2.0')
+            ->setDescription('Exportación de entregables — mismo formato que la plantilla de Carga Masiva');
 
-        return response()->streamDownload(function () use ($deliverables) {
-            $output = fopen('php://output', 'w');
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Entregables');
 
-            // Cabecera BOM para Excel (UTF-8)
-            fputs($output, "\xEF\xBB\xBF");
+        $headerLabels = array_values(ImportController::HEADERS);
 
-            // Encabezados
-            $headers = [
-                'Proyecto', 'Programa', 'Asignatura', 'Entregable', 'Tipo', 'Estado Global',
-                'Experto', 'Fecha Experto', 'Estado Experto',
-                'Pedagogía', 'Fecha Pedagogía', 'Estado Pedagogía',
-                'Diseño', 'Fecha Diseño', 'Estado Diseño',
-                'Audiovisual', 'Fecha Audiovisual', 'Estado Audiovisual',
-                'Ingeniería', 'Fecha Ingeniería', 'Estado Ingeniería',
-                'Calidad', 'Fecha Calidad', 'Estado Calidad',
-                '% Cumplimiento',
+        $col = 1;
+        foreach ($headerLabels as $label) {
+            $colLetter = Coordinate::stringFromColumnIndex($col);
+            $sheet->getCell($colLetter . '1')->setValue($label);
+            $sheet->getStyle($colLetter . '1')->applyFromArray([
+                'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => ImportController::COLOR_HEADER_BG]],
+                'font'      => ['bold' => true, 'size' => 9, 'color' => ['argb' => ImportController::COLOR_HEADER_FG]],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'wrapText' => true, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FF2C5282']]],
+            ]);
+            $col++;
+        }
+        $sheet->getRowDimension(1)->setRowHeight(32);
+
+        $row = 2;
+        foreach ($deliverables as $deliverable) {
+            $subject    = $deliverable->subject;
+            $program    = $subject?->academicProgram;
+            $project    = $program?->project;
+            $activities = $deliverable->roleActivities->keyBy('role');
+
+            // Acceso vía ?? null (no directo con []): no todos los
+            // entregables tienen una RoleActivity para cada rol, y el
+            // acceso directo por clave lanza "Undefined array key" en vez
+            // de simplemente devolver null.
+            $expertAct      = $activities['expert'] ?? null;
+            $pedagogyAct    = $activities['pedagogy'] ?? null;
+            $designAct      = $activities['design'] ?? null;
+            $audiovisualAct = $activities['audiovisual'] ?? null;
+            $engineeringAct = $activities['engineering'] ?? null;
+            $qaAct          = $activities['qa'] ?? null;
+
+            $values = [
+                $project?->name ?? '',
+                $deliverable->academicLevel?->name ?? '',
+                $program?->name ?? '',
+                $subject?->name ?? '',
+                $deliverable->name,
+                $deliverable->semestre ?? '',
+                $deliverable->ciclo ?? '',
+                $deliverable->type === 'update' ? 'Actualizacion' : 'Creacion',
+                $deliverable->start_date?->format('Y-m-d') ?? '',
+                $expertAct?->commitment_date?->format('Y-m-d') ?? '',
+                $pedagogyAct?->commitment_date?->format('Y-m-d') ?? '',
+                $designAct?->commitment_date?->format('Y-m-d') ?? '',
+                $audiovisualAct?->commitment_date?->format('Y-m-d') ?? '',
+                $engineeringAct?->commitment_date?->format('Y-m-d') ?? '',
+                $qaAct?->commitment_date?->format('Y-m-d') ?? '',
+                $pedagogyAct?->responsible?->email ?? '',
+                $designAct?->responsible?->email ?? '',
+                $audiovisualAct?->responsible?->email ?? '',
+                $engineeringAct?->responsible?->email ?? '',
+                $qaAct?->responsible?->email ?? '',
             ];
-            fputcsv($output, $headers);
 
-            foreach ($deliverables as $deliverable) {
-                $subject  = $deliverable->subject;
-                $program  = $subject?->academicProgram;
-                $project  = $program?->project;
-
-                $activities = $deliverable->roleActivities->keyBy('role');
-
-                // Calcular % cumplimiento excluyendo roles no_applicable
-                $completedRoles  = 0;
-                $applicableRoles = 0;
-                foreach (array_keys(self::ROLES) as $role) {
-                    $act = $activities[$role] ?? null;
-                    if ($act && $act->status === 'not_applicable') {
-                        continue;
-                    }
-                    $applicableRoles++;
-                    if ($act && in_array($act->status, RoleActivity::COMPLETED_STATUSES, true)) {
-                        $completedRoles++;
-                    }
-                }
-                $compliance = $applicableRoles > 0 ? round(($completedRoles / $applicableRoles) * 100, 1) : 0;
-
-                $row = [
-                    $project?->name       ?? '',
-                    $program?->name       ?? '',
-                    $subject?->name       ?? '',
-                    $deliverable->name,
-                    $deliverable->type    ?? '',
-                    $this->translateGlobalStatus($deliverable->global_status ?? ''),
-                ];
-
-                foreach (array_keys(self::ROLES) as $role) {
-                    $act = $activities[$role] ?? null;
-                    $row[] = $act?->responsible?->name ?? '';
-                    $row[] = $act?->commitment_date?->format('d/m/Y') ?? '';
-                    $row[] = RoleActivityController::translateStatus($act?->status ?? 'not_started');
-                }
-
-                $row[] = $compliance . '%';
-
-                fputcsv($output, $row);
+            $col = 1;
+            foreach ($values as $value) {
+                $sheet->getCell(Coordinate::stringFromColumnIndex($col) . $row)->setValue($value);
+                $col++;
             }
+            $row++;
+        }
 
-            fclose($output);
-        }, $filename, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
+        $col = 1;
+        foreach (ImportController::COLUMN_WIDTHS as $w) {
+            $sheet->getColumnDimensionByColumn($col)->setWidth($w);
+            $col++;
+        }
+
+        $sheet->freezePane('A2');
+
+        $date     = now()->format('Y-m-d');
+        $filename = "entregables_{$date}.xlsx";
+
+        $writer = new Xlsx($spreadsheet);
+        ob_start();
+        $writer->save('php://output');
+        $content = ob_get_clean();
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control'       => 'no-cache, no-store',
         ]);
     }
 
