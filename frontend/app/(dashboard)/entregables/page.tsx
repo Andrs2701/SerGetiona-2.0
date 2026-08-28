@@ -8,7 +8,7 @@ import {
   BookOpen, FolderOpen, LayoutList, Table2, ExternalLink, ArrowUpDown,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api, ENDPOINTS, downloadCsv } from '@/lib/api';
+import { api, ENDPOINTS, downloadCsv, DownloadError } from '@/lib/api';
 import type { Deliverable, RoleActivity, Comment, Role, User, DeliverableFlow, RoleStatus, DeliverableType, AcademicLevel } from '@/lib/types';
 import {
   GLOBAL_STATUS_LABELS, DELIVERABLE_TYPE_LABELS, ROLE_LABELS,
@@ -1519,6 +1519,13 @@ export default function EntregablesPage() {
   const [formPanel, setFormPanel]     = useState<FormMode | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
   const [showImport, setShowImport]   = useState(false);
+  const [exportCooldown, setExportCooldown] = useState(0);
+
+  useEffect(() => {
+    if (exportCooldown <= 0) return;
+    const t = setTimeout(() => setExportCooldown(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [exportCooldown]);
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
   const [users, setUsers]       = useState<User[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<RoleActivity | null>(null);
@@ -1760,8 +1767,20 @@ export default function EntregablesPage() {
   }
 
   async function handleExport() {
-    try { await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.xlsx'); addToast('Exportación iniciada.', 'success'); }
-    catch { addToast('Error al exportar.', 'error'); }
+    if (exportCooldown > 0) return;
+    try {
+      await downloadCsv(ENDPOINTS.EXPORT_DELIVERABLES, 'entregables.xlsx');
+      addToast('Exportación iniciada.', 'success');
+      setExportCooldown(6);
+    } catch (err) {
+      if (err instanceof DownloadError && err.status === 429) {
+        const wait = err.retryAfter ?? 60;
+        addToast(`Ya exportaste varias veces seguidas. Espera ${wait}s e intenta de nuevo.`, 'error');
+        setExportCooldown(wait);
+      } else {
+        addToast('Error al exportar.', 'error');
+      }
+    }
   }
 
   return (
@@ -1786,9 +1805,10 @@ export default function EntregablesPage() {
                 en el backend (mismo grupo que Carga Masiva) — sin permiso propio
                 en la Matriz todavía. */}
             {isAdminOrCoord && (
-              <button onClick={handleExport}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <Download size={14} /> Exportar
+              <button onClick={handleExport} disabled={exportCooldown > 0}
+                title={exportCooldown > 0 ? `Espera ${exportCooldown}s antes de volver a exportar` : undefined}
+                className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                <Download size={14} /> {exportCooldown > 0 ? `Espera ${exportCooldown}s` : 'Exportar'}
               </button>
             )}
             {isManager && (

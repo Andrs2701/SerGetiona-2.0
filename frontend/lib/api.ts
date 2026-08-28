@@ -105,6 +105,22 @@ function unwrap<T>(response: unknown): T {
   return response as T;
 }
 
+/**
+ * Lanzado por downloadCsv en vez de un Error genérico para que el llamador
+ * pueda distinguir un 429 (throttle) y leer cuántos segundos debe esperar
+ * — Laravel manda ese valor en el header Retry-After de la respuesta.
+ */
+export class DownloadError extends Error {
+  status: number;
+  retryAfter?: number;
+  constructor(status: number, retryAfter?: number) {
+    super(`HTTP ${status}`);
+    this.name = 'DownloadError';
+    this.status = status;
+    this.retryAfter = retryAfter;
+  }
+}
+
 export async function downloadCsv(path: string, filename: string): Promise<void> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('sergestiona_token') : null;
   const headers: Record<string, string> = { 'Accept': 'application/json' };
@@ -112,7 +128,8 @@ export async function downloadCsv(path: string, filename: string): Promise<void>
   const res = await fetch(`${BASE_URL}${path}`, { headers });
   if (!res.ok) {
     if (res.status === 401) handleUnauthorized(path);
-    throw new Error(`HTTP ${res.status}`);
+    const retryAfterHeader = res.headers.get('Retry-After');
+    throw new DownloadError(res.status, retryAfterHeader ? Number(retryAfterHeader) : undefined);
   }
   const blob = await res.blob();
   const a = document.createElement('a');
