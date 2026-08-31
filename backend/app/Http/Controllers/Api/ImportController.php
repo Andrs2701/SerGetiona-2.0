@@ -405,65 +405,75 @@ class ImportController extends Controller
             return [[], 'No se pudo leer el archivo Excel: ' . $e->getMessage()];
         }
 
-        $sheet    = $spreadsheet->getActiveSheet();
-        $highRow  = $sheet->getHighestDataRow();
-        $highCol  = $sheet->getHighestDataColumn();
+        // Todo lo que sigue también va protegido: un archivo puede cargar
+        // bien con IOFactory::load() y aun así hacer fallar la lectura de
+        // encabezados/celdas más adelante (celdas fusionadas, formatos
+        // numéricos raros, hojas corruptas mezcladas con datos válidos) —
+        // sin este try/catch, eso se caía como un 500 crudo sin ningún
+        // mensaje útil en vez del formato de error normal de este endpoint.
+        try {
+            $sheet    = $spreadsheet->getActiveSheet();
+            $highRow  = $sheet->getHighestDataRow();
+            $highCol  = $sheet->getHighestDataColumn();
 
-        if ($highRow < 2) {
-            return [[], 'El archivo no contiene filas de datos.'];
-        }
+            if ($highRow < 2) {
+                return [[], 'El archivo no contiene filas de datos.'];
+            }
 
-        // Find the header row: look for a row that contains canonical keys or their Spanish labels.
-        $headerRow = null;
-        $colMap    = []; // colIndex (1-based) → canonical key
+            // Find the header row: look for a row that contains canonical keys or their Spanish labels.
+            $headerRow = null;
+            $colMap    = []; // colIndex (1-based) → canonical key
 
-        $maxCol = Coordinate::columnIndexFromString($highCol);
+            $maxCol = Coordinate::columnIndexFromString($highCol);
 
-        for ($r = 1; $r <= min($highRow, 5); $r++) {
-            $candidates = [];
-            for ($c = 1; $c <= $maxCol; $c++) {
-                $colLetter = Coordinate::stringFromColumnIndex($c);
-                $raw       = (string) $sheet->getCell($colLetter . $r)->getValue();
-                $norm      = $this->normalizeHeader($raw);
-                if ($norm !== null) {
-                    $candidates[$c] = $norm;
+            for ($r = 1; $r <= min($highRow, 5); $r++) {
+                $candidates = [];
+                for ($c = 1; $c <= $maxCol; $c++) {
+                    $colLetter = Coordinate::stringFromColumnIndex($c);
+                    $raw       = (string) $sheet->getCell($colLetter . $r)->getValue();
+                    $norm      = $this->normalizeHeader($raw);
+                    if ($norm !== null) {
+                        $candidates[$c] = $norm;
+                    }
+                }
+                // Accept this row if it contains at least 3 canonical header matches
+                if (count($candidates) >= 3) {
+                    $headerRow = $r;
+                    $colMap    = $candidates;
+                    break;
                 }
             }
-            // Accept this row if it contains at least 3 canonical header matches
-            if (count($candidates) >= 3) {
-                $headerRow = $r;
-                $colMap    = $candidates;
-                break;
+
+            if ($headerRow === null) {
+                return [[], 'No se encontró la fila de encabezados. Asegúrate de usar la plantilla oficial o que la primera fila de datos contenga los nombres de columna.'];
             }
-        }
 
-        if ($headerRow === null) {
-            return [[], 'No se encontró la fila de encabezados. Asegúrate de usar la plantilla oficial o que la primera fila de datos contenga los nombres de columna.'];
-        }
-
-        // Parse data rows
-        $rows = [];
-        for ($r = $headerRow + 1; $r <= $highRow; $r++) {
-            $row     = [];
-            $hasData = false;
-            foreach ($colMap as $colIdx => $key) {
-                $colLetter = Coordinate::stringFromColumnIndex($colIdx);
-                $cell      = $sheet->getCell($colLetter . $r);
-                $value     = $this->cellToString($cell);
-                $row[$key] = $value;
-                if ($value !== '') $hasData = true;
+            // Parse data rows
+            $rows = [];
+            for ($r = $headerRow + 1; $r <= $highRow; $r++) {
+                $row     = [];
+                $hasData = false;
+                foreach ($colMap as $colIdx => $key) {
+                    $colLetter = Coordinate::stringFromColumnIndex($colIdx);
+                    $cell      = $sheet->getCell($colLetter . $r);
+                    $value     = $this->cellToString($cell);
+                    $row[$key] = $value;
+                    if ($value !== '') $hasData = true;
+                }
+                // Skip completely empty rows
+                if ($hasData) {
+                    $rows[] = $row;
+                }
             }
-            // Skip completely empty rows
-            if ($hasData) {
-                $rows[] = $row;
+
+            if (empty($rows)) {
+                return [[], 'El archivo no contiene filas de datos (sólo encabezados).'];
             }
-        }
 
-        if (empty($rows)) {
-            return [[], 'El archivo no contiene filas de datos (sólo encabezados).'];
+            return [$rows, null];
+        } catch (\Throwable $e) {
+            return [[], 'No se pudo procesar el contenido del archivo Excel: ' . $e->getMessage()];
         }
-
-        return [$rows, null];
     }
 
     /**
