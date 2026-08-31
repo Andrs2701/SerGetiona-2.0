@@ -111,6 +111,7 @@ class ExportController extends Controller
                 $audiovisualAct?->commitment_date?->format('Y-m-d') ?? '',
                 $engineeringAct?->commitment_date?->format('Y-m-d') ?? '',
                 $qaAct?->commitment_date?->format('Y-m-d') ?? '',
+                $expertAct?->responsible?->email ?? '',
                 $pedagogyAct?->responsible?->email ?? '',
                 $designAct?->responsible?->email ?? '',
                 $audiovisualAct?->responsible?->email ?? '',

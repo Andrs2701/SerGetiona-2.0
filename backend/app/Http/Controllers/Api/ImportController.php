@@ -42,6 +42,7 @@ class ImportController extends Controller
         'fecha_entrega_audiovisual'     => 'Fecha Entrega Audiovisual',
         'fecha_entrega_ingeniero'       => 'Fecha Entrega Ingeniero',
         'fecha_entrega_calidad'         => 'Fecha Entrega Calidad',
+        'correo_responsable_experto'    => 'Correo Responsable Experto',
         'correo_responsable_pedagogia'  => 'Correo Responsable Pedagogía',
         'correo_responsable_diseno'     => 'Correo Responsable Diseño',
         'correo_responsable_audiovisual'=> 'Correo Responsable Audiovisual',
@@ -55,19 +56,18 @@ class ImportController extends Controller
         'tipo_contenido', 'fecha_inicio',
         'fecha_entrega_experto', 'fecha_entrega_pedagogia', 'fecha_entrega_diseno',
         'fecha_entrega_audiovisual', 'fecha_entrega_ingeniero', 'fecha_entrega_calidad',
-        'correo_responsable_pedagogia', 'correo_responsable_diseno',
+        'correo_responsable_experto', 'correo_responsable_pedagogia', 'correo_responsable_diseno',
         'correo_responsable_audiovisual', 'correo_responsable_ingeniero',
         'correo_responsable_calidad',
     ];
 
     /**
      * Columns that MUST have a value in every data row.
-     * `fecha_entrega_experto` is NOT required: no bulk-import column exists to
-     * assign an Experto responsable, so that activity is always created
-     * without responsible_id, and RoleActivityObserver::creating() already
-     * marks any role_activity without a responsable as 'not_applicable' —
-     * whether or not a commitment_date was supplied. Requiring the date here
-     * would only block rows where the Experto phase genuinely doesn't apply.
+     * Ningún `fecha_entrega_*`/`correo_responsable_*` es obligatorio: un rol
+     * sin responsable asignado queda automáticamente en 'not_applicable'
+     * (RoleActivityObserver::creating()), lo cual es válido — no todos los
+     * entregables necesitan los 6 roles. Exigir esas columnas bloquearía
+     * filas donde ese rol simplemente no aplica.
      */
     private const REQUIRED_COLS = [
         'programa', 'asignatura', 'semana_modulo', 'tipo_contenido',
@@ -75,6 +75,7 @@ class ImportController extends Controller
 
     /** Map column key → role key (for responsible e-mail look-ups). */
     private const RESPONSIBLE_COLS = [
+        'correo_responsable_experto'      => 'expert',
         'correo_responsable_pedagogia'    => 'pedagogy',
         'correo_responsable_diseno'       => 'design',
         'correo_responsable_audiovisual'  => 'audiovisual',
@@ -121,7 +122,7 @@ class ImportController extends Controller
     private const COLOR_REQUIRED   = 'FFFF4444'; // red marker for required columns
 
     /** Column widths, in the same order as HEADERS. */
-    public const COLUMN_WIDTHS = [22, 18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30];
+    public const COLUMN_WIDTHS = [22, 18, 28, 28, 20, 10, 8, 18, 14, 18, 18, 18, 18, 18, 18, 30, 30, 30, 30, 30, 30];
 
     // ---------------------------------------------------------------
     // GET /api/import/template
@@ -205,6 +206,7 @@ class ImportController extends Controller
             '2026-07-28',
             '2026-08-04',
             '2026-08-11',
+            'experto@universidad.edu.co',
             'pedagogia@universidad.edu.co',
             'disenio@universidad.edu.co',
             'audiovisual@universidad.edu.co',
@@ -561,6 +563,8 @@ class ImportController extends Controller
             'fecha_entrega_ingeniero'           => 'fecha_entrega_ingeniero',
             'fecha entrega calidad'             => 'fecha_entrega_calidad',
             'fecha_entrega_calidad'             => 'fecha_entrega_calidad',
+            'correo responsable experto'        => 'correo_responsable_experto',
+            'correo_responsable_experto'        => 'correo_responsable_experto',
             'correo responsable pedagogia'      => 'correo_responsable_pedagogia',
             'correo responsable pedagogía'      => 'correo_responsable_pedagogia',
             'correo_responsable_pedagogia'      => 'correo_responsable_pedagogia',
