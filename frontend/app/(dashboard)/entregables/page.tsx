@@ -1351,6 +1351,7 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
   const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
   const [dlTemplate, setDlTemplate] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function buildForm() {
@@ -1368,6 +1369,19 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
     try { await downloadCsv(ENDPOINTS.IMPORT_TEMPLATE, 'plantilla_sergestiona.xlsx'); }
     catch { addToast('Error al descargar la plantilla.', 'error'); }
     finally { setDlTemplate(false); }
+  }
+
+  function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    const dropped = e.dataTransfer.files?.[0];
+    if (!dropped) return;
+    const ext = dropped.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['xlsx', 'xls', 'csv'].includes(ext)) {
+      addToast('Formato no soportado. Usa .xlsx, .xls o .csv.', 'error');
+      return;
+    }
+    setFile(dropped);
   }
 
   async function handleValidate() {
@@ -1469,12 +1483,19 @@ function BulkImportModal({ projects, onClose, onSuccess, addToast }: {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5">Archivo Excel <span className="text-red-500">*</span></label>
                   <div className={clsx('border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
-                    file ? 'border-blue-500 bg-blue-50/70 dark:border-blue-400 dark:bg-blue-950/35' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-blue-400 dark:hover:bg-blue-950/30'
-                  )} onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={26} className={clsx('mx-auto mb-2', file ? 'text-blue-600 dark:text-blue-300' : 'text-gray-400 dark:text-slate-300')} />
-                    {file
+                    isDragging ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/50'
+                      : file ? 'border-blue-500 bg-blue-50/70 dark:border-blue-400 dark:bg-blue-950/35' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-blue-400 dark:hover:bg-blue-950/30'
+                  )}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
+                    onDrop={handleFileDrop}>
+                    <Upload size={26} className={clsx('mx-auto mb-2', (isDragging || file) ? 'text-blue-600 dark:text-blue-300' : 'text-gray-400 dark:text-slate-300')} />
+                    {isDragging
+                      ? <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Suelta el archivo aquí</p>
+                      : file
                       ? <div><p className="text-sm font-semibold text-gray-800">{file.name}</p><p className="text-xs text-gray-400 mt-0.5">{(file.size / 1024).toFixed(1)} KB</p></div>
-                      : <><p className="text-sm text-gray-600">Haz clic para seleccionar</p><p className="text-xs text-gray-400 mt-1">Formato: .xlsx — Máx. 10 MB</p></>
+                      : <><p className="text-sm text-gray-600">Haz clic o arrastra el archivo aquí</p><p className="text-xs text-gray-400 mt-1">Formato: .xlsx — Máx. 10 MB</p></>
                     }
                     <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
                   </div>
