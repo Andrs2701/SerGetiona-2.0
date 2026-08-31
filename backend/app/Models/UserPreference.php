@@ -18,6 +18,7 @@ class UserPreference extends Model
         'email_tasks' => true,
         'email_chat' => false,
         'email_deadlines' => false,
+        'entregables_view' => 'rows',
     ];
 
     protected $fillable = [
@@ -28,6 +29,7 @@ class UserPreference extends Model
         'email_tasks',
         'email_chat',
         'email_deadlines',
+        'entregables_view',
     ];
 
     protected $casts = [

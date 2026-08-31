@@ -26,6 +26,7 @@ class PreferenceController extends Controller
             'email_tasks'                   => 'nullable|boolean',
             'email_chat'                    => 'nullable|boolean',
             'email_deadlines'               => 'nullable|boolean',
+            'entregables_view'              => 'nullable|in:rows,grouped',
         ]);
 
         $pref = UserPreference::updateOrCreate(

@@ -1733,7 +1733,16 @@ export default function EntregablesPage() {
       .then(r => setProjects(Array.isArray(r) ? r : [])).catch(() => {});
     api.get<User[]>(ENDPOINTS.USERS_ASSIGNABLE)
       .then(r => setUsers(Array.isArray(r) ? r : [])).catch(() => {});
+    // Restaura la última vista (Detallada/Tabla) que el usuario dejó configurada
+    api.get<{ preferences: { entregables_view?: ViewMode } }>(ENDPOINTS.PREFERENCES)
+      .then(res => { if (res.preferences?.entregables_view) setViewMode(res.preferences.entregables_view); })
+      .catch(() => {});
   }, []);
+
+  function changeViewMode(v: ViewMode) {
+    setViewMode(v);
+    api.put(ENDPOINTS.PREFERENCES, { entregables_view: v }).catch(() => {});
+  }
 
   useEffect(() => {
     const filter = searchParams.get('filter');
@@ -2241,13 +2250,13 @@ export default function EntregablesPage() {
           </button>
 
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            <button onClick={() => setViewMode('rows')} title="Vista detallada por roles"
+            <button onClick={() => changeViewMode('rows')} title="Vista detallada por roles"
               className={clsx('p-1.5 rounded-md transition-colors flex items-center gap-1',
                 viewMode === 'rows' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600')}>
               <LayoutList size={15} />
               {viewMode === 'rows' && <span className="text-xs font-medium">Detallada</span>}
             </button>
-            <button onClick={() => setViewMode('grouped')} title="Vista tabla compacta"
+            <button onClick={() => changeViewMode('grouped')} title="Vista tabla compacta"
               className={clsx('p-1.5 rounded-md transition-colors flex items-center gap-1',
                 viewMode === 'grouped' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600')}>
               <Table2 size={15} />
