@@ -345,6 +345,82 @@ class DeliverableController extends Controller
         ]);
     }
 
+    // ─── POST /deliverables/bulk-update-activity ──────────────────────────────
+
+    /**
+     * Actualiza responsable y/o fecha de compromiso de UN rol sobre varios
+     * entregables a la vez. Misma lógica selectiva ya probada en
+     * ImportController::persistRow() (Carga Masiva con update_existing):
+     * el responsable se sobrescribe si cambia; la fecha se sobrescribe si
+     * cambia y la actividad aún no tiene actual_delivery_date (para no
+     * alterar retroactivamente las métricas de puntualidad de
+     * HealthService, que comparan esa fecha contra commitment_date en vivo).
+     */
+    public function bulkUpdateActivity(Request $request)
+    {
+        $data = $request->validate([
+            'ids'             => 'required|array|min:1',
+            'ids.*'           => 'integer|exists:deliverables,id',
+            'role'            => 'required|in:expert,pedagogy,design,audiovisual,engineering,qa',
+            'responsible_id'  => 'nullable|exists:users,id|required_without:commitment_date',
+            'commitment_date' => 'nullable|date|required_without:responsible_id',
+        ]);
+
+        $updated          = 0;
+        $skippedDelivered = 0;
+
+        DB::transaction(function () use ($data, &$updated, &$skippedDelivered) {
+            foreach ($data['ids'] as $deliverableId) {
+                $activity = RoleActivity::firstOrCreate(
+                    ['deliverable_id' => $deliverableId, 'role' => $data['role']],
+                    ['status' => 'not_started', 'checklist' => json_encode(RoleActivity::defaultChecklist($data['role']))]
+                );
+
+                $updates = [];
+                if (!empty($data['responsible_id']) && $data['responsible_id'] !== $activity->responsible_id) {
+                    $updates['responsible_id'] = $data['responsible_id'];
+                }
+                if (!empty($data['commitment_date'])) {
+                    $current = optional($activity->commitment_date)->format('Y-m-d');
+                    if ($data['commitment_date'] !== $current) {
+                        if ($activity->actual_delivery_date === null) {
+                            $updates['commitment_date'] = $data['commitment_date'];
+                        } else {
+                            $skippedDelivered++;
+                        }
+                    }
+                }
+                if (empty($updates)) continue;
+
+                $activity->update($updates);
+                $updated++;
+
+                if (isset($updates['responsible_id'])) {
+                    $u = User::find($updates['responsible_id']);
+                    if ($u) NotificationService::notifyTaskAssigned($activity, $u);
+                }
+                if (isset($updates['commitment_date']) && $activity->responsible_id) {
+                    $u = User::find($activity->responsible_id);
+                    if ($u) {
+                        NotificationService::notify(
+                            $u,
+                            'date_changed',
+                            'Fecha de compromiso actualizada',
+                            "La fecha límite de tu actividad '{$activity->role}' fue actualizada a {$updates['commitment_date']}.",
+                            ['entity_type' => 'RoleActivity', 'entity_id' => $activity->id, 'deliverable_id' => $deliverableId]
+                        );
+                    }
+                }
+                RoleActivityController::recalculateGlobalStatus($activity->deliverable);
+            }
+        });
+
+        return response()->json([
+            'updated'           => $updated,
+            'skipped_delivered' => $skippedDelivered,
+        ]);
+    }
+
     // ─── GET /deliverables/{id}/flow ──────────────────────────────────────────
 
     public function flow(Request $request, Deliverable $deliverable)

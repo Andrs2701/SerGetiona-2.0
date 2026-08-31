@@ -557,6 +557,80 @@ function DeleteConfirm({ title = 'Eliminar entregable', message, onConfirm, onCa
   );
 }
 
+function BulkEditModal({ count, users, onApply, onCancel }: {
+  count: number;
+  users: User[];
+  onApply: (role: Role, responsibleId: number | null, commitmentDate: string | null) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [role, setRole] = useState<Role>('expert');
+  const [responsibleQuery, setResponsibleQuery] = useState('');
+  const [responsibleId, setResponsibleId] = useState<number | null>(null);
+  const [showAllRoles, setShowAllRoles] = useState(false);
+  const [date, setDate] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const filteredUsers = showAllRoles ? users : users.filter(u => u.role === role || u.covering_roles?.includes(role));
+  const canApply = (!!responsibleId || !!date) && !loading;
+
+  async function handleApply() {
+    setLoading(true);
+    try { await onApply(role, responsibleId, date || null); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onCancel} />
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <h3 className="font-semibold text-gray-900 mb-1">Editar {count} entregable{count !== 1 ? 's' : ''}</h3>
+          <p className="text-xs text-gray-500 mb-4">Cambia el responsable y/o la fecha de compromiso de un rol para todas las entregas seleccionadas.</p>
+
+          <label className="block text-xs font-medium text-gray-600 mb-1">Rol</label>
+          <select value={role}
+            onChange={e => { setRole(e.target.value as Role); setResponsibleId(null); setResponsibleQuery(''); }}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-[#194276]/30">
+            {(Object.keys(ROLE_LABELS) as Role[]).map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+
+          <label className="block text-xs font-medium text-gray-600 mb-1">Nuevo responsable (opcional)</label>
+          <input list="bulk-edit-responsible-list" value={responsibleQuery}
+            onChange={e => {
+              const typed = e.target.value;
+              setResponsibleQuery(typed);
+              const match = filteredUsers.find(u => u.name === typed);
+              setResponsibleId(match ? match.id : null);
+            }}
+            placeholder="Buscar por nombre..."
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-1 focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+          <datalist id="bulk-edit-responsible-list">
+            {filteredUsers.map(u => <option key={u.id} value={u.name} />)}
+          </datalist>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 mb-3 cursor-pointer select-none">
+            <input type="checkbox" checked={showAllRoles} onChange={e => setShowAllRoles(e.target.checked)}
+              className="w-3 h-3 rounded border-gray-300" />
+            Mostrar todos los roles
+          </label>
+
+          <label className="block text-xs font-medium text-gray-600 mb-1">Nueva fecha de compromiso (opcional)</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-1 focus:outline-none focus:ring-2 focus:ring-[#194276]/30" />
+          <p className="text-[11px] text-gray-400 mb-4">No se sobrescribe la fecha en actividades ya entregadas.</p>
+
+          <div className="flex gap-3">
+            <button onClick={onCancel} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button onClick={handleApply} disabled={!canApply}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors" style={{ background: '#194276' }}>
+              {loading ? 'Aplicando...' : 'Aplicar cambios'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Deliverable Form Panel ───────────────────────────────────────────────────
 
 interface ActivityForm { role: Role; responsible_id: string; commitment_date: string; }
@@ -1539,6 +1613,7 @@ export default function EntregablesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [showImport, setShowImport]   = useState(false);
   const [exportCooldown, setExportCooldown] = useState(0);
 
@@ -1816,6 +1891,20 @@ export default function EntregablesPage() {
     } catch { addToast('Error al eliminar los entregables seleccionados.', 'error'); }
   }
 
+  async function handleBulkEditApply(role: Role, responsibleId: number | null, commitmentDate: string | null) {
+    try {
+      const res = await api.post<{ updated: number; skipped_delivered: number }>(ENDPOINTS.DELIVERABLES_BULK_UPDATE_ACTIVITY, {
+        ids: Array.from(selectedIds), role, responsible_id: responsibleId, commitment_date: commitmentDate,
+      });
+      let msg = `${res.updated} actualizado${res.updated !== 1 ? 's' : ''}.`;
+      if (res.skipped_delivered > 0) msg += ` ${res.skipped_delivered} con fecha ya entregada (no se tocó).`;
+      addToast(msg, 'success');
+      setBulkEditOpen(false);
+      setSelectedIds(new Set());
+      loadData();
+    } catch { addToast('Error al editar los entregables seleccionados.', 'error'); }
+  }
+
   async function handleExport() {
     if (exportCooldown > 0) return;
     try {
@@ -2078,6 +2167,10 @@ export default function EntregablesPage() {
             <button onClick={() => setSelectedIds(new Set())}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 rounded-lg transition-colors">
               <X size={12} /> Cancelar selección
+            </button>
+            <button onClick={() => setBulkEditOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors" style={{ background: '#194276' }}>
+              <Pencil size={12} /> Editar seleccionados
             </button>
             <button onClick={() => setBulkDeleteConfirm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
@@ -2346,6 +2439,12 @@ export default function EntregablesPage() {
           title="Eliminar entregables"
           message={<>¿Seguro que deseas eliminar <strong>{selectedIds.size} entregable{selectedIds.size !== 1 ? 's' : ''}</strong>? Esta acción no se puede deshacer.</>}
           onConfirm={handleBulkDelete} onCancel={() => setBulkDeleteConfirm(false)}
+        />
+      )}
+      {bulkEditOpen && (
+        <BulkEditModal
+          count={selectedIds.size} users={users}
+          onApply={handleBulkEditApply} onCancel={() => setBulkEditOpen(false)}
         />
       )}
 

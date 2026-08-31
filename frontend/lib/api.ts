@@ -168,6 +168,7 @@ export const ENDPOINTS = {
   PROJECT_DELIVERABLES: (projectId: number) => `/deliverables?project_id=${projectId}`,
   DELIVERABLE: (id: number) => `/deliverables/${id}`,
   DELIVERABLES_BULK_DELETE: '/deliverables/bulk-delete',
+  DELIVERABLES_BULK_UPDATE_ACTIVITY: '/deliverables/bulk-update-activity',
   DELIVERABLE_COMMENTS: (id: number) => `/deliverables/${id}/comments`,
 
   // Role activities
