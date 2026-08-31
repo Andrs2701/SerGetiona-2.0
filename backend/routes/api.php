@@ -209,18 +209,24 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
         // Salud de proyectos (vista de detalle de un proyecto puntual)
         Route::get('projects/{project}/health', [HealthController::class, 'project']);
 
-        Route::post('/import/deliverables', [ImportController::class, 'deliverables'])->middleware('throttle:10,1');
+        // El 3er parámetro (prefix) es obligatorio aquí: sin él, este límite
+        // usa la misma clave que el throttle:90,1 del grupo completo (ambos
+        // resuelven a sha1($user->id), ver ThrottleRequests::formatIdentifier())
+        // y termina contando TODA la actividad de la API del usuario, no solo
+        // esta acción — un usuario navegando normalmente ya gasta ese cupo
+        // antes de tocar este botón siquiera.
+        Route::post('/import/deliverables', [ImportController::class, 'deliverables'])->middleware('throttle:10,1,import-deliverables');
         Route::get('/import/template', [ImportController::class, 'template']);
 
-        Route::get('/export/deliverables', [ExportController::class, 'deliverables'])->middleware('throttle:10,1');
-        Route::get('/export/production', [ProductionLogController::class, 'export'])->middleware('throttle:10,1');
+        Route::get('/export/deliverables', [ExportController::class, 'deliverables'])->middleware('throttle:10,1,export-deliverables');
+        Route::get('/export/production', [ProductionLogController::class, 'export'])->middleware('throttle:10,1,export-production');
     });
 
     // Exportar Escuelas/Proyectos — mismo permiso que crear/editar/eliminar
     // uno (projects.manage), en vez de admin/coordinator fijo, para que el
     // botón "Exportar" del listado siga la Matriz igual que "Nueva Escuela / Proyecto".
     Route::get('/export/projects', [ExportController::class, 'projects'])
-        ->middleware(['permission:projects,manage', 'throttle:10,1']);
+        ->middleware(['permission:projects,manage', 'throttle:10,1,export-projects']);
 
     // Flujo secuencial de entregable
     Route::get('deliverables/{deliverable}/flow', [DeliverableController::class, 'flow']);
