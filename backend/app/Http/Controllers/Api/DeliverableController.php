@@ -16,6 +16,7 @@ use App\Services\NotificationService;
 use App\Support\ResourceAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DeliverableController extends Controller
 {
@@ -303,6 +304,45 @@ class DeliverableController extends Controller
         $deliverable->roleActivities()->delete();
         $deliverable->delete();
         return response()->json(['message' => 'Entregable eliminado correctamente.']);
+    }
+
+    // ─── POST /deliverables/bulk-delete ───────────────────────────────────────
+
+    public function bulkDestroy(Request $request)
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:deliverables,id',
+        ]);
+        $ids = $data['ids'];
+
+        $deliverables = Deliverable::whereIn('id', $ids)->get(['id', 'name']);
+        $userId       = $request->user()->id;
+
+        DB::transaction(function () use ($ids, $deliverables, $userId, $request) {
+            // Mismo orden que destroy() y por el mismo motivo: RoleActivity no
+            // usa SoftDeletes, así que hay que limpiarlas primero con un DELETE
+            // real para no dejarlas huérfanas (ver comentario en destroy()).
+            RoleActivity::whereIn('deliverable_id', $ids)->delete();
+            Deliverable::whereIn('id', $ids)->delete();
+
+            foreach ($deliverables as $d) {
+                AuditLog::create([
+                    'user_id'     => $userId,
+                    'action'      => 'deleted',
+                    'entity_type' => 'Deliverable',
+                    'entity_id'   => $d->id,
+                    'old_value'   => $d->name,
+                    'ip_address'  => $request->ip(),
+                    'created_at'  => now(),
+                ]);
+            }
+        });
+
+        return response()->json([
+            'deleted' => count($ids),
+            'message' => count($ids) . ' entregable(s) eliminados.',
+        ]);
     }
 
     // ─── GET /deliverables/{id}/flow ──────────────────────────────────────────

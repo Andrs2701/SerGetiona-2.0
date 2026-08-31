@@ -81,6 +81,8 @@ Route::middleware(['auth:sanctum', 'throttle:90,1'])->group(function () {
     Route::apiResource('deliverables', DeliverableController::class)->only(['index', 'show']);
     Route::apiResource('deliverables', DeliverableController::class)
         ->except(['index', 'show'])->middleware('permission:entregables,manage');
+    Route::post('deliverables/bulk-delete', [DeliverableController::class, 'bulkDestroy'])
+        ->middleware('permission:entregables,manage');
     Route::put('activities/{activity}', [RoleActivityController::class, 'update']);
     Route::post('activities/{activity}/quick-action', [RoleActivityController::class, 'quickAction']);
     Route::get('activities/{activity}/timeline', [RoleActivityController::class, 'timeline']);

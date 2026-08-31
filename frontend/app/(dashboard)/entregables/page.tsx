@@ -310,9 +310,11 @@ interface RowProps {
   onDelete: () => void;
   onQuickAction: (a: QuickAction) => void;
   onSelectActivity?: (activity: RoleActivity, deliverable: Deliverable) => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit, onDelete, onQuickAction, onSelectActivity }: RowProps) {
+function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit, onDelete, onQuickAction, onSelectActivity, selected, onToggleSelect }: RowProps) {
   const acts = d.role_activities ?? [];
   const byRole: Partial<Record<Role, RoleActivity>> = {};
   acts.forEach(a => { byRole[a.role] = a; });
@@ -342,6 +344,10 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
     )}>
       {/* ── Header line ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
+        {isManager && onToggleSelect && (
+          <input type="checkbox" checked={!!selected} onChange={onToggleSelect} onClick={e => e.stopPropagation()}
+            className="w-4 h-4 rounded border-gray-300 shrink-0 cursor-pointer" />
+        )}
         {/* Subject + module */}
         <div className="flex-1 min-w-[200px] cursor-pointer group" onClick={onView}>
           <div className="flex items-center gap-2 flex-wrap">
@@ -530,7 +536,7 @@ function GroupHeader({
   );
 }
 
-function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+function DeleteConfirm({ title = 'Eliminar entregable', message, onConfirm, onCancel }: { title?: string; message: React.ReactNode; onConfirm: () => void; onCancel: () => void }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onCancel} />
@@ -539,10 +545,8 @@ function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm:
           <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Trash2 size={20} className="text-red-600" />
           </div>
-          <h3 className="text-center font-semibold text-gray-900 mb-2">Eliminar entregable</h3>
-          <p className="text-center text-sm text-gray-600 mb-6">
-            ¿Seguro que deseas eliminar <strong>"{name}"</strong>? Esta acción no se puede deshacer.
-          </p>
+          <h3 className="text-center font-semibold text-gray-900 mb-2">{title}</h3>
+          <p className="text-center text-sm text-gray-600 mb-6">{message}</p>
           <div className="flex gap-3">
             <button onClick={onCancel} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Cancelar</button>
             <button onClick={onConfirm} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Eliminar</button>
@@ -1533,6 +1537,8 @@ export default function EntregablesPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [formPanel, setFormPanel]     = useState<FormMode | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [showImport, setShowImport]   = useState(false);
   const [exportCooldown, setExportCooldown] = useState(0);
 
@@ -1739,6 +1745,24 @@ export default function EntregablesPage() {
     });
   }
 
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every(d => selectedIds.has(d.id));
+
+  function toggleSelectAll() {
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(filtered.map(d => d.id)));
+  }
+
+  // Evita que quede seleccionado (e invisible) algo que ya no aparece tras
+  // cambiar un filtro o el término de búsqueda.
+  useEffect(() => { setSelectedIds(new Set()); }, [filtered]);
+
   const hasActiveFilters = !!(
     search || filterProject || filterStatus || filterResponsible || filterSemestre ||
     filterCiclo || filterAcademicLevel || filterYear || filterMonth || filterWeek ||
@@ -1779,6 +1803,17 @@ export default function EntregablesPage() {
       setDeleteTarget(null);
       loadData();
     } catch { addToast('Error al eliminar.', 'error'); }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await api.post<{ deleted: number }>(ENDPOINTS.DELIVERABLES_BULK_DELETE, { ids });
+      addToast(`${res.deleted} entregable(s) eliminados.`, 'success');
+      setBulkDeleteConfirm(false);
+      setSelectedIds(new Set());
+      loadData();
+    } catch { addToast('Error al eliminar los entregables seleccionados.', 'error'); }
   }
 
   async function handleExport() {
@@ -2034,6 +2069,24 @@ export default function EntregablesPage() {
         </div>
       </div>
 
+      {isManager && selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 mb-4">
+          <span className="text-sm font-medium text-blue-900">
+            {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelectedIds(new Set())}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 rounded-lg transition-colors">
+              <X size={12} /> Cancelar selección
+            </button>
+            <button onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+              <Trash2 size={12} /> Eliminar seleccionados
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <TableSkeleton rows={5} cols={6} />
@@ -2068,6 +2121,8 @@ export default function EntregablesPage() {
                         onDelete={() => setDeleteTarget(d)}
                         onQuickAction={action => handleQuickAction(d, action)}
                         onSelectActivity={handleSelectActivity}
+                        selected={selectedIds.has(d.id)}
+                        onToggleSelect={() => toggleSelect(d.id)}
                       />
                     ))}
                     {isManager && (
@@ -2112,6 +2167,12 @@ export default function EntregablesPage() {
                 <table className="w-full text-sm min-w-[980px]">
                   <thead className="bg-gray-50/80 border-b border-gray-100">
                     <tr>
+                      {isManager && (
+                        <th className="w-8 px-3 py-2">
+                          <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll}
+                            className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
+                        </th>
+                      )}
                       {['Programa','Asignatura / Módulo','Tipo','Estado','Responsable activo','F. Compromiso','Avance (excl. N/A)','Acciones'].map(h => (
                         <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                       ))}
@@ -2130,6 +2191,12 @@ export default function EntregablesPage() {
                           'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
                           overdue && 'border-l-4 border-l-red-500'
                         )}>
+                          {isManager && (
+                            <td className="px-3 py-2.5">
+                              <input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleSelect(d.id)}
+                                className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
+                            </td>
+                          )}
                           <td className="px-3 py-2.5 max-w-[150px]">
                             <p className="font-semibold text-gray-700 text-xs truncate">{d.program_name ?? '—'}</p>
                             <p className="text-[10px] text-gray-400 truncate">{d.project_name ?? '—'}</p>
@@ -2269,7 +2336,17 @@ export default function EntregablesPage() {
       )}
 
       {deleteTarget && (
-        <DeleteConfirm name={deleteTarget.name} onConfirm={() => handleDelete(deleteTarget)} onCancel={() => setDeleteTarget(null)} />
+        <DeleteConfirm
+          message={<>¿Seguro que deseas eliminar <strong>"{deleteTarget.name}"</strong>? Esta acción no se puede deshacer.</>}
+          onConfirm={() => handleDelete(deleteTarget)} onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      {bulkDeleteConfirm && (
+        <DeleteConfirm
+          title="Eliminar entregables"
+          message={<>¿Seguro que deseas eliminar <strong>{selectedIds.size} entregable{selectedIds.size !== 1 ? 's' : ''}</strong>? Esta acción no se puede deshacer.</>}
+          onConfirm={handleBulkDelete} onCancel={() => setBulkDeleteConfirm(false)}
+        />
       )}
 
       {showImport && (
