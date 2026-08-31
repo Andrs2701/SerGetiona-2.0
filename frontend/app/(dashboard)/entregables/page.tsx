@@ -122,6 +122,19 @@ function isOverdue(d: Deliverable): boolean {
   });
 }
 
+// Un responsable "cubre" un rol cuando su rol propio es distinto al de la
+// actividad pero tiene una cobertura temporal activa que lo incluye.
+function isCoveringRole(role: Role, activity: RoleActivity | undefined, users: User[]): boolean {
+  const responsibleId = activity?.responsible?.id;
+  if (!responsibleId) return false;
+  const u = users.find(x => x.id === responsibleId);
+  return !!u && u.role !== role && !!u.covering_roles?.includes(role);
+}
+
+function initials(name: string): string {
+  return name.split(' ').slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase();
+}
+
 function isApproaching(d: Deliverable): boolean {
   if (d.global_status === 'finished' || d.global_status === 'cancelled') return false;
   return (d.role_activities ?? []).some(a => {
@@ -299,6 +312,80 @@ function RoleCell({ role, activity, onSelect, isCovering, isManager }: { role: R
   );
 }
 
+// ─── Role avatar cell (compact, vista Tabla) ───────────────────────────────────
+
+function RoleAvatarCell({ role, activity, onSelect, isCovering, isManager }: { role: Role; activity?: RoleActivity; onSelect?: () => void; isCovering?: boolean; isManager?: boolean }) {
+  const isNA = !activity || activity.status === 'not_applicable';
+  const isClickable = !isNA || isManager;
+  const days = daysUntil(activity?.commitment_date);
+  const overdueDate = !isNA && !!activity && !NOT_OVERDUE_ROLE_STATUSES.includes(activity.status) && !activity.actual_delivery_date && days !== null && days < 0;
+  const cfg = ACTIVITY_STATUS_CFG[activity?.status ?? 'not_started'] ?? ACTIVITY_STATUS_CFG.not_started;
+  const responsibleName = activity?.responsible?.name;
+  const tooltip = activity
+    ? `${responsibleName ?? 'Sin asignar'} · ${ROLE_LABELS[role]} · ${cfg.label}${isCovering ? ' · Cubriendo el rol' : ''}`
+    : `${ROLE_LABELS[role]} · No aplica`;
+
+  return (
+    <div
+      onClick={isClickable ? onSelect : undefined}
+      title={tooltip}
+      className={clsx(
+        'flex flex-col items-center gap-1 py-1 rounded-md transition-colors min-w-[38px]',
+        onSelect && isClickable && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40'
+      )}
+    >
+      {isNA ? (
+        <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+      ) : (
+        <>
+          <div
+            className={clsx(
+              'relative w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0',
+              responsibleName ? ROLE_BADGE_BG[role] : 'bg-gray-200 dark:bg-gray-700 text-gray-400 border border-dashed border-gray-300 dark:border-gray-600'
+            )}
+            style={isCovering ? { boxShadow: '0 0 0 1.5px var(--card-bg), 0 0 0 3px #4338ca' } : undefined}
+          >
+            {responsibleName ? initials(responsibleName) : '?'}
+            <span className={clsx('absolute -right-0.5 -bottom-0.5 w-2 h-2 rounded-full border border-white dark:border-gray-800', cfg.dot)} />
+          </div>
+          <span className={clsx('text-[9px] leading-none whitespace-nowrap', overdueDate ? 'text-red-500 font-bold' : 'text-gray-500 dark:text-gray-400')}>
+            {formatDateShort(activity?.commitment_date)}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Leyenda de colores (roles y estados) ──────────────────────────────────────
+
+function TableLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-3 py-2.5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400">
+      <span className="font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Roles</span>
+      {ROLES.map(role => (
+        <span key={role} className="flex items-center gap-1">
+          <span className={clsx('w-2.5 h-2.5 rounded-full shrink-0', ROLE_BADGE_BG[role])} />
+          {ROLE_LABELS[role]}
+        </span>
+      ))}
+      <span className="w-px h-3 bg-gray-200 dark:bg-gray-700" />
+      <span className="font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Estado</span>
+      {Object.entries(ACTIVITY_STATUS_CFG).map(([key, cfg]) => (
+        <span key={key} className="flex items-center gap-1">
+          <span className={clsx('w-2 h-2 rounded-full shrink-0', cfg.dot)} />
+          {cfg.label}
+        </span>
+      ))}
+      <span className="w-px h-3 bg-gray-200 dark:bg-gray-700" />
+      <span className="flex items-center gap-1.5">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-gray-300" style={{ boxShadow: '0 0 0 1.5px var(--card-bg), 0 0 0 3px #4338ca' }} />
+        Cubriendo el rol temporalmente
+      </span>
+    </div>
+  );
+}
+
 // ─── Deliverable Row (primary "rows" view) ────────────────────────────────────
 
 interface RowProps {
@@ -318,15 +405,6 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
   const acts = d.role_activities ?? [];
   const byRole: Partial<Record<Role, RoleActivity>> = {};
   acts.forEach(a => { byRole[a.role] = a; });
-
-  // Un responsable "cubre" un rol cuando su rol propio es distinto al de la
-  // actividad pero tiene una cobertura temporal activa que lo incluye.
-  const isCoveringRole = (role: Role, activity?: RoleActivity) => {
-    const responsibleId = activity?.responsible?.id;
-    if (!responsibleId) return false;
-    const u = users.find(x => x.id === responsibleId);
-    return !!u && u.role !== role && !!u.covering_roles?.includes(role);
-  };
 
   const overdue = isOverdue(d);
   const { pct, done, total } = calcProgressExcNA(acts);
@@ -417,7 +495,7 @@ function DeliverableRow({ deliverable: d, isManager, users = [], onView, onEdit,
       {/* ── Role grid: 2 cols mobile · 3 cols sm · 6 cols lg ─────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:grid-cols-6">
         {ROLES.map(role => (
-          <RoleCell key={role} role={role} activity={byRole[role]} isCovering={isCoveringRole(role, byRole[role])} isManager={isManager} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
+          <RoleCell key={role} role={role} activity={byRole[role]} isCovering={isCoveringRole(role, byRole[role], users)} isManager={isManager} onSelect={onSelectActivity && byRole[role] ? () => onSelectActivity(byRole[role]!, d) : undefined} />
         ))}
       </div>
 
@@ -2269,6 +2347,7 @@ export default function EntregablesPage() {
       {/* ── TABLE VIEW (secondary, compact, flat — sin agrupar por programa) ── */}
       {viewMode === 'grouped' && !loading && (
         <div className="space-y-3">
+          <TableLegend />
           {filtered.length === 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
               <Filter size={32} className="mx-auto mb-2 opacity-30" />
@@ -2278,7 +2357,7 @@ export default function EntregablesPage() {
           {filtered.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[980px]">
+                <table className="w-full text-sm min-w-[1040px]">
                   <thead className="bg-gray-50/80 border-b border-gray-100">
                     <tr>
                       {isManager && (
@@ -2287,7 +2366,15 @@ export default function EntregablesPage() {
                             className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
                         </th>
                       )}
-                      {['Programa','Asignatura / Módulo','Tipo','Estado','Responsable activo','F. Compromiso','Avance (excl. N/A)','Acciones'].map(h => (
+                      {['Programa','Asignatura / Módulo','Tipo','Estado'].map(h => (
+                        <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                      {ROLES.map(role => (
+                        <th key={role} title={ROLE_LABELS[role]} className="text-center px-1 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">
+                          {ROLE_ABBR[role]}
+                        </th>
+                      ))}
+                      {['Avance (excl. N/A)','Acciones'].map(h => (
                         <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -2295,11 +2382,9 @@ export default function EntregablesPage() {
                   <tbody>
                     {filtered.map(d => {
                       const acts = d.role_activities ?? [];
-                      const active = getActiveActivity(d);
-                      const days = daysUntil(active?.commitment_date);
-                      const overdue = days !== null && days < 0 && !active?.actual_delivery_date
-                        && !(active && NOT_OVERDUE_ROLE_STATUSES.includes(active.status))
-                        && d.global_status !== 'finished';
+                      const byRole: Partial<Record<Role, RoleActivity>> = {};
+                      acts.forEach(a => { byRole[a.role] = a; });
+                      const overdue = isOverdue(d);
                       return (
                         <tr key={d.id} className={clsx(
                           'border-b border-gray-50 dark:border-gray-700 hover:bg-blue-50/20 dark:hover:bg-gray-700/30 transition-colors relative',
@@ -2339,20 +2424,17 @@ export default function EntregablesPage() {
                             )}>{DELIVERABLE_TYPE_LABELS[d.type]}</span>
                           </td>
                           <td className="px-3 py-2.5"><StatusBadge status={d.global_status} type="global" /></td>
-                          <td className="px-3 py-2.5 text-xs">
-                            {active ? (
-                              <div>
-                                <p className="font-medium text-gray-800 truncate max-w-[120px]">{active.responsible?.name ?? '—'}</p>
-                                <p className="text-[10px] text-gray-400">{ROLE_LABELS[active.role]}</p>
-                              </div>
-                            ) : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
-                            <span className={clsx('text-xs', overdue ? 'text-red-600 font-semibold' : 'text-gray-600')}>
-                              {formatDate(active?.commitment_date)}
-                            </span>
-                            {overdue && <span className="ml-1 text-[9px] text-red-500 font-bold">({Math.abs(days!)}d)</span>}
-                          </td>
+                          {ROLES.map(role => (
+                            <td key={role} className="px-1 py-1.5 text-center align-middle">
+                              <RoleAvatarCell
+                                role={role}
+                                activity={byRole[role]}
+                                isCovering={isCoveringRole(role, byRole[role], users)}
+                                isManager={isManager}
+                                onSelect={byRole[role] ? () => handleSelectActivity(byRole[role]!, d) : undefined}
+                              />
+                            </td>
+                          ))}
                           <td className="px-3 py-2.5"><ProgressExcNA activities={acts} compact /></td>
                           <td className="px-2 py-2.5">
                             <div className="flex items-center gap-0.5">
