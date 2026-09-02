@@ -754,6 +754,26 @@ class RoleActivityController extends Controller
             return;
         }
 
+        // 2b. Sin Calidad (rol QA no aplica o no tiene actividad para este
+        // entregable) nadie puede disparar el "Caso A" de
+        // RoleActivityController::update() (QA se aprueba a sí mismo ->
+        // termina el entregable) — sin este atajo el entregable queda
+        // encallado en "En Revisión" para siempre en cuanto el último rol
+        // aplicable entrega, porque nunca existirá un QA que lo termine.
+        // A diferencia del Caso A, aquí NO se tocan los estados
+        // individuales de los roles hermanos: 'delivered'/'in_review'
+        // siguen reflejando fielmente que nadie los aprobó formalmente
+        // (no hay QA que lo haga) — solo el entregable pasa a 'finished'.
+        if (!$qaActivity) {
+            $doneStatuses = ['approved', 'delivered', 'in_review'];
+            $allDone = $activities->every(fn ($a) => in_array($a->status, $doneStatuses, true));
+            if ($allDone) {
+                $deliverable->global_status = 'finished';
+                $deliverable->save();
+                return;
+            }
+        }
+
         // 3. Si hay al menos una actividad devuelta con observaciones o hallazgos
         $hasObservations = $activities->contains(function ($a) {
             return in_array($a->status, ['adjustments_requested', 'with_findings'], true);
