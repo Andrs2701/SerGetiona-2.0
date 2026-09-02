@@ -112,6 +112,38 @@ class ImportControllerTest extends TestCase
     }
 
     /**
+     * "05/03/2026" es ambigua para cualquiera que no sepa la convención del
+     * sistema: día y mes son ambos ≤ 12, así que tanto día-primero (5 de
+     * marzo) como mes-primero (3 de mayo, lectura estadounidense) son
+     * calendáricamente válidos. parseDate() prueba 'd/m/Y' antes que
+     * 'Y-m-d', así que debe interpretarla como día-primero — este test es
+     * el único que cubre ese caso; los demás usan día > 12, donde solo una
+     * lectura es posible y no prueban nada sobre el orden de prioridad.
+     */
+    public function test_import_interprets_ambiguous_date_as_day_first(): void
+    {
+        $project = Project::factory()->create();
+
+        $csv = "programa,asignatura,semana_modulo,tipo_contenido,fecha_inicio\n"
+            . "Especializacion en Datos,Estadistica,Semana 1,Creacion,05/03/2026\n";
+
+        $file = UploadedFile::fake()->createWithContent('carga.csv', $csv);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/import/deliverables?validate_only=0', [
+                'project_id' => $project->id,
+                'file'       => $file,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('imported', 1)
+            ->assertJsonPath('errors', []);
+
+        $deliverable = Deliverable::where('name', 'Semana 1')->first();
+        // Día-primero: "05/03" es el 5 de marzo, no el 3 de mayo.
+        $this->assertSame('2026-03-05', $deliverable->start_date?->toDateString());
+    }
+
+    /**
      * DateTime::createFromFormat('d/m/Y', ...) no rechaza valores fuera de
      * rango por sí solo: "rueda" el mes/día hacia el siguiente (32/13/2026
      * se vuelve silenciosamente 2027-02-01) en vez de fallar. Sin chequear

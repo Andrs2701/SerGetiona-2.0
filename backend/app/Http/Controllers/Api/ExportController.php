@@ -13,6 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ExportController extends Controller
 {
@@ -104,13 +105,13 @@ class ExportController extends Controller
                 $deliverable->semestre ?? '',
                 $deliverable->ciclo ?? '',
                 $deliverable->type === 'update' ? 'Actualizacion' : 'Creacion',
-                $deliverable->start_date?->format('Y-m-d') ?? '',
-                $expertAct?->commitment_date?->format('Y-m-d') ?? '',
-                $pedagogyAct?->commitment_date?->format('Y-m-d') ?? '',
-                $designAct?->commitment_date?->format('Y-m-d') ?? '',
-                $audiovisualAct?->commitment_date?->format('Y-m-d') ?? '',
-                $engineeringAct?->commitment_date?->format('Y-m-d') ?? '',
-                $qaAct?->commitment_date?->format('Y-m-d') ?? '',
+                $deliverable->start_date,
+                $expertAct?->commitment_date,
+                $pedagogyAct?->commitment_date,
+                $designAct?->commitment_date,
+                $audiovisualAct?->commitment_date,
+                $engineeringAct?->commitment_date,
+                $qaAct?->commitment_date,
                 $expertAct?->responsible?->email ?? '',
                 $pedagogyAct?->responsible?->email ?? '',
                 $designAct?->responsible?->email ?? '',
@@ -121,7 +122,13 @@ class ExportController extends Controller
 
             $col = 1;
             foreach ($values as $value) {
-                $sheet->getCell(Coordinate::stringFromColumnIndex($col) . $row)->setValue($value);
+                $coord = Coordinate::stringFromColumnIndex($col) . $row;
+                if ($value instanceof \DateTimeInterface) {
+                    $sheet->getCell($coord)->setValue(ExcelDate::PHPToExcel($value));
+                    $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('dd/mm/yyyy');
+                } else {
+                    $sheet->getCell($coord)->setValue($value ?? '');
+                }
                 $col++;
             }
             $row++;

@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\RoleActivity;
 use App\Models\Subject;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -19,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ImportController extends Controller
 {
@@ -199,13 +201,13 @@ class ImportController extends Controller
             'I',
             '1',
             'Creacion',
-            '2026-07-01',
-            '2026-07-07',
-            '2026-07-14',
-            '2026-07-21',
-            '2026-07-28',
-            '2026-08-04',
-            '2026-08-11',
+            Carbon::parse('2026-07-01'),
+            Carbon::parse('2026-07-07'),
+            Carbon::parse('2026-07-14'),
+            Carbon::parse('2026-07-21'),
+            Carbon::parse('2026-07-28'),
+            Carbon::parse('2026-08-04'),
+            Carbon::parse('2026-08-11'),
             'experto@universidad.edu.co',
             'pedagogia@universidad.edu.co',
             'disenio@universidad.edu.co',
@@ -216,7 +218,13 @@ class ImportController extends Controller
 
         $col = 1;
         foreach ($example as $value) {
-            $sheet->getCell(Coordinate::stringFromColumnIndex($col) . '4')->setValue($value);
+            $coord = Coordinate::stringFromColumnIndex($col) . '4';
+            if ($value instanceof \DateTimeInterface) {
+                $sheet->getCell($coord)->setValue(ExcelDate::PHPToExcel($value));
+                $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('dd/mm/yyyy');
+            } else {
+                $sheet->getCell($coord)->setValue($value);
+            }
             $col++;
         }
         $sheet->getStyle('A4:T4')->applyFromArray([
@@ -831,7 +839,11 @@ class ImportController extends Controller
         $value = trim($value);
         if ($value === '') return null;
 
-        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d'] as $format) {
+        // Solo los 2 formatos que la app documenta (instrucciones de la
+        // plantilla y mensaje de error de validación) — d/m/Y se prueba
+        // primero para que una fecha ambigua como "05/03/2026" se
+        // interprete día-primero, nunca mes-primero.
+        foreach (['d/m/Y', 'Y-m-d'] as $format) {
             $date = \DateTime::createFromFormat($format, $value);
             if ($date === false) continue;
 
@@ -846,7 +858,6 @@ class ImportController extends Controller
             }
         }
 
-        $timestamp = strtotime($value);
-        return $timestamp !== false ? date('Y-m-d', $timestamp) : null;
+        return null;
     }
 }
