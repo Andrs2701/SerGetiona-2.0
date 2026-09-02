@@ -131,6 +131,34 @@ class OrphanedRoleActivityTest extends TestCase
         $this->assertIsInt($totalByRole);
     }
 
+    /**
+     * Reporte real: una asignatura/programa cuyo único entregable se borró
+     * seguía apareciendo en "Programas/Asignaturas con menor avance" con
+     * 0% — como si estuviera atrasada, en vez de simplemente no tener ya
+     * nada que reportar.
+     */
+    public function test_dashboard_breakdown_omits_program_and_subject_with_no_remaining_deliverables(): void
+    {
+        $emptyProgram = AcademicProgram::factory()->create(['name' => 'Tecnólogo en Publicidad Digital']);
+        $emptySubject = Subject::factory()->create(['academic_program_id' => $emptyProgram->id, 'name' => 'Prueba']);
+        $deletedDeliverable = Deliverable::factory()->create(['subject_id' => $emptySubject->id]);
+        $deletedDeliverable->delete();
+
+        $activeProgram = AcademicProgram::factory()->create();
+        $activeSubject = Subject::factory()->create(['academic_program_id' => $activeProgram->id]);
+        Deliverable::factory()->create(['subject_id' => $activeSubject->id]);
+
+        $dashboard = $this->actingAs($this->admin, 'sanctum')->getJson('/api/reports/dashboard')->assertOk();
+
+        $programIds = collect($dashboard->json('programs_breakdown'))->pluck('id');
+        $subjectIds = collect($dashboard->json('subjects_breakdown'))->pluck('id');
+
+        $this->assertNotContains($emptyProgram->id, $programIds, 'Un programa sin entregables activos no debe aparecer en el desglose.');
+        $this->assertNotContains($emptySubject->id, $subjectIds, 'Una asignatura sin entregables activos no debe aparecer en el desglose.');
+        $this->assertContains($activeProgram->id, $programIds);
+        $this->assertContains($activeSubject->id, $subjectIds);
+    }
+
     public function test_cleanup_migration_removes_preexisting_orphans(): void
     {
         $deliverable = Deliverable::factory()->create();

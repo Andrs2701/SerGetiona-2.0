@@ -266,7 +266,13 @@ class ReportController extends Controller
                 'active_count'                        => $activeByProgram->get($prog->id, 0),
                 'pending_count'                       => max(0, $total - $finished),
             ];
-        })->sortByDesc('overdue_count')->values();
+        })
+            // Un programa sin ningún entregable activo (todos sus entregables
+            // se borraron, o nunca tuvo ninguno) no tiene nada que reportar —
+            // dejarlo aparecía con 0% de avance y encabezaba "menor avance"
+            // como si estuviera atrasado, en vez de simplemente no existir ya.
+            ->filter(fn ($p) => $p['total'] > 0)
+            ->sortByDesc('overdue_count')->values();
 
         // Per-subject breakdown
         $subjects = \App\Models\Subject::with('academicProgram.project')->get();
@@ -318,7 +324,11 @@ class ReportController extends Controller
                 'active_count'                        => $activeBySubject->get($sub->id, 0),
                 'pending_count'                       => max(0, $total - $finished),
             ];
-        })->sortByDesc('overdue_count')->values();
+        })
+            // Misma razón que en $programsBreakdown: una asignatura sin
+            // entregables activos no debe aparecer con 0% en "menor avance".
+            ->filter(fn ($s) => $s['total'] > 0)
+            ->sortByDesc('overdue_count')->values();
 
         // Activities by role with more detail (for flow/bottleneck analysis)
         $inactiveList = implode("','", RoleActivity::INACTIVE_STATUSES);
