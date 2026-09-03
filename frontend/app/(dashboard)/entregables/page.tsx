@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search, Eye, MessageCircle, FileText, CheckCircle2, RotateCcw,
-  X, Download, ChevronDown, AlertCircle, Clock, Filter,
+  X, Download, ChevronDown, ChevronUp, AlertCircle, Clock, Filter,
   Upload, Plus, Pencil, Trash2, User as UserIcon, Calendar,
   BookOpen, FolderOpen, LayoutList, Table2, ExternalLink, ArrowUpDown,
 } from 'lucide-react';
@@ -60,6 +60,7 @@ const ACTIVITY_STATUS_CFG: Record<string, { label: string; dot: string; text: st
 
 type QuickAction = 'approve' | 'request_adjustments';
 type ViewMode = 'rows' | 'grouped';
+type SortColumn = 'program' | 'subject' | 'type' | 'status' | 'progress' | Role;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,34 @@ function isCoveringRole(role: Role, activity: RoleActivity | undefined, users: U
 
 function initials(name: string): string {
   return name.split(' ').slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase();
+}
+
+const ROLES_FOR_SORT: Role[] = ['expert', 'pedagogy', 'design', 'audiovisual', 'engineering', 'qa'];
+
+function compareForColumn(a: Deliverable, b: Deliverable, col: SortColumn): number {
+  if ((ROLES_FOR_SORT as string[]).includes(col)) {
+    const actA = (a.role_activities ?? []).find(x => x.role === col);
+    const actB = (b.role_activities ?? []).find(x => x.role === col);
+    // "Sin fecha" debe coincidir con lo que la celda realmente muestra
+    // (RoleAvatarCell pinta "—" para no_aplica/sin fila) — un rol no
+    // aplica puede tener un commitment_date viejo en la BD que ya no
+    // significa nada, así que no basta con mirar el campo solo.
+    const da = (actA && actA.status !== 'not_applicable') ? actA.commitment_date ?? null : null;
+    const db = (actB && actB.status !== 'not_applicable') ? actB.commitment_date ?? null : null;
+    // Sin fecha (rol no aplica o sin fila) siempre al final, en cualquier dirección.
+    if (da === null && db === null) return 0;
+    if (da === null) return 1;
+    if (db === null) return -1;
+    return da < db ? -1 : da > db ? 1 : 0;
+  }
+  switch (col) {
+    case 'program':  return (a.program_name ?? '').localeCompare(b.program_name ?? '');
+    case 'subject':  return (a.subject_name ?? '').localeCompare(b.subject_name ?? '');
+    case 'type':     return DELIVERABLE_TYPE_LABELS[a.type].localeCompare(DELIVERABLE_TYPE_LABELS[b.type]);
+    case 'status':   return GLOBAL_STATUS_LABELS[a.global_status].localeCompare(GLOBAL_STATUS_LABELS[b.global_status]);
+    case 'progress': return calcProgressExcNA(a.role_activities ?? []).pct - calcProgressExcNA(b.role_activities ?? []).pct;
+    default:         return 0;
+  }
 }
 
 function isApproaching(d: Deliverable): boolean {
@@ -383,6 +412,33 @@ function TableLegend() {
         Cubriendo el rol temporalmente
       </span>
     </div>
+  );
+}
+
+// ─── Encabezado ordenable (clic para asc/desc), vista Tabla ───────────────────
+
+function SortableTh({ label, col, sortColumn, sortDir, onSort, align = 'left', title }: {
+  label: string; col: SortColumn; sortColumn: SortColumn | null; sortDir: 'asc' | 'desc';
+  onSort: (col: SortColumn) => void; align?: 'left' | 'center'; title?: string;
+}) {
+  const active = sortColumn === col;
+  return (
+    <th
+      title={title}
+      onClick={() => onSort(col)}
+      className={clsx(
+        'py-2 text-[10px] font-semibold uppercase whitespace-nowrap cursor-pointer select-none transition-colors',
+        align === 'center' ? 'text-center px-1' : 'text-left px-3',
+        active ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+      )}
+    >
+      <span className={clsx('inline-flex items-center gap-0.5', align === 'center' && 'justify-center w-full')}>
+        {label}
+        {active
+          ? (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
+          : <ArrowUpDown size={10} className="opacity-30" />}
+      </span>
+    </th>
   );
 }
 
@@ -1686,6 +1742,7 @@ export default function EntregablesPage() {
   const [search, setSearch]     = useState('');
   const [filterProject, setFilterProject]       = useState('');
   const [filterStatus, setFilterStatus]         = useState('');
+  const [filterType, setFilterType]             = useState('');
   const [filterResponsible, setFilterResponsible] = useState('');
   const [filterSemestre, setFilterSemestre]     = useState('');
   const [filterCiclo, setFilterCiclo]           = useState('');
@@ -1707,6 +1764,11 @@ export default function EntregablesPage() {
   const [toasts, setToasts]   = useState<ToastMsg[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('rows');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // Orden por columna de la vista Tabla (clic en encabezado) — tiene
+  // prioridad sobre sortOrder mientras esté activo; sortOrder sigue
+  // controlando el orden por defecto (más antiguo/reciente primero).
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [colSortDir, setColSortDir] = useState<'asc' | 'desc'>('asc');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [formPanel, setFormPanel]     = useState<FormMode | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Deliverable | null>(null);
@@ -1881,6 +1943,7 @@ export default function EntregablesPage() {
     }
     if (filterProject && d.project_name !== filterProject) return false;
     if (filterStatus && d.global_status !== filterStatus) return false;
+    if (filterType && d.type !== filterType) return false;
     if (filterResponsible && !(d.role_activities ?? []).some(a => a.responsible?.name === filterResponsible)) return false;
     if (filterSemestre && d.semestre !== filterSemestre) return false;
     if (filterCiclo && d.ciclo !== filterCiclo) return false;
@@ -1895,8 +1958,14 @@ export default function EntregablesPage() {
     // Hide completed unless the user explicitly filtered for them or toggled showCompleted
     if (!showCompleted && !COMPLETED_STATUSES.includes(filterStatus) && COMPLETED_STATUSES.includes(d.global_status)) return false;
     return true;
-  }).sort((a, b) => sortOrder === 'desc' ? b.id - a.id : a.id - b.id),
-  [data, search, filterProject, filterStatus, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, viewBy, filterYear, filterMonth, filterWeek, onlyOverdue, showCompleted, sortOrder]);
+  }).sort((a, b) => {
+    if (sortColumn) {
+      const cmp = compareForColumn(a, b, sortColumn);
+      return colSortDir === 'desc' ? -cmp : cmp;
+    }
+    return sortOrder === 'desc' ? b.id - a.id : a.id - b.id;
+  }),
+  [data, search, filterProject, filterStatus, filterType, filterResponsible, filterSemestre, filterCiclo, filterAcademicLevel, viewBy, filterYear, filterMonth, filterWeek, onlyOverdue, showCompleted, sortOrder, sortColumn, colSortDir]);
 
   const completedHiddenCount = useMemo(
     () => !showCompleted && !COMPLETED_STATUSES.includes(filterStatus)
@@ -1947,7 +2016,7 @@ export default function EntregablesPage() {
   useEffect(() => { setSelectedIds(new Set()); }, [filtered]);
 
   const hasActiveFilters = !!(
-    search || filterProject || filterStatus || filterResponsible || filterSemestre ||
+    search || filterProject || filterStatus || filterType || filterResponsible || filterSemestre ||
     filterCiclo || filterAcademicLevel || filterYear || filterMonth || filterWeek ||
     onlyOverdue || showCompleted
   );
@@ -1956,6 +2025,7 @@ export default function EntregablesPage() {
     setSearch('');
     setFilterProject('');
     setFilterStatus('');
+    setFilterType('');
     setFilterResponsible('');
     setFilterSemestre('');
     setFilterCiclo('');
@@ -1965,6 +2035,15 @@ export default function EntregablesPage() {
     setFilterWeek('');
     setOnlyOverdue(false);
     setShowCompleted(false);
+  }
+
+  function handleColumnSort(col: SortColumn) {
+    if (sortColumn === col) {
+      setColSortDir(dir => dir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(col);
+      setColSortDir('asc');
+    }
   }
 
   async function handleQuickAction(d: Deliverable, action: QuickAction) {
@@ -2095,6 +2174,12 @@ export default function EntregablesPage() {
             className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[140px]">
             <option value="">Todos los estados</option>
             {Object.entries(GLOBAL_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#194276]/30 sm:min-w-[130px]">
+            <option value="">Todos los tipos</option>
+            {Object.entries(DELIVERABLE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
 
           <label className="flex min-h-10 items-center gap-1.5 cursor-pointer select-none">
@@ -2241,12 +2326,16 @@ export default function EntregablesPage() {
           )}
 
           <button
-            onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
-            title={sortOrder === 'asc' ? 'Más antiguo primero — clic para ordenar de más reciente a más antiguo' : 'Más reciente primero — clic para ordenar de más antiguo a más reciente'}
+            onClick={() => { setSortColumn(null); setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); }}
+            title={
+              sortColumn
+                ? 'Quitar el orden por columna y volver al orden por fecha de creación'
+                : sortOrder === 'asc' ? 'Más antiguo primero — clic para ordenar de más reciente a más antiguo' : 'Más reciente primero — clic para ordenar de más antiguo a más reciente'
+            }
             className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-2.5 py-2 sm:py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
           >
             <ArrowUpDown size={12} />
-            {sortOrder === 'asc' ? 'Más antiguo primero' : 'Más reciente primero'}
+            {sortColumn ? 'Quitar orden por columna' : sortOrder === 'asc' ? 'Más antiguo primero' : 'Más reciente primero'}
           </button>
 
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
@@ -2375,17 +2464,16 @@ export default function EntregablesPage() {
                             className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
                         </th>
                       )}
-                      {['Programa','Asignatura / Módulo','Tipo','Estado'].map(h => (
-                        <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                      ))}
+                      <SortableTh label="Programa" col="program" sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} />
+                      <SortableTh label="Asignatura / Módulo" col="subject" sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} />
+                      <SortableTh label="Tipo" col="type" sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} />
+                      <SortableTh label="Estado" col="status" sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} />
                       {ROLES.map(role => (
-                        <th key={role} title={ROLE_LABELS[role]} className="text-center px-1 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">
-                          {ROLE_ABBR[role]}
-                        </th>
+                        <SortableTh key={role} label={ROLE_ABBR[role]} col={role} title={ROLE_LABELS[role]}
+                          sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} align="center" />
                       ))}
-                      {['Avance (excl. N/A)','Acciones'].map(h => (
-                        <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                      ))}
+                      <SortableTh label="Avance (excl. N/A)" col="progress" sortColumn={sortColumn} sortDir={colSortDir} onSort={handleColumnSort} />
+                      <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
